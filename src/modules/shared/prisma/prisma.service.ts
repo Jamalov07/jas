@@ -14,12 +14,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 		this.config = config
 
 		this.$use(async (params, next) => {
-			if (['findMany', 'findFirst'].includes(params.action) && !['ActionModel', 'BotUserModel'].includes(params.model)) {
+			if (['findMany', 'findFirst'].includes(params.action) && !['ActionModel', 'BotUserModel', 'CurrencyModel', 'ProductPriceModel'].includes(params.model)) {
 				if (!params.args) params.args = {}
 				if (!params?.args?.orderBy) {
 					params.args.orderBy = [{ createdAt: 'desc' }]
 				} else {
-					if (!['PublicIdModel'].includes(params.model)) {
+					if (!['PublicIdModel', 'CurrencyModel', 'ProductPriceModel'].includes(params.model)) {
 						if (Array.isArray(params.args.orderBy)) {
 							params.args.orderBy.push({ createdAt: 'desc' })
 						} else {
