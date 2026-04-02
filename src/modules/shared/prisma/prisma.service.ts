@@ -27,7 +27,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 						}
 					}
 				}
-				if (!['DayCloseLog'].includes(params.model)) {
+				if (!['DayCloseLog', 'CurrencyModel', 'ProductPriceModel'].includes(params.model)) {
 					if (!params.args.where.deletedAt) {
 						params.args.where.deletedAt = null
 					}
