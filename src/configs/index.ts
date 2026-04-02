@@ -1,0 +1,6 @@
+import 'dotenv/config'
+export * from './app.config'
+export * from './database.config'
+export * from './jwt.config'
+export * from './bot.config'
+export * from './old-service.config'

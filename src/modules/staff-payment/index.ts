@@ -1,0 +1,6 @@
+export * from './staff-payment.controller'
+export * from './staff-payment.module'
+export * from './staff-payment.repository'
+export * from './staff-payment.service'
+export * from './dtos'
+export * from './interfaces'

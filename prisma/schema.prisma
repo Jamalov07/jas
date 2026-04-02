@@ -1,0 +1,382 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+enum ActionMethodEnum {
+  get     @map("get")
+  put     @map("put")
+  post    @map("post")
+  patch   @map("patch")
+  delete  @map("delete")
+
+  @@map("action_method")
+}
+
+enum UserTypeEnum {
+  staff     @map("staff")
+  client    @map("client")
+  supplier  @map("supplier")
+  admin     @map("admin")
+
+  @@map("user_type")
+}
+
+enum SellingStatusEnum {
+  accepted     @map("accepted")
+  notaccepted  @map("notaccepted")
+
+  @@map("selling_status")
+}
+
+enum ServiceTypeEnum {
+  selling    @map("selling")
+  arrival    @map("arrival")
+  returning  @map("returning")
+  staff      @map("staff")
+  supplier   @map("supplier")
+  client     @map("client")
+  none       @map("none")
+
+  @@map("service_type")
+}
+
+enum BotLanguageEnum {
+  uz
+  ru
+  en
+}
+
+enum PageEnum {
+  stat             @map("stat")
+  product          @map("product")
+  selling          @map("selling")
+  arrival          @map("arrival")
+  returning        @map("returning")
+  client           @map("client")
+  clientpayment    @map("clientpayment")
+  clientreport     @map("clientreport")
+  supplier         @map("supplier")
+  supplierpayment  @map("supplierpayment")
+  stuff            @map("stuff")
+  stuffpayment     @map("stuffpayment")
+}
+
+model ActionModel {
+  id            String            @map("id")             @db.Uuid       @default(dbgenerated("GEN_RANDOM_UUID()"))
+  url           String            @map("url")            @db.VarChar()
+  name          String            @map("name")           @db.VarChar()
+  method        ActionMethodEnum  
+  description   String            @map("description")    @db.VarChar()  @default("")
+  permissionId  String?           @map("permission_id")  @db.Uuid
+
+  permission  PermissionModel?  @relation(fields: [ permissionId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  
+  users  UserModel[]
+
+  @@id([ id ])
+  @@index([ id ])
+  @@unique([ url, name, method ])
+  @@map("action")
+}
+
+model PermissionModel {
+  id         String     @map("id")          @db.Uuid         @default(dbgenerated("GEN_RANDOM_UUID()"))
+  name       String     @map("name")        @db.VarChar()
+  createdAt  DateTime   @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+  updatedAt  DateTime   @map("updated_at")  @db.Timestamptz  @updatedAt
+  deletedAt  DateTime?  @map("deleted_at")  @db.Timestamptz
+
+  actions   ActionModel[]
+
+  @@id([ id ])
+  @@index([ id ])
+  @@unique([ name ])
+  @@map("permission")
+}
+
+model UserModel {
+  id        String   @map("id")        @db.Uuid       @default(dbgenerated("GEN_RANDOM_UUID()"))
+  phone     String   @map("phone")     @db.VarChar()    
+  fullname  String   @map("fullname")  @db.VarChar()
+  password  String   @map("password")  @db.VarChar()  
+  token     String?  @map("token")     @db.VarChar()  
+  balance   Decimal  @map("balance")   @db.Decimal(10, 3)  @default(0)
+  type      UserTypeEnum
+
+  pages     PageEnum[] @default([])
+ 
+  createdAt  DateTime   @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+  updatedAt  DateTime   @map("updated_at")  @db.Timestamptz  @updatedAt
+  deletedAt  DateTime?  @map("deleted_at")  @db.Timestamptz
+
+  telegram  BotUserModel?
+
+  actions          ActionModel[]
+  productMVs       ProductMVModel[]
+
+  payments         PaymentModel[]    @relation(name: "addedtome")
+  sellings         SellingModel[]    @relation(name: "addedtome")
+  arrivals         ArrivalModel[]    @relation(name: "addedtome")
+  returnings       ReturningModel[]  @relation(name: "addedtome")
+
+  addedPayments    PaymentModel[]    @relation(name: "addedfromme")
+  addedSellings    SellingModel[]    @relation(name: "addedfromme")
+  addedArrivals    ArrivalModel[]    @relation(name: "addedfromme")
+  addedReturnings  ReturningModel[]  @relation(name: "addedfromme")
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ phone ])
+  @@index([ type ])
+  @@index([ createdAt ])
+  @@map("user")
+}
+
+model BotUserModel {
+  id        String  @map("id")         @db.VarChar()  @unique
+  isActive  Boolean @map("is_active")  @db.Boolean    @default(true) 
+  userId    String? @map("user_id")    @db.Uuid       @unique
+  language  BotLanguageEnum @map("language")          @default(uz)               
+
+  user  UserModel?  @relation(fields: [ userId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ userId ])
+  @@map("bot_user")
+}
+
+model PaymentModel {
+  id           String   @map("id")            @db.Uuid            @default(dbgenerated("GEN_RANDOM_UUID()"))
+  sum          Decimal  @map("sum")           @db.Decimal(10, 3)  @default(0)
+  cash         Decimal  @map("cash")          @db.Decimal(10, 3)  @default(0)
+  card         Decimal  @map("card")          @db.Decimal(10, 3)  @default(0)
+  other        Decimal  @map("other")         @db.Decimal(10, 3)  @default(0)
+  transfer     Decimal  @map("transfer")      @db.Decimal(10, 3)  @default(0)
+  fromBalance  Decimal  @map("from_balance")  @db.Decimal(10, 3)  @default(0)
+  description  String?  @map("description")   @db.VarChar()       @default("")
+  userId       String   @map("user_id")       @db.Uuid
+  total        Decimal  @map("total")         @db.Decimal(10, 3)  @default(0)
+
+  type         ServiceTypeEnum                                    @default(none)
+  sellingId    String?          @map("selling_id")    @db.Uuid @unique
+  arrivalId    String?          @map("arrival_id")    @db.Uuid @unique
+  returningId  String?          @map("returning_id")  @db.Uuid @unique
+  staffId      String           @map("staff_id")      @db.Uuid
+  
+  user       UserModel        @relation(name: "addedtome",        fields: [ userId      ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  staff      UserModel        @relation(name: "addedfromme",      fields: [ staffId     ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)  
+  selling    SellingModel?    @relation(name: "sellingpayment",   fields: [ sellingId   ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)  
+  arrival    ArrivalModel?    @relation(name: "arrivalpayment",   fields: [ arrivalId   ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)  
+  returning  ReturningModel?  @relation(name: "returningpayment", fields: [ returningId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)  
+
+  createdAt  DateTime   @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+  updatedAt  DateTime   @map("updated_at")  @db.Timestamptz  @updatedAt
+  deletedAt  DateTime?  @map("deleted_at")  @db.Timestamptz
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ userId ])
+  @@index([ type ])
+  @@index([ sellingId ])
+  @@index([ returningId ])
+  @@index([ arrivalId ])
+  @@map("payment")
+}
+
+model SellingModel {
+  id        String            @map("id")         @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  publicId  Int               @map("public_id")  @db.Integer        @default(autoincrement())
+  date      DateTime          @map("date")       @db.Timestamptz()  @default(dbgenerated("NOW()"))
+  status    SellingStatusEnum @map("status")                        @default(notaccepted)
+  clientId  String            @map("client_id")  @db.Uuid
+  staffId   String            @map("staff_id")   @db.Uuid
+  totalPrice  Decimal          @map("total_price")  @db.Decimal(10, 3)  @default(0)
+
+  client  UserModel  @relation(name: "addedtome",   fields: [ clientId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  staff   UserModel  @relation(name: "addedfromme", fields: [ staffId  ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+
+  products  ProductMVModel[]
+  payment   PaymentModel?     @relation(name: "sellingpayment")
+
+  createdAt  DateTime   @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+  updatedAt  DateTime   @map("updated_at")  @db.Timestamptz  @updatedAt
+  deletedAt  DateTime?  @map("deleted_at")  @db.Timestamptz
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ date ])
+  @@index([ createdAt ])
+  @@index([ status ])
+  @@index([ clientId ])
+  @@map("selling")
+}
+
+model ArrivalModel {
+  id          String    @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  date        DateTime  @map("date")         @db.Timestamptz()  @default(dbgenerated("NOW()"))
+  staffId     String    @map("staff_id")     @db.Uuid
+  supplierId  String    @map("supplier_id")  @db.Uuid
+  totalPrice  Decimal   @map("total_price")  @db.Decimal(10, 3) @default(0)
+  totalCost   Decimal   @map("total_cost")   @db.Decimal(10, 3) @default(0)
+
+  supplier  UserModel  @relation(name: "addedtome",   fields: [ supplierId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  staff     UserModel  @relation(name: "addedfromme", fields: [ staffId    ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+
+  products  ProductMVModel[]
+  payment   PaymentModel?     @relation(name: "arrivalpayment")
+
+  createdAt  DateTime   @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+  updatedAt  DateTime   @map("updated_at")  @db.Timestamptz  @updatedAt
+  deletedAt  DateTime?  @map("deleted_at")  @db.Timestamptz
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ date ])
+  @@index([ createdAt ])
+  @@index([ supplierId ])
+  @@map("arrival")
+}
+
+model ReturningModel {
+  id          String    @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  date        DateTime  @map("date")         @db.Timestamptz()  @default(dbgenerated("NOW()"))
+  status      SellingStatusEnum @map("status")                  @default(notaccepted)
+  staffId     String    @map("staff_id")     @db.Uuid
+  clientId    String    @map("client_id")    @db.Uuid
+  totalPrice  Decimal   @map("total_price")  @db.Decimal(10, 3) @default(0)
+
+  client  UserModel  @relation(name: "addedtome",   fields: [ clientId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  staff   UserModel  @relation(name: "addedfromme", fields: [ staffId  ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+
+  products  ProductMVModel[]
+  payment   PaymentModel?     @relation(name: "returningpayment")
+
+  createdAt  DateTime   @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+  updatedAt  DateTime   @map("updated_at")  @db.Timestamptz  @updatedAt
+  deletedAt  DateTime?  @map("deleted_at")  @db.Timestamptz
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ createdAt ])
+  @@index([ date ])
+  @@index([ clientId ])
+  @@index([ status ])
+  @@map("returning")
+}
+
+model ProductMVModel {
+  id         String  @map("id")          @db.Uuid            @default(dbgenerated("GEN_RANDOM_UUID()"))
+  price      Decimal @map("price")       @db.Decimal(10, 3)  @default(0)
+  cost       Decimal @map("cost")        @db.Decimal(10, 3)  @default(0)
+  count      Int     @map("count")       @db.Integer         @default(1)
+  productId  String  @map("product_id")  @db.Uuid
+  totalPrice Decimal @map("total_price") @db.Decimal(10, 3)  @default(0)
+  totalCost  Decimal @map("total_cost")  @db.Decimal(10, 3)  @default(0)
+  
+  type         ServiceTypeEnum
+  sellingId    String?           @map("selling_id")    @db.Uuid
+  arrivalId    String?           @map("arrival_id")    @db.Uuid
+  returningId  String?           @map("returning_id")  @db.Uuid
+  staffId      String            @map("staff_id")      @db.Uuid
+
+  staff      UserModel        @relation(fields: [ staffId     ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  product    ProductModel     @relation(fields: [ productId   ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  selling    SellingModel?    @relation(fields: [ sellingId   ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)  
+  arrival    ArrivalModel?    @relation(fields: [ arrivalId   ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)  
+  returning  ReturningModel?  @relation(fields: [ returningId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)  
+
+  createdAt  DateTime   @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+  updatedAt  DateTime   @map("updated_at")  @db.Timestamptz  @updatedAt
+  deletedAt  DateTime?  @map("deleted_at")  @db.Timestamptz
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ sellingId ])
+  @@index([ returningId ])
+  @@index([ arrivalId ])
+  @@index([ type ])
+  @@index([ createdAt ])
+  @@map("product_mv")
+}
+
+model ProductModel {
+  id             String    @map("id")              @db.Uuid            @default(dbgenerated("GEN_RANDOM_UUID()"))
+  name           String    @map("name")            @db.VarChar()
+  description    String?   @map("description")     @db.VarChar()       @default("")
+  count          Int       @map("count")           @db.Integer         @default(1)
+  minAmount      Int       @map("min_amount")      @db.Integer         @default(1)
+    
+  createdAt  DateTime   @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+  updatedAt  DateTime   @map("updated_at")  @db.Timestamptz  @updatedAt
+  deletedAt  DateTime?  @map("deleted_at")  @db.Timestamptz
+ 
+  productMVs     ProductMVModel[]
+  productPrices ProductPriceModel[]
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ name ])
+  @@index([ createdAt ])
+  @@map("product")
+}
+
+enum PriceTypeEnum {
+  cost
+  selling
+  wholesale
+}
+
+model ProductPriceModel {
+  id           String  @map("id")             @db.Uuid            @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type         PriceTypeEnum
+  price        Decimal @map("price")          @db.Decimal(10, 3)  @default(0)
+  totalPrice   Decimal @map("total_price")    @db.Decimal(10, 3)  @default(0)
+  productId    String  @map("product_id")     @db.Uuid
+  currencyId   String  @map("currency_id")    @db.Uuid
+  exchangeRate Decimal @map("exchange_rate")  @db.Decimal(10, 3)  @default(0)
+
+  product   ProductModel   @relation(fields: [ productId  ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  currency  CurrencyModel  @relation(fields: [ currencyId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ productId ])
+  @@index([ currencyId ])
+  @@unique([ type, productId ])
+  @@map("product_price")
+}
+
+model CurrencyModel {
+  id            String   @map("id")             @db.Uuid            @default(dbgenerated("GEN_RANDOM_UUID()"))
+  name          String   @map("name")           @db.VarChar()       @unique
+  symbol        String   @map("symbol")         @db.VarChar()
+  isActive      Boolean  @map("is_active")      @default(true)
+  exchangeRate  Decimal  @map("exchange_rate")  @db.Decimal(10, 3)  @default(0)
+  createdAt     DateTime @map("created_at")     @db.Timestamptz     @default(dbgenerated("NOW()"))
+
+  productPrices ProductPriceModel[]
+
+  @@id([ id ])
+  @@index([ id ])
+  @@index([ name ])
+  @@index([ symbol ])
+  @@index([ exchangeRate ])
+  @@index([ createdAt ])
+  @@map("currency")
+}
+
+model DayCloseLog {
+  id         String    @map("id")          @db.Uuid            @default(dbgenerated("GEN_RANDOM_UUID()"))
+  closedDate DateTime  @db.Date 
+  createdAt  DateTime  @map("created_at")  @db.Timestamptz  @default(dbgenerated("NOW()"))
+
+  @@id([ id ])
+  @@map("day_close_log")
+}

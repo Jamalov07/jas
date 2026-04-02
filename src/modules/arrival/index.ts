@@ -1,0 +1,6 @@
+export * from './arrival.controller'
+export * from './arrival.module'
+export * from './arrival.repository'
+export * from './arrival.service'
+export * from './dtos'
+export * from './interfaces'
