@@ -5,6 +5,7 @@ import { ProductGetOneRequest, ProductCreateOneRequest, ProductUpdateOneRequest,
 import { Decimal } from '@prisma/client/runtime/library'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
+import { PriceTypeEnum } from '@prisma/client'
 
 @Injectable()
 export class ProductService {
@@ -27,7 +28,11 @@ export class ProductService {
 				lastSellingDate: lastSelling?.selling?.date ?? null,
 				lastSellingPrice: lastSelling?.price ?? null,
 				lastSellingCount: lastSelling?.count ?? null,
-				prices: p.productPrices,
+				prices: {
+					cost: p.productPrices.find((pri) => pri.type === PriceTypeEnum.cost),
+					selling: p.productPrices.find((pri) => pri.type === PriceTypeEnum.selling),
+					wholesale: p.productPrices.find((pri) => pri.type === PriceTypeEnum.wholesale),
+				},
 			}
 		})
 
@@ -67,7 +72,11 @@ export class ProductService {
 			lastSellingDate: lastSelling.selling.date ?? null,
 			lastSellingPrice: lastSelling?.price ?? null,
 			lastSellingCount: lastSelling?.count ?? null,
-			prices: product.productPrices,
+			prices: {
+				cost: product.productPrices.find((pri) => pri.type === PriceTypeEnum.cost),
+				selling: product.productPrices.find((pri) => pri.type === PriceTypeEnum.selling),
+				wholesale: product.productPrices.find((pri) => pri.type === PriceTypeEnum.wholesale),
+			},
 		}
 
 		delete result.productMVs

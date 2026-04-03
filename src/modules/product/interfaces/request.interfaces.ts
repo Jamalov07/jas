@@ -5,7 +5,6 @@ import { Decimal } from '@prisma/client/runtime/library'
 export declare interface ProductPriceInput {
 	price: Decimal
 	currencyId: string
-	exchangeRate: Decimal
 }
 
 export declare interface ProductPriceUpdateInput {

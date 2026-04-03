@@ -162,6 +162,15 @@ export class ProductRepository {
 	}
 
 	async createOne(body: ProductCreateOneRequest) {
+		const currencyIds = [body.prices.cost.currencyId, body.prices.selling.currencyId, body.prices.wholesale.currencyId]
+
+		const currencies = await this.prisma.currencyModel.findMany({
+			where: { id: { in: currencyIds } },
+			select: { id: true, exchangeRate: true },
+		})
+
+		const getExchangeRate = (currencyId: string) => currencies.find((c) => c.id === currencyId)?.exchangeRate ?? new Decimal(0)
+
 		const product = await this.prisma.productModel.create({
 			data: {
 				name: body.name,
@@ -175,21 +184,21 @@ export class ProductRepository {
 							price: body.prices.cost.price,
 							totalPrice: new Decimal(body.count).mul(body.prices.cost.price),
 							currencyId: body.prices.cost.currencyId,
-							exchangeRate: body.prices.cost.exchangeRate,
+							exchangeRate: getExchangeRate(body.prices.cost.currencyId),
 						},
 						{
 							type: PriceTypeEnum.selling,
 							price: body.prices.selling.price,
 							totalPrice: new Decimal(body.count).mul(body.prices.selling.price),
 							currencyId: body.prices.selling.currencyId,
-							exchangeRate: body.prices.selling.exchangeRate,
+							exchangeRate: getExchangeRate(body.prices.selling.currencyId),
 						},
 						{
 							type: PriceTypeEnum.wholesale,
 							price: body.prices.wholesale.price,
 							totalPrice: new Decimal(body.count).mul(body.prices.wholesale.price),
 							currencyId: body.prices.wholesale.currencyId,
-							exchangeRate: body.prices.wholesale.exchangeRate,
+							exchangeRate: getExchangeRate(body.prices.wholesale.currencyId),
 						},
 					],
 				},

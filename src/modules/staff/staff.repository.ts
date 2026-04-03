@@ -98,7 +98,7 @@ export class StaffRepository implements OnModuleInit {
 	async getOne(query: StaffGetOneRequest) {
 		const user = await this.prisma.userModel.findFirst({
 			where: { id: query.id, fullname: query.fullname, phone: query.phone },
-			select: { id: true, fullname: true, phone: true, createdAt: true, deletedAt: true, password: true, token: true, pages: true },
+			select: { id: true, fullname: true, phone: true, currency: true, createdAt: true, deletedAt: true, password: true, token: true, pages: true },
 		})
 
 		return user

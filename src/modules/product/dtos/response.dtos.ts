@@ -26,8 +26,8 @@ export class ProductPriceDataDto implements ProductPriceData {
 }
 
 export class ProductFindOneDataDto extends PickType(ProductRequiredDto, ['id', 'name', 'createdAt', 'description', 'count', 'minAmount']) implements ProductFindOneData {
-	@ApiProperty({ type: ProductPriceDataDto, isArray: true })
-	prices: ProductPriceData[]
+	@ApiProperty({})
+	prices: Record<PriceTypeEnum, ProductPriceData>
 
 	@ApiPropertyOptional({ type: Date })
 	lastSellingDate?: Date

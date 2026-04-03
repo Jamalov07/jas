@@ -12,7 +12,7 @@ import {
 } from '../interfaces'
 import { PaginationRequestDto, RequestOtherFieldsDto, IsDecimalIntOrBigInt } from '@common'
 import { ProductOptionalDto, ProductRequiredDto } from './fields.dtos'
-import { IsDecimal, IsNotEmpty, IsOptional, IsUUID, ValidateNested } from 'class-validator'
+import { IsNotEmpty, IsOptional, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -26,11 +26,6 @@ export class ProductPriceInputDto implements ProductPriceInput {
 	@IsNotEmpty()
 	@IsUUID('4')
 	currencyId: string
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	exchangeRate: Decimal
 }
 
 export class ProductPriceUpdateInputDto implements ProductPriceUpdateInput {

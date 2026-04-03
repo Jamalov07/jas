@@ -20,4 +20,22 @@ export class CommonRepository {
 
 		return { isClosed: dayClose ? true : false }
 	}
+
+	async getUserById(id: string) {
+		const user = await this.prisma.userModel.findFirst({
+			where: { id },
+			select: { id: true, type: true, currencyId: true },
+		})
+
+		return user
+	}
+
+	async updateStaffCurrency(userId: string, currencyId: string) {
+		const user = await this.prisma.userModel.update({
+			where: { id: userId },
+			data: { currencyId },
+		})
+
+		return user
+	}
 }
