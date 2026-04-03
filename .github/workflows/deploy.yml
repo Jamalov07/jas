@@ -1,4 +1,4 @@
-name: Deploy Both Instances
+name: Deploy to jas
 
 on:
   push:
@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Deploy to jas
         run: |
-          cd /var/www/jas
+          cd /home/runner/jas
           git pull origin main
           pnpm install
           npx prisma db push
