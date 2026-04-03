@@ -1,4 +1,4 @@
-import { PickType, IntersectionType, ApiPropertyOptional } from '@nestjs/swagger'
+import { PickType, IntersectionType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
 	SellingCreateOneRequest,
 	SellingDeleteOneRequest,
@@ -10,13 +10,13 @@ import {
 	SellingProduct,
 	SellingUpdateOneRequest,
 } from '../interfaces'
-import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
+import { IsDecimalIntOrBigInt, PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { SellingOptionalDto, SellingRequiredDto } from './fields.dtos'
 import { ClientPaymentOptionalDto, ClientPaymentRequiredDto } from '../../client-payment'
-import { ProductMVRequiredDto } from '../../product-mv'
-import { ArrayNotEmpty, IsArray, IsEnum, IsOptional, IsUUID, ValidateNested } from 'class-validator'
+import { ArrayNotEmpty, IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { StatsTypeEnum } from '../enums'
+import { Decimal } from '@prisma/client/runtime/library'
 
 export class SellingFindManyRequestDto
 	extends IntersectionType(
@@ -32,7 +32,27 @@ export class SellingPaymentDto
 	extends IntersectionType(PickType(ClientPaymentRequiredDto, ['card', 'cash', 'other', 'transfer']), PickType(ClientPaymentOptionalDto, ['description']))
 	implements SellingPayment {}
 
-export class SellingProductDto extends PickType(ProductMVRequiredDto, ['count', 'price', 'productId']) implements SellingProduct {}
+export class SellingProductDto implements SellingProduct {
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	productId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsNumber()
+	count: number
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	price: Decimal
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+}
 
 export class SellingCreateOneRequestDto
 	extends IntersectionType(PickType(SellingRequiredDto, ['clientId', 'date', 'send']), PickType(SellingOptionalDto, ['staffId']))

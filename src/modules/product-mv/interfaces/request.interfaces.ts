@@ -1,5 +1,6 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
 import { ProductMVOptional, ProductMVRequired } from './fields.interfaces'
+import { Decimal } from '@prisma/client/runtime/library'
 
 export declare interface ProductMVFindManyRequest
 	extends Pick<ProductMVOptional, 'type' | 'arrivalId' | 'productId' | 'returningId' | 'sellingId' | 'staffId'>,
@@ -12,22 +13,61 @@ export declare interface ProductMVGetManyRequest extends ProductMVOptional, Pagi
 
 export declare interface ProductMVGetOneRequest extends ProductMVOptional {}
 
-export declare interface SellingProductMVCreateOneRequest
-	extends Pick<ProductMVRequired, 'count' | 'price' | 'productId' | 'sellingId'>,
-		Pick<ProductMVOptional, 'staffId' | 'totalPrice'> {}
-export declare interface ArrivalProductMVCreateOneRequest
-	extends Pick<ProductMVRequired, 'cost' | 'count' | 'price' | 'arrivalId' | 'productId'>,
-		Pick<ProductMVOptional, 'staffId' | 'totalCost' | 'totalPrice'> {}
+export declare interface SellingProductMVCreateOneRequest {
+	count: number
+	price: Decimal
+	currencyId: string
+	productId: string
+	sellingId: string
+	staffId?: string
+}
 
-export declare interface ReturningProductMVCreateOneRequest
-	extends Pick<ProductMVRequired, 'count' | 'price' | 'productId' | 'returningId'>,
-		Pick<ProductMVOptional, 'staffId' | 'totalPrice'> {}
+export declare interface ArrivalProductMVCreateOneRequest {
+	count: number
+	cost: Decimal
+	costCurrencyId: string
+	price: Decimal
+	priceCurrencyId: string
+	arrivalId: string
+	productId: string
+	staffId?: string
+}
 
-export declare interface SellingProductMVUpdateOneRequest extends Pick<ProductMVOptional, 'count' | 'price' | 'productId' | 'sellingId' | 'totalPrice'> {
+export declare interface ReturningProductMVCreateOneRequest {
+	count: number
+	price: Decimal
+	currencyId: string
+	productId: string
+	returningId: string
+	staffId?: string
+}
+
+export declare interface SellingProductMVUpdateOneRequest {
+	count?: number
+	price?: Decimal
+	currencyId?: string
+	productId?: string
+	sellingId?: string
 	send?: boolean
 }
-export declare interface ArrivalProductMVUpdateOneRequest extends Pick<ProductMVOptional, 'cost' | 'count' | 'price' | 'arrivalId' | 'productId' | 'totalCost' | 'totalPrice'> {}
-export declare interface ReturningProductMVUpdateOneRequest extends Pick<ProductMVOptional, 'count' | 'price' | 'productId' | 'returningId' | 'totalPrice'> {}
+
+export declare interface ArrivalProductMVUpdateOneRequest {
+	count?: number
+	cost?: Decimal
+	costCurrencyId?: string
+	price?: Decimal
+	priceCurrencyId?: string
+	arrivalId?: string
+	productId?: string
+}
+
+export declare interface ReturningProductMVUpdateOneRequest {
+	count?: number
+	price?: Decimal
+	currencyId?: string
+	productId?: string
+	returningId?: string
+}
 
 export declare interface ProductMVDeleteOneRequest extends Pick<ProductMVOptional, 'id'> {
 	send?: boolean

@@ -10,8 +10,15 @@ import {
 	ReturningUpdateOneRequest,
 } from './interfaces'
 import { ReturningController } from './returning.controller'
-import { SellingStatusEnum, ServiceTypeEnum } from '@prisma/client'
+import { PriceTypeEnum, SellingStatusEnum, ServiceTypeEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
+
+const TOTALS_SELECT = {
+	id: true,
+	currencyId: true,
+	total: true,
+	currency: { select: { id: true, symbol: true, name: true } },
+}
 
 @Injectable()
 export class ReturningRepository implements OnModuleInit {
@@ -36,7 +43,7 @@ export class ReturningRepository implements OnModuleInit {
 			select: {
 				id: true,
 				status: true,
-				totalPrice: true,
+				totals: { select: TOTALS_SELECT },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -44,7 +51,15 @@ export class ReturningRepository implements OnModuleInit {
 				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
 				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
 				payment: { select: { id: true, cash: true, fromBalance: true, total: true } },
-				products: { orderBy: [{ createdAt: 'desc' }], select: { id: true, price: true, count: true, product: { select: { name: true } } } },
+				products: {
+					orderBy: [{ createdAt: 'desc' }],
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+				},
 			},
 			...paginationOptions,
 		})
@@ -62,10 +77,19 @@ export class ReturningRepository implements OnModuleInit {
 				createdAt: true,
 				deletedAt: true,
 				date: true,
+				totals: { select: TOTALS_SELECT },
 				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
 				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
 				payment: { select: { total: true, id: true, cash: true, fromBalance: true } },
-				products: { orderBy: [{ createdAt: 'desc' }], select: { id: true, price: true, count: true, product: { select: { name: true } } } },
+				products: {
+					orderBy: [{ createdAt: 'desc' }],
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+				},
 			},
 		})
 
@@ -132,9 +156,17 @@ export class ReturningRepository implements OnModuleInit {
 			const tomorrow = new Date(today)
 			tomorrow.setDate(today.getDate() + 1)
 			tomorrow.setHours(0, 0, 0, 0)
-
 			body.date = tomorrow
 		}
+
+		// Pre-fetch exchange rates
+		const currencyIds = [...new Set((body.products ?? []).map((p) => p.currencyId))]
+		const currencies = await this.prisma.currencyModel.findMany({
+			where: { id: { in: currencyIds } },
+			select: { id: true, exchangeRate: true },
+		})
+		const currencyExchangeMap = Object.fromEntries(currencies.map((c) => [c.id, c.exchangeRate]))
+
 		const returning = await this.prisma.returningModel.create({
 			data: {
 				status: body.status,
@@ -142,7 +174,6 @@ export class ReturningRepository implements OnModuleInit {
 				date: new Date(body.date),
 				createdAt: dayClose ? body.date : undefined,
 				staffId: body.staffId,
-				totalPrice: body.totalPrice,
 				payment: {
 					create: {
 						total: body.payment.total,
@@ -155,20 +186,22 @@ export class ReturningRepository implements OnModuleInit {
 					},
 				},
 				products: {
-					createMany: {
-						skipDuplicates: false,
-						data: body.products
-							? body.products?.map((p) => ({
-									productId: p.productId,
-									type: ServiceTypeEnum.returning,
-									count: p.count,
-									price: p.price,
-									totalPrice: p.totalPrice,
-									staffId: body.staffId,
-									createdAt: dayClose ? body.date : undefined,
-								}))
-							: [],
-					},
+					create: (body.products ?? []).map((p) => ({
+						productId: p.productId,
+						type: ServiceTypeEnum.returning,
+						count: p.count,
+						staffId: body.staffId,
+						createdAt: dayClose ? body.date : undefined,
+						productMVPrices: {
+							create: {
+								type: PriceTypeEnum.selling,
+								price: p.price,
+								totalPrice: new Decimal(p.price).mul(p.count),
+								currencyId: p.currencyId,
+								exchangeRate: currencyExchangeMap[p.currencyId] ?? 0,
+							},
+						},
+					})),
 				},
 			},
 			select: {
@@ -181,12 +214,30 @@ export class ReturningRepository implements OnModuleInit {
 				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
 				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
 				payment: { select: { id: true, cash: true, fromBalance: true } },
-				products: { select: { id: true, price: true, count: true, product: { select: { name: true } } } },
+				products: {
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { totalPrice: true, currencyId: true } },
+						product: { select: { id: true, name: true } },
+					},
+				},
 			},
 		})
 
-		if (body.status === SellingStatusEnum.accepted && body.products?.length) {
-			// Barcha mahsulotlarni birdaniga olish
+		// Upsert ReturningTotalModel per currency
+		for (const product of returning.products) {
+			for (const mvPrice of product.productMVPrices) {
+				await this.prisma.returningTotalModel.upsert({
+					where: { returningId_currencyId: { returningId: returning.id, currencyId: mvPrice.currencyId } },
+					update: { total: { increment: mvPrice.totalPrice } },
+					create: { returningId: returning.id, currencyId: mvPrice.currencyId, total: mvPrice.totalPrice },
+				})
+			}
+		}
+
+		// Increment product counts if accepted
+		if (body.status === SellingStatusEnum.accepted && (body.products?.length ?? 0) > 0) {
 			const existingProducts = await this.prisma.productModel.findMany({
 				where: { id: { in: body.products.map((p) => p.productId) } },
 				select: { id: true },
@@ -206,7 +257,30 @@ export class ReturningRepository implements OnModuleInit {
 			)
 		}
 
-		return returning
+		// Return with totals
+		return this.prisma.returningModel.findFirst({
+			where: { id: returning.id },
+			select: {
+				id: true,
+				status: true,
+				updatedAt: true,
+				createdAt: true,
+				deletedAt: true,
+				date: true,
+				totals: { select: TOTALS_SELECT },
+				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
+				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
+				payment: { select: { id: true, cash: true, fromBalance: true } },
+				products: {
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+				},
+			},
+		})
 	}
 
 	async updateOne(query: ReturningGetOneRequest, body: ReturningUpdateOneRequest) {
@@ -218,7 +292,6 @@ export class ReturningRepository implements OnModuleInit {
 				date: body.date ? new Date(body.date) : undefined,
 				status: body.status,
 				clientId: body.clientId,
-				totalPrice: body.totalPrice,
 				deletedAt: body.deletedAt,
 				payment: {
 					update: {
@@ -236,10 +309,18 @@ export class ReturningRepository implements OnModuleInit {
 				createdAt: true,
 				deletedAt: true,
 				date: true,
+				totals: { select: TOTALS_SELECT },
 				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
 				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
 				payment: { select: { id: true, cash: true, fromBalance: true } },
-				products: { select: { id: true, price: true, count: true, product: { select: { id: true, name: true } } } },
+				products: {
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true } },
+						product: { select: { id: true, name: true } },
+					},
+				},
 			},
 		})
 
@@ -285,9 +366,8 @@ export class ReturningRepository implements OnModuleInit {
 			where: { id: { in: ids }, type: ServiceTypeEnum.returning },
 			select: {
 				id: true,
-				price: true,
-				cost: true,
 				count: true,
+				productMVPrices: { select: { price: true, type: true, currencyId: true } },
 				product: true,
 			},
 		})

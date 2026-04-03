@@ -1,9 +1,38 @@
 import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
-import { ArrivalCreateOneResponse, ArrivalFindManyData, ArrivalFindManyResponse, ArrivalFindOneData, ArrivalFindOneResponse, ArrivalModifyResponse } from '../interfaces'
+import {
+	ArrivalCreateOneResponse,
+	ArrivalFindManyData,
+	ArrivalFindManyResponse,
+	ArrivalFindOneData,
+	ArrivalFindOneResponse,
+	ArrivalModifyResponse,
+	ArrivalTotalData,
+} from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ArrivalRequiredDto } from './fields.dtos'
+import { Decimal } from '@prisma/client/runtime/library'
 
-export class ArrivalFindOneDataDto extends PickType(ArrivalRequiredDto, ['id', 'date', 'createdAt']) implements ArrivalFindOneData {}
+export class ArrivalTotalDataDto implements ArrivalTotalData {
+	@ApiProperty({ type: String })
+	id: string
+
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty()
+	currency: { id: string; symbol: string; name: string }
+
+	@ApiProperty({ type: Number })
+	totalCost: Decimal
+
+	@ApiProperty({ type: Number })
+	totalPrice: Decimal
+}
+
+export class ArrivalFindOneDataDto extends PickType(ArrivalRequiredDto, ['id', 'date', 'createdAt']) implements ArrivalFindOneData {
+	@ApiProperty({ type: ArrivalTotalDataDto, isArray: true })
+	totals?: ArrivalTotalData[]
+}
 
 export class ArrivalFindManyDataDto extends PaginationResponseDto implements ArrivalFindManyData {
 	@ApiProperty({ type: ArrivalFindOneDataDto, isArray: true })

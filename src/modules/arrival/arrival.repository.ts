@@ -10,7 +10,16 @@ import {
 	ArrivalUpdateOneRequest,
 } from './interfaces'
 import { ArrivalController } from './arrival.controller'
-import { ServiceTypeEnum } from '@prisma/client'
+import { PriceTypeEnum, ServiceTypeEnum } from '@prisma/client'
+import { Decimal } from '@prisma/client/runtime/library'
+
+const TOTALS_SELECT = {
+	id: true,
+	currencyId: true,
+	totalCost: true,
+	totalPrice: true,
+	currency: { select: { id: true, symbol: true, name: true } },
+}
 
 @Injectable()
 export class ArrivalRepository implements OnModuleInit {
@@ -31,8 +40,7 @@ export class ArrivalRepository implements OnModuleInit {
 			select: {
 				id: true,
 				date: true,
-				totalCost: true,
-				totalPrice: true,
+				totals: { select: TOTALS_SELECT },
 				supplier: { select: { fullname: true, phone: true, id: true } },
 				updatedAt: true,
 				createdAt: true,
@@ -41,7 +49,12 @@ export class ArrivalRepository implements OnModuleInit {
 				payment: { select: { id: true, total: true, card: true, cash: true, other: true, transfer: true, description: true } },
 				products: {
 					orderBy: [{ createdAt: 'desc' }],
-					select: { id: true, price: true, count: true, cost: true, product: { select: { name: true, cost: true, count: true, price: true, id: true } } },
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true, count: true, id: true } },
+					},
 				},
 			},
 			orderBy: [{ createdAt: 'desc' }],
@@ -57,13 +70,22 @@ export class ArrivalRepository implements OnModuleInit {
 			select: {
 				id: true,
 				date: true,
+				totals: { select: TOTALS_SELECT },
 				supplier: { select: { fullname: true, phone: true, id: true } },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
 				staff: { select: { fullname: true, phone: true, id: true } },
 				payment: { select: { total: true, id: true, card: true, cash: true, other: true, transfer: true, description: true } },
-				products: { orderBy: [{ createdAt: 'desc' }], select: { id: true, price: true, count: true, cost: true, product: { select: { name: true } } } },
+				products: {
+					orderBy: [{ createdAt: 'desc' }],
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+				},
 			},
 		})
 
@@ -96,8 +118,7 @@ export class ArrivalRepository implements OnModuleInit {
 			select: {
 				id: true,
 				date: true,
-				totalCost: true,
-				totalPrice: true,
+				totals: { select: TOTALS_SELECT },
 				supplier: {
 					select: {
 						id: true,
@@ -115,7 +136,13 @@ export class ArrivalRepository implements OnModuleInit {
 				deletedAt: true,
 				staff: true,
 				payment: true,
-				products: { select: { price: true, count: true, cost: true, product: { select: { name: true } } } },
+				products: {
+					select: {
+						count: true,
+						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+				},
 			},
 			...paginationOptions,
 		})
@@ -151,16 +178,22 @@ export class ArrivalRepository implements OnModuleInit {
 			const tomorrow = new Date(today)
 			tomorrow.setDate(today.getDate() + 1)
 			tomorrow.setHours(0, 0, 0, 0)
-
 			body.date = tomorrow
 		}
+
+		// Pre-fetch exchange rates for all currencies used
+		const currencyIds = [...new Set((body.products ?? []).flatMap((p) => [p.costCurrencyId, p.priceCurrencyId]))]
+		const currencies = await this.prisma.currencyModel.findMany({
+			where: { id: { in: currencyIds } },
+			select: { id: true, exchangeRate: true },
+		})
+		const currencyExchangeMap = Object.fromEntries(currencies.map((c) => [c.id, c.exchangeRate]))
+
 		const arrival = await this.prisma.arrivalModel.create({
 			data: {
 				supplierId: body.supplierId,
 				date: new Date(body.date),
 				createdAt: dayClose ? body.date : undefined,
-				totalCost: body.totalCost,
-				totalPrice: body.totalPrice,
 				staffId: body.staffId,
 				payment: {
 					create: {
@@ -177,20 +210,33 @@ export class ArrivalRepository implements OnModuleInit {
 					},
 				},
 				products: {
-					createMany: {
-						skipDuplicates: false,
-						data: body.products.map((p) => ({
-							productId: p.productId,
-							type: ServiceTypeEnum.arrival,
-							cost: p.cost,
-							count: p.count,
-							price: p.price,
-							totalCost: p.totalCost,
-							totalPrice: p.totalPrice,
-							staffId: body.staffId,
-							createdAt: dayClose ? body.date : undefined,
-						})),
-					},
+					create: (body.products ?? []).map((p) => ({
+						productId: p.productId,
+						type: ServiceTypeEnum.arrival,
+						count: p.count,
+						staffId: body.staffId,
+						createdAt: dayClose ? body.date : undefined,
+						productMVPrices: {
+							createMany: {
+								data: [
+									{
+										type: PriceTypeEnum.cost,
+										price: p.cost,
+										totalPrice: new Decimal(p.cost).mul(p.count),
+										currencyId: p.costCurrencyId,
+										exchangeRate: currencyExchangeMap[p.costCurrencyId] ?? 0,
+									},
+									{
+										type: PriceTypeEnum.selling,
+										price: p.price,
+										totalPrice: new Decimal(p.price).mul(p.count),
+										currencyId: p.priceCurrencyId,
+										exchangeRate: currencyExchangeMap[p.priceCurrencyId] ?? 0,
+									},
+								],
+							},
+						},
+					})),
 				},
 			},
 			select: {
@@ -202,29 +248,86 @@ export class ArrivalRepository implements OnModuleInit {
 				deletedAt: true,
 				staff: { select: { fullname: true, phone: true, id: true } },
 				payment: { select: { id: true, card: true, cash: true, other: true, transfer: true, description: true, total: true } },
-				products: { select: { id: true, price: true, count: true, cost: true, product: { select: { name: true } } } },
+				products: {
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { type: true, price: true, totalPrice: true, currencyId: true } },
+						product: { select: { id: true, name: true } },
+					},
+				},
 			},
 		})
 
-		if (body.products) {
-			const existingProducts = await this.prisma.productModel.findMany({
-				where: { id: { in: body.products.map((p) => p.productId) } },
-				select: { id: true },
+		// Update product counts and selling prices
+		for (const product of arrival.products) {
+			await this.prisma.productModel.update({
+				where: { id: product.product.id },
+				data: { count: { increment: product.count } },
 			})
+		}
 
-			const existingProductSet = new Set(existingProducts.map((p) => p.id))
-
-			for (const product of body.products) {
-				if (existingProductSet.has(product.productId)) {
-					await this.prisma.productModel.update({
-						where: { id: product.productId },
-						data: { cost: product.cost, price: product.price, count: { increment: product.count } },
+		// Upsert ArrivalTotalModel per currency
+		for (const product of arrival.products) {
+			for (const mvPrice of product.productMVPrices) {
+				if (mvPrice.type === PriceTypeEnum.cost) {
+					await this.prisma.arrivalTotalModel.upsert({
+						where: { arrivalId_currencyId: { arrivalId: arrival.id, currencyId: mvPrice.currencyId } },
+						update: { totalCost: { increment: mvPrice.totalPrice } },
+						create: { arrivalId: arrival.id, currencyId: mvPrice.currencyId, totalCost: mvPrice.totalPrice, totalPrice: 0 },
+					})
+				} else if (mvPrice.type === PriceTypeEnum.selling) {
+					await this.prisma.arrivalTotalModel.upsert({
+						where: { arrivalId_currencyId: { arrivalId: arrival.id, currencyId: mvPrice.currencyId } },
+						update: { totalPrice: { increment: mvPrice.totalPrice } },
+						create: { arrivalId: arrival.id, currencyId: mvPrice.currencyId, totalCost: 0, totalPrice: mvPrice.totalPrice },
 					})
 				}
 			}
 		}
 
-		return arrival
+		// Update ProductPriceModel (selling/cost prices) from arrival
+		for (const product of arrival.products) {
+			const countResult = await this.prisma.productModel.findFirst({ where: { id: product.product.id }, select: { count: true } })
+			const newCount = countResult?.count ?? product.count
+
+			for (const mvPrice of product.productMVPrices) {
+				if (mvPrice.type === PriceTypeEnum.selling || mvPrice.type === PriceTypeEnum.cost) {
+					const existingProductPrice = await this.prisma.productPriceModel.findFirst({
+						where: { productId: product.product.id, type: mvPrice.type },
+					})
+					if (existingProductPrice) {
+						await this.prisma.productPriceModel.update({
+							where: { id: existingProductPrice.id },
+							data: { price: mvPrice.price, totalPrice: new Decimal(mvPrice.price).mul(newCount) },
+						})
+					}
+				}
+			}
+		}
+
+		return this.prisma.arrivalModel.findFirst({
+			where: { id: arrival.id },
+			select: {
+				id: true,
+				date: true,
+				totals: { select: TOTALS_SELECT },
+				supplier: { select: { fullname: true, phone: true, id: true } },
+				updatedAt: true,
+				createdAt: true,
+				deletedAt: true,
+				staff: { select: { fullname: true, phone: true, id: true } },
+				payment: { select: { id: true, card: true, cash: true, other: true, transfer: true, description: true, total: true } },
+				products: {
+					select: {
+						id: true,
+						count: true,
+						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+				},
+			},
+		})
 	}
 
 	async updateOne(query: ArrivalGetOneRequest, body: ArrivalUpdateOneRequest) {
@@ -236,8 +339,6 @@ export class ArrivalRepository implements OnModuleInit {
 				supplierId: body.supplierId,
 				date: body.date ? new Date(body.date) : undefined,
 				deletedAt: body.deletedAt,
-				totalCost: body.totalCost,
-				totalPrice: body.totalPrice,
 				payment: {
 					update: {
 						total: body.payment.total,
@@ -279,9 +380,8 @@ export class ArrivalRepository implements OnModuleInit {
 			where: { id: { in: ids }, type: ServiceTypeEnum.arrival },
 			select: {
 				id: true,
-				price: true,
-				cost: true,
 				count: true,
+				productMVPrices: { select: { price: true, type: true, currencyId: true } },
 				product: true,
 			},
 		})

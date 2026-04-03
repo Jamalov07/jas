@@ -17,8 +17,11 @@ export class ClientDeedDto implements ClientDeed {
 	@ApiProperty({ type: Date })
 	date: Date
 
-	@ApiProperty({ enum: ['debit', 'kredit'] })
+	@ApiProperty({ enum: ['debit', 'credit'] })
 	type: 'debit' | 'credit'
+
+	@ApiProperty({ enum: ['selling', 'payment', 'returning', 'arrival'] })
+	action: 'selling' | 'payment' | 'returning' | 'arrival'
 
 	@ApiProperty({ type: Decimal })
 	value: Decimal

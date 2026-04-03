@@ -1,8 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { ClientOptional, ClientRequired } from '../interfaces'
-import { IsEnum, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString } from 'class-validator'
-import { $Enums, UserTypeEnum } from '@prisma/client'
+import { IsEnum, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID } from 'class-validator'
+import { $Enums, PageEnum, UserTypeEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export class ClientRequiredDto extends DefaultRequiredFieldsDto implements ClientRequired {
@@ -33,6 +33,14 @@ export class ClientRequiredDto extends DefaultRequiredFieldsDto implements Clien
 
 	@ApiProperty({ type: Decimal })
 	balance: Decimal
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+
+	@ApiProperty({ enum: PageEnum, isArray: true })
+	pages: $Enums.PageEnum[]
 }
 
 export class ClientOptionalDto extends DefaultOptionalFieldsDto implements ClientOptional {
@@ -63,4 +71,12 @@ export class ClientOptionalDto extends DefaultOptionalFieldsDto implements Clien
 
 	@ApiPropertyOptional({ type: Decimal })
 	balance?: Decimal
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	currencyId?: string
+
+	@ApiPropertyOptional({ enum: PageEnum, isArray: true })
+	pages?: $Enums.PageEnum[]
 }

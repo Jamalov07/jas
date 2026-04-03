@@ -25,9 +25,9 @@ export class ProductService {
 
 			return {
 				...p,
-				lastSellingDate: lastSelling?.selling?.date ?? null,
-				lastSellingPrice: lastSelling?.price ?? null,
-				lastSellingCount: lastSelling?.count ?? null,
+			lastSellingDate: lastSelling?.selling?.date ?? null,
+			lastSellingPrice: lastSelling?.productMVPrices?.find((p) => p.type === 'selling')?.price ?? lastSelling?.productMVPrices?.[0]?.price ?? null,
+			lastSellingCount: lastSelling?.count ?? null,
 				prices: {
 					cost: p.productPrices.find((pri) => pri.type === PriceTypeEnum.cost),
 					selling: p.productPrices.find((pri) => pri.type === PriceTypeEnum.selling),
@@ -70,7 +70,7 @@ export class ProductService {
 		const result = {
 			...product,
 			lastSellingDate: lastSelling.selling.date ?? null,
-			lastSellingPrice: lastSelling?.price ?? null,
+			lastSellingPrice: lastSelling?.productMVPrices?.find((p) => p.type === 'selling')?.price ?? lastSelling?.productMVPrices?.[0]?.price ?? null,
 			lastSellingCount: lastSelling?.count ?? null,
 			prices: {
 				cost: product.productPrices.find((pri) => pri.type === PriceTypeEnum.cost),

@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Patch, Post, Query, Req, UseGuards } fro
 import { ProductMVService } from './product-mv.service'
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import {
-	arrivalProductMVCreateOneRequestDto,
+	ArrivalProductMVCreateOneRequestDto,
 	ArrivalProductMVUpdateOneRequestDto,
 	ProductMVDeleteOneRequestDto,
 	ProductMVFindManyRequestDto,
@@ -60,7 +60,7 @@ export class ProductMVController {
 	@Post('arrival/one')
 	@ApiOperation({ summary: 'add one arrival product' })
 	@ApiOkResponse({ type: ProductModifyResponseDto })
-	async createOneArrival(@Req() request: CRequest, @Body() body: arrivalProductMVCreateOneRequestDto): Promise<ProductModifyResponseDto> {
+	async createOneArrival(@Req() request: CRequest, @Body() body: ArrivalProductMVCreateOneRequestDto): Promise<ProductModifyResponseDto> {
 		return this.productMVService.createOneArrival(request, body)
 	}
 

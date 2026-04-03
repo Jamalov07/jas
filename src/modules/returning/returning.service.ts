@@ -12,7 +12,6 @@ import {
 	ReturningDeleteOneRequest,
 } from './interfaces'
 import { ClientService } from '../client'
-import { ProductService } from '../product'
 import { SellingStatusEnum } from '@prisma/client'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
@@ -23,7 +22,6 @@ export class ReturningService {
 	constructor(
 		private readonly returningRepository: ReturningRepository,
 		private readonly clientService: ClientService,
-		private readonly productService: ProductService,
 		private readonly commonService: CommonService,
 		private readonly excelService: ExcelService,
 	) {}
@@ -36,9 +34,8 @@ export class ReturningService {
 			return {
 				...returning,
 				payment: returning.payment.total.toNumber() ? returning.payment : null,
-				debt: returning.totalPrice.minus(returning.payment.total),
 				totalPayment: returning.payment.total,
-				totalPrice: returning.totalPrice,
+				totals: returning.totals,
 			}
 		})
 
@@ -65,7 +62,7 @@ export class ReturningService {
 			throw new BadRequestException(ERROR_MSG.RETURNING.NOT_FOUND.UZ)
 		}
 
-		return createResponse({ data: { ...returning }, success: { messages: ['find one success'] } })
+		return createResponse({ data: { ...returning, totals: returning.totals, totalPayment: returning.payment.total }, success: { messages: ['find one success'] } })
 	}
 
 	async excelDownloadOne(res: Response, query: ReturningFindOneRequest) {
@@ -129,27 +126,19 @@ export class ReturningService {
 				const tomorrow = new Date()
 				tomorrow.setDate(tomorrow.getDate() + 1)
 				tomorrow.setHours(0, 0, 0, 0)
-
 				body.date = tomorrow
 			} else {
 				body.date = new Date()
 			}
 		}
 
-		let totalPrice = new Decimal(0)
-
 		body = {
 			...body,
 			staffId: request.user.id,
 			payment: { ...body.payment, total: total },
-			products: body.products.map((product) => {
-				const totalProductPrice = new Decimal(product.price).mul(product.count)
-				totalPrice = totalPrice.plus(totalProductPrice)
-				return { ...product, totalPrice: totalProductPrice }
-			}),
 		}
 
-		const returning = await this.returningRepository.createOne({ ...body, totalPrice: totalPrice })
+		const returning = await this.returningRepository.createOne(body)
 
 		return createResponse({ data: returning, success: { messages: ['create one success'] } })
 	}
@@ -191,8 +180,6 @@ export class ReturningService {
 		await this.getOne(query)
 		if (query.method === DeleteMethodEnum.hard) {
 			await this.returningRepository.deleteOne(query)
-		} else {
-			// await this.returningRepository.updateOne(query, { deletedAt: new Date() })
 		}
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
 	}

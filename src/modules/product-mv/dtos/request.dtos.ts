@@ -1,4 +1,4 @@
-import { PickType, IntersectionType } from '@nestjs/swagger'
+import { PickType, IntersectionType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
 	ProductMVDeleteOneRequest,
 	ProductMVFindManyRequest,
@@ -10,8 +10,10 @@ import {
 	SellingProductMVCreateOneRequest,
 	SellingProductMVUpdateOneRequest,
 } from '../interfaces'
-import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
+import { IsDecimalIntOrBigInt, PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { ProductMVOptionalDto, ProductMVRequiredDto } from './fields.dtos'
+import { Decimal } from '@prisma/client/runtime/library'
+import { IsNotEmpty, IsNumber, IsOptional, IsUUID } from 'class-validator'
 
 export class ProductMVFindManyRequestDto
 	extends IntersectionType(
@@ -23,32 +25,189 @@ export class ProductMVFindManyRequestDto
 
 export class ProductMVFindOneRequestDto extends IntersectionType(PickType(ProductMVRequiredDto, ['id'])) implements ProductMVFindOneRequest {}
 
-export class SellingProductMVCreateOneRequestDto
-	extends IntersectionType(PickType(ProductMVRequiredDto, ['price', 'sellingId', 'count', 'productId']))
-	implements SellingProductMVCreateOneRequest {}
+export class SellingProductMVCreateOneRequestDto implements SellingProductMVCreateOneRequest {
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	sellingId: string
 
-export class arrivalProductMVCreateOneRequestDto
-	extends IntersectionType(PickType(ProductMVRequiredDto, ['price', 'arrivalId', 'cost', 'count', 'productId']))
-	implements ArrivalProductMVCreateOneRequest {}
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	productId: string
 
-export class ReturningProductMVCreateOneRequestDto
-	extends IntersectionType(PickType(ProductMVRequiredDto, ['price', 'returningId', 'count', 'productId']))
-	implements ReturningProductMVCreateOneRequest {}
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsNumber()
+	count: number
 
-export class SellingProductMVUpdateOneRequestDto
-	extends IntersectionType(PickType(ProductMVOptionalDto, ['price', 'sellingId', 'count', 'productId']))
-	implements SellingProductMVUpdateOneRequest
-{
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	price: Decimal
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+}
+
+export class ArrivalProductMVCreateOneRequestDto implements ArrivalProductMVCreateOneRequest {
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	arrivalId: string
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	productId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsNumber()
+	count: number
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	cost: Decimal
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	costCurrencyId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	price: Decimal
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	priceCurrencyId: string
+}
+
+export class ReturningProductMVCreateOneRequestDto implements ReturningProductMVCreateOneRequest {
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	returningId: string
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	productId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsNumber()
+	count: number
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	price: Decimal
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+}
+
+export class SellingProductMVUpdateOneRequestDto implements SellingProductMVUpdateOneRequest {
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	sellingId?: string
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	productId?: string
+
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsNumber()
+	count?: number
+
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsDecimalIntOrBigInt()
+	price?: Decimal
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	currencyId?: string
+
 	send?: boolean
 }
 
-export class ArrivalProductMVUpdateOneRequestDto
-	extends IntersectionType(PickType(ProductMVOptionalDto, ['price', 'arrivalId', 'cost', 'count', 'productId']))
-	implements ArrivalProductMVUpdateOneRequest {}
+export class ArrivalProductMVUpdateOneRequestDto implements ArrivalProductMVUpdateOneRequest {
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	arrivalId?: string
 
-export class ReturningProductMVUpdateOneRequestDto
-	extends IntersectionType(PickType(ProductMVOptionalDto, ['price', 'returningId', 'count', 'productId']))
-	implements ReturningProductMVUpdateOneRequest {}
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	productId?: string
+
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsNumber()
+	count?: number
+
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsDecimalIntOrBigInt()
+	cost?: Decimal
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	costCurrencyId?: string
+
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsDecimalIntOrBigInt()
+	price?: Decimal
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	priceCurrencyId?: string
+}
+
+export class ReturningProductMVUpdateOneRequestDto implements ReturningProductMVUpdateOneRequest {
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	returningId?: string
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	productId?: string
+
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsNumber()
+	count?: number
+
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsDecimalIntOrBigInt()
+	price?: Decimal
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	currencyId?: string
+}
 
 export class ProductMVDeleteOneRequestDto
 	extends IntersectionType(PickType(ProductMVRequiredDto, ['id']), PickType(RequestOtherFieldsDto, ['method']))

@@ -7,15 +7,21 @@ import { ProductMVFindOneData } from '../../product-mv'
 import { BotSellingTitleEnum } from '../enums'
 import { ClientPaymentFindOneData } from '../../client-payment'
 
+export declare interface SellingTotalData {
+	id: string
+	currencyId: string
+	currency: { id: string; symbol: string; name: string }
+	total: Decimal
+}
+
 export declare interface SellingCalc {
-	totalPrice: Decimal
 	totalPayment: Decimal
 	totalCardPayment: Decimal
 	totalCashPayment: Decimal
 	totalOtherPayment: Decimal
 	totalTransferPayment: Decimal
-	totalDebt: Decimal
 }
+
 export declare interface SellingFindManyData extends PaginationResponse<SellingFindOneData> {
 	calc: SellingCalc
 }
@@ -25,7 +31,7 @@ export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' |
 	staff?: StaffFindOneData
 	debt?: Decimal
 	totalPayment?: Decimal
-	totalPrice?: Decimal
+	totalPrices?: SellingTotalData[]
 	products?: ProductMVFindOneData[]
 	title?: BotSellingTitleEnum
 	payment?: ClientPaymentFindOneData
@@ -52,21 +58,34 @@ export declare interface Debt {
 	theirDebt: Decimal
 }
 
+export declare interface TotalStatsByCurrency {
+	currencyId: string
+	symbol: string
+	total: Decimal
+}
+
 export declare interface SellingGetTotalStatsData {
-	daily: Decimal
-	weekly: Decimal
-	monthly: Decimal
-	yearly: Decimal
+	daily: TotalStatsByCurrency[]
+	weekly: TotalStatsByCurrency[]
+	monthly: TotalStatsByCurrency[]
+	yearly: TotalStatsByCurrency[]
 	client: Debt
 	supplier: Debt
 }
+
 export declare interface SellingGetTotalStatsResponse extends GlobalResponse {
 	data: SellingGetTotalStatsData
 }
 
+export declare interface SellingGetPeriodStatsSum {
+	currencyId: string
+	symbol: string
+	total: Decimal
+}
+
 export declare interface SellingGetPeriodStatsData {
 	date: string
-	sum: Decimal
+	sums: SellingGetPeriodStatsSum[]
 }
 
 export declare interface SellingGetPeriodStatsResponse extends GlobalResponse {

@@ -32,7 +32,8 @@ export class ClientService {
 
 		const mappedClients = clients.map((c) => {
 			const sellingDebt = c.sellings.reduce((acc, sel) => {
-				return acc.plus(sel.totalPrice).minus(sel.payment.total)
+				const selTotal = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
+				return acc.plus(selTotal).minus(sel.payment.total)
 			}, new Decimal(0))
 
 			c.returnings.map((returning) => {
@@ -149,9 +150,10 @@ export class ClientService {
 		}, new Decimal(0))
 
 		const sellingDebt = client.sellings.reduce((acc, sel) => {
+			const selTotal = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
 			if ((!deedStartDate || sel.date >= deedStartDate) && (!deedEndDate || sel.date <= deedEndDate)) {
-				deeds.push({ type: 'debit', action: 'selling', value: sel.totalPrice, date: sel.date, description: '' })
-				totalDebit = totalDebit.plus(sel.totalPrice)
+				deeds.push({ type: 'debit', action: 'selling', value: selTotal, date: sel.date, description: '' })
+				totalDebit = totalDebit.plus(selTotal)
 			}
 
 			if ((!deedStartDate || sel.payment.createdAt >= deedStartDate) && (!deedEndDate || sel.payment.createdAt <= deedEndDate)) {
@@ -159,7 +161,7 @@ export class ClientService {
 				totalCredit = totalCredit.plus(sel.payment.total)
 			}
 
-			return acc.plus(sel.totalPrice).minus(sel.payment.total)
+			return acc.plus(selTotal).minus(sel.payment.total)
 		}, new Decimal(0))
 
 		let returningTotalSum = new Decimal(0)
@@ -175,7 +177,8 @@ export class ClientService {
 		const filteredDeeds = deeds.filter((d) => !d.value.equals(0)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
 		const sellingDebt2 = client.sellings.reduce((acc, sel) => {
-			return acc.plus(sel.totalPrice).minus(sel.payment.total)
+			const selTotal = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
+			return acc.plus(selTotal).minus(sel.payment.total)
 		}, new Decimal(0))
 
 		client.returnings.map((returning) => {

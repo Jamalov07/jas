@@ -9,9 +9,12 @@ import {
 	SellingFindOneResponse,
 	SellingGetPeriodStatsData,
 	SellingGetPeriodStatsResponse,
+	SellingGetPeriodStatsSum,
 	SellingGetTotalStatsData,
 	SellingGetTotalStatsResponse,
 	SellingModifyResponse,
+	SellingTotalData,
+	TotalStatsByCurrency,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { SellingRequiredDto } from './fields.dtos'
@@ -19,12 +22,29 @@ import { ClientFindOneData, ClientFindOneDataDto } from '../../client'
 import { StaffFindOneData, StaffFindOneDataDto } from '../../staff'
 import { Decimal } from '@prisma/client/runtime/library'
 
+export class SellingTotalDataDto implements SellingTotalData {
+	@ApiProperty({ type: String })
+	id: string
+
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty()
+	currency: { id: string; symbol: string; name: string }
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+}
+
 export class SellingFindOneDataDto extends PickType(SellingRequiredDto, ['id', 'status', 'createdAt', 'date', 'send', 'sended']) implements SellingFindOneData {
 	@ApiProperty({ type: ClientFindOneDataDto })
 	client?: ClientFindOneData
 
 	@ApiProperty({ type: StaffFindOneDataDto })
 	staff?: StaffFindOneData
+
+	@ApiProperty({ type: SellingTotalDataDto, isArray: true })
+	totalPrices?: SellingTotalData[]
 }
 
 export class SellingCalcDto implements SellingCalc {
@@ -41,13 +61,7 @@ export class SellingCalcDto implements SellingCalc {
 	totalTransferPayment: Decimal
 
 	@ApiProperty({ type: Number })
-	totalDebt: Decimal
-
-	@ApiProperty({ type: Number })
 	totalPayment: Decimal
-
-	@ApiProperty({ type: Number })
-	totalPrice: Decimal
 }
 
 export class SellingFindManyDataDto extends PaginationResponseDto implements SellingFindManyData {
@@ -82,18 +96,30 @@ export class DebtDto implements Debt {
 	@ApiProperty({ type: Number })
 	theirDebt: Decimal
 }
+
+export class TotalStatsByCurrencyDto implements TotalStatsByCurrency {
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: String })
+	symbol: string
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+}
+
 export class SellingGetTotalStatsDataDto implements SellingGetTotalStatsData {
-	@ApiProperty({ type: Number })
-	monthly: Decimal
+	@ApiProperty({ type: TotalStatsByCurrencyDto, isArray: true })
+	daily: TotalStatsByCurrency[]
 
-	@ApiProperty({ type: Number })
-	daily: Decimal
+	@ApiProperty({ type: TotalStatsByCurrencyDto, isArray: true })
+	weekly: TotalStatsByCurrency[]
 
-	@ApiProperty({ type: Number })
-	weekly: Decimal
+	@ApiProperty({ type: TotalStatsByCurrencyDto, isArray: true })
+	monthly: TotalStatsByCurrency[]
 
-	@ApiProperty({ type: Number })
-	yearly: Decimal
+	@ApiProperty({ type: TotalStatsByCurrencyDto, isArray: true })
+	yearly: TotalStatsByCurrency[]
 
 	@ApiProperty({ type: DebtDto })
 	client: Debt
@@ -101,14 +127,26 @@ export class SellingGetTotalStatsDataDto implements SellingGetTotalStatsData {
 	@ApiProperty({ type: DebtDto })
 	supplier: Debt
 }
+
 export class SellingGetTotalStatsResponseDto extends GlobalResponseDto implements SellingGetTotalStatsResponse {
 	@ApiProperty({ type: SellingGetTotalStatsDataDto })
 	data: SellingGetTotalStatsData
 }
 
-export class SellingGetPeriodStatsDataDto implements SellingGetPeriodStatsData {
+export class SellingGetPeriodStatsSumDto implements SellingGetPeriodStatsSum {
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: String })
+	symbol: string
+
 	@ApiProperty({ type: Number })
-	sum: Decimal
+	total: Decimal
+}
+
+export class SellingGetPeriodStatsDataDto implements SellingGetPeriodStatsData {
+	@ApiProperty({ type: SellingGetPeriodStatsSumDto, isArray: true })
+	sums: SellingGetPeriodStatsSum[]
 
 	@ApiProperty({ type: String })
 	date: string

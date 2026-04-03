@@ -8,6 +8,11 @@ export class SupplierPaymentRequiredDto extends DefaultRequiredFieldsDto impleme
 	@ApiProperty({ type: Number })
 	@IsNotEmpty()
 	@IsDecimalIntOrBigInt()
+	total: Decimal
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
 	card: Decimal
 
 	@ApiProperty({ type: Number })

@@ -12,6 +12,7 @@ import {
 	SellingDeleteOneRequest,
 	SellingGetTotalStatsRequest,
 	SellingGetPeriodStatsRequest,
+	TotalStatsByCurrency,
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 import { ArrivalService } from '../arrival'
@@ -41,19 +42,15 @@ export class SellingService {
 		const sellingsCount = await this.sellingRepository.countFindMany(query)
 
 		const calc = {
-			totalPrice: new Decimal(0),
 			totalPayment: new Decimal(0),
 			totalCardPayment: new Decimal(0),
 			totalCashPayment: new Decimal(0),
 			totalOtherPayment: new Decimal(0),
 			totalTransferPayment: new Decimal(0),
-			totalDebt: new Decimal(0),
 		}
 
 		const mappedSellings = sellings.map((selling) => {
-			calc.totalPrice = calc.totalPrice.plus(selling.totalPrice)
 			calc.totalPayment = calc.totalPayment.plus(selling.payment.total)
-			calc.totalDebt = calc.totalDebt.plus(selling.totalPrice.minus(selling.payment.total))
 			calc.totalCardPayment = calc.totalCardPayment.plus(selling.payment.card)
 			calc.totalCashPayment = calc.totalCashPayment.plus(selling.payment.cash)
 			calc.totalOtherPayment = calc.totalOtherPayment.plus(selling.payment.other)
@@ -62,9 +59,8 @@ export class SellingService {
 			return {
 				...selling,
 				payment: selling.payment.total.toNumber() ? selling.payment : null,
-				debt: selling.totalPrice.minus(selling.payment.total),
 				totalPayment: selling.payment.total,
-				totalPrice: selling.totalPrice,
+				totalPrices: selling.totals,
 			}
 		})
 
@@ -92,12 +88,8 @@ export class SellingService {
 			throw new BadRequestException(ERROR_MSG.SELLING.NOT_FOUND.UZ)
 		}
 
-		const totalPrice = selling.products.reduce((acc, product) => {
-			return acc.plus(new Decimal(product.count).mul(product.price))
-		}, new Decimal(0))
-
 		return createResponse({
-			data: { ...selling, debt: totalPrice.minus(selling.payment.total), totalPayment: selling.payment.total, totalPrice: totalPrice },
+			data: { ...selling, totalPayment: selling.payment.total, totalPrices: selling.totals },
 			success: { messages: ['find one success'] },
 		})
 	}
@@ -141,9 +133,8 @@ export class SellingService {
 				if (body.date) {
 					const inputDate = new Date(body.date)
 					const now = new Date()
-
-					const isToday = inputDate.getFullYear() === now.getFullYear() && inputDate.getMonth() === now.getMonth() && inputDate.getDate() === now.getDate()
-
+					const isToday =
+						inputDate.getFullYear() === now.getFullYear() && inputDate.getMonth() === now.getMonth() && inputDate.getDate() === now.getDate()
 					if (isToday) {
 						body.date = now
 					} else {
@@ -166,31 +157,19 @@ export class SellingService {
 				const tomorrow = new Date()
 				tomorrow.setDate(tomorrow.getDate() + 1)
 				tomorrow.setHours(0, 0, 0, 0)
-
 				body.date = tomorrow
 			} else {
 				body.date = new Date()
 			}
 		}
 
-		let totalPrice = new Decimal(0)
 		body = {
 			...body,
 			staffId: request.user.id,
 			payment: { ...body.payment, total: total },
-			products: body.products.map((product) => {
-				const productTotalPrice = new Decimal(product.price ?? 0).mul(product.count)
-
-				totalPrice = totalPrice.plus(productTotalPrice)
-
-				return {
-					...product,
-					totalPrice: productTotalPrice,
-				}
-			}),
 		}
 
-		const selling = await this.sellingRepository.createOne({ ...body, totalPrice: totalPrice })
+		const selling = await this.sellingRepository.createOne(body)
 
 		if (body.send) {
 			if (selling.status === SellingStatusEnum.accepted) {
@@ -200,14 +179,12 @@ export class SellingService {
 					client: client.data,
 					title: BotSellingTitleEnum.new,
 					totalPayment: total,
-					totalPrice: body.totalPrice,
-					debt: body.totalPrice.minus(total),
+					totalPrices: selling.totals,
 					products: selling.products.map((p) => ({
 						...p,
-						product: { ...p.product, prices: p.product.productPrices },
 						status: BotSellingProductTitleEnum.new,
 					})),
-				}
+				} as any
 
 				if (client.data.telegram?.id) {
 					await this.botService.sendSellingToClient(sellingInfo).catch((e) => {
@@ -230,7 +207,6 @@ export class SellingService {
 	async updateOne(request: CRequest, query: SellingGetOneRequest, body: SellingUpdateOneRequest) {
 		const selling = await this.getOne(query)
 
-		// accepted bo‘lsa, date o‘zgartirilmaydi
 		if (selling.data.status === SellingStatusEnum.accepted) {
 			body.date = undefined
 		}
@@ -239,50 +215,40 @@ export class SellingService {
 		let shouldSend = true
 		let isFirstSend = false
 
-		// Faqat status accepted bo‘lmagan bo‘lsa va paymentda haqiqiy qiymatlar bo‘lsa
 		const hasValidPayment = body.payment && ['card', 'cash', 'other', 'transfer'].some((key) => !!body.payment?.[key] && +body.payment[key] !== 0)
 
 		if (body.status !== SellingStatusEnum.accepted) {
 			if (hasValidPayment) {
 				body.status = SellingStatusEnum.accepted
 				body.date = new Date()
-				// total hisoblash
 				total = new Decimal(body.payment?.card ?? 0)
 					.plus(body.payment?.cash ?? 0)
 					.plus(body.payment?.other ?? 0)
 					.plus(body.payment?.transfer ?? 0)
 			}
 		} else {
-			// status accepted deb kelyapti
 			if (selling.data.status !== SellingStatusEnum.accepted) {
 				isFirstSend = true
 			}
 			body.date = new Date()
 			shouldSend = true
-
-			// total hisoblash (agar bor bo‘lsa)
 			total = new Decimal(body.payment?.card ?? 0)
 				.plus(body.payment?.cash ?? 0)
 				.plus(body.payment?.other ?? 0)
 				.plus(body.payment?.transfer ?? 0)
 		}
 
-		// body ni tozalab, safe qilib joylashtiramiz
 		body = {
 			...body,
 			status: body.status,
 			staffId: request.user.id || selling.data.staff.id,
 			payment: hasValidPayment
-				? {
-						...body.payment,
-						total: total,
-					}
-				: selling.data.payment, // agar payment yo‘q bo‘lsa, eskisini saqlaymiz
+				? { ...body.payment, total: total }
+				: selling.data.payment,
 		}
 
 		const updatedSelling = await this.sellingRepository.updateOne(query, body)
 
-		// Clientni yangilaymiz
 		const client = await this.clientService.findOne({ id: selling.data.client.id })
 
 		const sellingInfo = {
@@ -290,25 +256,21 @@ export class SellingService {
 			client: client.data,
 			title: isFirstSend ? BotSellingTitleEnum.new : undefined,
 			totalPayment: total,
-			totalPrice: updatedSelling.totalPrice,
-			debt: updatedSelling.totalPrice.minus(total),
+			totalPrices: updatedSelling.totals,
 			products: updatedSelling.products.map((p) => ({
 				...p,
 				status: BotSellingProductTitleEnum.new,
-				product: { ...p.product, prices: p.product.productPrices },
 			})),
-		}
+		} as any
 
 		console.log(shouldSend, selling.data.status, body.status, updatedSelling.status, total, sellingInfo.payment.total)
-		// clientga yuborish
+
 		if (selling.data.status === SellingStatusEnum.accepted || body.status === SellingStatusEnum.accepted || updatedSelling.status === SellingStatusEnum.accepted) {
 			if (body.send) {
 				if (updatedSelling.client?.telegram?.id) {
 					await this.botService.sendSellingToClient(sellingInfo).catch(console.log)
 				}
 			}
-			// channelga yuborish
-			// if (shouldSend) {
 			const wasAccepted = selling.data.status === SellingStatusEnum.accepted
 			const prevPaymentTotal = selling.data.payment?.total ?? new Decimal(0)
 			const isAcceptedNow = updatedSelling.status === SellingStatusEnum.accepted
@@ -316,22 +278,14 @@ export class SellingService {
 			const paymentChanged = !prevPaymentTotal.equals(newPaymentTotal)
 			const hadPaymentBefore = !prevPaymentTotal.isZero()
 			const shouldSendPayment =
-				// 1) birinchi marta accepted bo‘ldi va payment bor
-				(!wasAccepted && isAcceptedNow && !newPaymentTotal.isZero()) ||
-				// 2) oldin accepted edi va payment o‘zgardi
-				(wasAccepted && paymentChanged)
-			const isModified =
-				// faqat oldin payment bo‘lgan bo‘lsa
-				hadPaymentBefore && paymentChanged
+				(!wasAccepted && isAcceptedNow && !newPaymentTotal.isZero()) || (wasAccepted && paymentChanged)
+			const isModified = hadPaymentBefore && paymentChanged
 
 			await this.botService.sendSellingToChannel(sellingInfo).catch(console.log)
 
-			// if (!total.isZero() || !sellingInfo.payment.total.isZero()) {
 			if (shouldSendPayment) {
 				await this.botService.sendPaymentToChannel(sellingInfo.payment, isModified, client.data)
 			}
-			// }
-			// }
 		}
 
 		return createResponse({ data: null, success: { messages: ['update one success'] } })
@@ -342,23 +296,18 @@ export class SellingService {
 		if (query.method === DeleteMethodEnum.hard) {
 			await this.sellingRepository.deleteOne(query)
 			const client = await this.clientService.findOne({ id: selling.data.client.id })
-			const sellingInfo = {
-				...selling.data,
-				products: selling.data.products.map((p) => ({
-					...p,
-					product: { ...p.product, prices: p.product.productPrices },
-				})),
-				client: client.data,
-			}
-			if (selling.data.status === SellingStatusEnum.accepted) {
-				await this.botService.sendDeletedSellingToChannel(sellingInfo)
+		const sellingInfo = {
+			...selling.data,
+			products: selling.data.products,
+			client: client.data,
+		} as any
+		if (selling.data.status === SellingStatusEnum.accepted) {
+			await this.botService.sendDeletedSellingToChannel(sellingInfo)
 				const totalPayment = selling.data.payment.card.plus(selling.data.payment.cash).plus(selling.data.payment.other).plus(selling.data.payment.transfer)
 				if (totalPayment.toNumber()) {
 					await this.botService.sendDeletedPaymentToChannel(selling.data.payment, client.data)
 				}
 			}
-		} else {
-			// await this.sellingRepository.updateOne(query, { deletedAt: new Date() })
 		}
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
 	}
@@ -369,7 +318,6 @@ export class SellingService {
 		const getDateRange = (type: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
 			const start = new Date(now)
 			const end = new Date(now)
-
 			if (type === 'weekly') {
 				start.setDate(now.getDate() - now.getDay())
 				end.setDate(start.getDate() + 6)
@@ -380,7 +328,6 @@ export class SellingService {
 				start.setMonth(0, 1)
 				end.setMonth(11, 31)
 			}
-
 			return { startDate: start, endDate: end }
 		}
 
@@ -390,37 +337,40 @@ export class SellingService {
 		const statsPromises = statTypes.map((type) =>
 			limit(async () => {
 				const { startDate, endDate } = getDateRange(type)
-				const result = await this.prisma.sellingModel.aggregate({
+				const totals = await this.prisma.sellingTotalModel.findMany({
 					where: {
-						date: {
-							gte: startDate ? new Date(new Date(startDate).setHours(0, 0, 0, 0)) : undefined,
-							lte: endDate ? new Date(new Date(endDate).setHours(23, 59, 59, 999)) : undefined,
+						selling: {
+							date: {
+								gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
+								lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+							},
+							client: { deletedAt: null },
+							status: SellingStatusEnum.accepted,
 						},
-						client: { deletedAt: null },
-						status: SellingStatusEnum.accepted,
 					},
-					_sum: { totalPrice: true },
+					select: { total: true, currencyId: true, currency: { select: { symbol: true } } },
 				})
 
-				return new Decimal(result._sum.totalPrice || 0)
+				const map = new Map<string, TotalStatsByCurrency>()
+				for (const t of totals) {
+					const existing = map.get(t.currencyId)
+					if (existing) {
+						existing.total = existing.total.plus(t.total)
+					} else {
+						map.set(t.currencyId, { currencyId: t.currencyId, symbol: t.currency.symbol, total: new Decimal(t.total) })
+					}
+				}
+				return Array.from(map.values())
 			}),
 		)
 
-		// ✅ Promise.all natijalarini to‘g‘ri tartibda ajratib olamiz
 		const [daily, weekly, monthly, yearly] = await Promise.all(statsPromises)
 
 		const supplierDebt = await this.getSupplierDebtStats()
 		const clientDebt = await this.getClientDebtStats()
 
 		return createResponse({
-			data: {
-				daily,
-				weekly,
-				monthly,
-				yearly,
-				client: clientDebt,
-				supplier: supplierDebt,
-			},
+			data: { daily, weekly, monthly, yearly, client: clientDebt, supplier: supplierDebt },
 			success: { messages: ['get total stats success'] },
 		})
 	}
@@ -432,7 +382,10 @@ export class SellingService {
 				balance: true,
 				sellings: {
 					where: { status: SellingStatusEnum.accepted },
-					select: { totalPrice: true, payment: { select: { total: true } } },
+					select: {
+						totals: { select: { total: true } },
+						payment: { select: { total: true } },
+					},
 				},
 				returnings: {
 					where: { status: SellingStatusEnum.accepted },
@@ -445,7 +398,11 @@ export class SellingService {
 		let ourDebt = new Decimal(0)
 
 		for (const c of clients) {
-			const sellingDebt = c.sellings.reduce((acc, s) => acc.plus(s.totalPrice).minus(s.payment.total), new Decimal(0))
+			const sellingDebt = c.sellings.reduce((acc, s) => {
+				const sellingTotal = s.totals.reduce((sum, t) => sum.plus(t.total), new Decimal(0))
+				return acc.plus(sellingTotal).minus(s.payment.total)
+			}, new Decimal(0))
+
 			c.returnings.map((returning) => {
 				c.balance = c.balance.minus(returning.payment.fromBalance)
 			})
@@ -469,7 +426,10 @@ export class SellingService {
 				balance: true,
 				arrivals: {
 					where: { deletedAt: null },
-					select: { totalCost: true, payment: { select: { total: true } } },
+					select: {
+						totals: { select: { totalCost: true } },
+						payment: { select: { total: true } },
+					},
 				},
 			},
 		})
@@ -478,7 +438,10 @@ export class SellingService {
 		let theirDebt = new Decimal(0)
 
 		for (const s of suppliers) {
-			const arrivalDebt = s.arrivals.reduce((acc, a) => acc.plus(a.totalCost).minus(a.payment?.total ?? 0), new Decimal(0))
+			const arrivalDebt = s.arrivals.reduce((acc, a) => {
+				const costTotal = a.totals.reduce((sum, t) => sum.plus(t.totalCost), new Decimal(0))
+				return acc.plus(costTotal).minus(a.payment?.total ?? 0)
+			}, new Decimal(0))
 
 			const totalDebt = s.balance.plus(arrivalDebt ?? 0)
 
@@ -494,7 +457,6 @@ export class SellingService {
 
 	async getPeriodStats(query: SellingGetPeriodStatsRequest) {
 		const result = await this.sellingRepository.getPeriodStats(query)
-
 		return createResponse({ data: result, success: { messages: ['get period stats success'] } })
 	}
 }

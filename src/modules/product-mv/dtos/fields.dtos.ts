@@ -1,7 +1,6 @@
-import { Decimal } from '@prisma/client/runtime/library'
 import { ProductMVOptional, ProductMVRequired } from '../interfaces'
 import { $Enums, ServiceTypeEnum } from '@prisma/client'
-import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto, IsDecimalIntOrBigInt } from '../../../common'
+import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID } from 'class-validator'
 
@@ -13,18 +12,8 @@ export class ProductMVRequiredDto extends DefaultRequiredFieldsDto implements Pr
 
 	@ApiProperty({ type: Number })
 	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	cost: Decimal
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
 	@IsNumber()
 	count: number
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	price: Decimal
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
@@ -50,16 +39,6 @@ export class ProductMVRequiredDto extends DefaultRequiredFieldsDto implements Pr
 	@IsNotEmpty()
 	@IsEnum(ServiceTypeEnum)
 	type: $Enums.ServiceTypeEnum
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	totalCost: Decimal
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	totalPrice: Decimal
 }
 
 export class ProductMVOptionalDto extends DefaultOptionalFieldsDto implements ProductMVOptional {
@@ -70,18 +49,8 @@ export class ProductMVOptionalDto extends DefaultOptionalFieldsDto implements Pr
 
 	@ApiPropertyOptional({ type: Number })
 	@IsOptional()
-	@IsDecimalIntOrBigInt()
-	cost?: Decimal
-
-	@ApiPropertyOptional({ type: Number })
-	@IsOptional()
 	@IsNumber()
 	count?: number
-
-	@ApiPropertyOptional({ type: Number })
-	@IsOptional()
-	@IsDecimalIntOrBigInt()
-	price?: Decimal
 
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()

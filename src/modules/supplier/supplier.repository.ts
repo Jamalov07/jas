@@ -36,15 +36,14 @@ export class SupplierRepository implements OnModuleInit {
 				fullname: true,
 				balance: true,
 				phone: true,
-				arrivals: {
-					select: {
-						date: true,
-						totalCost: true,
-						payment: { select: { card: true, cash: true, other: true, transfer: true, total: true } },
-						products: { select: { cost: true, count: true, price: true } },
-					},
-					orderBy: { date: 'desc' },
+			arrivals: {
+				select: {
+					date: true,
+					totals: { select: { totalCost: true } },
+					payment: { select: { card: true, cash: true, other: true, transfer: true, total: true } },
 				},
+				orderBy: { date: 'desc' },
+			},
 				payments: {
 					where: { type: ServiceTypeEnum.supplier },
 					select: { card: true, cash: true, other: true, transfer: true, total: true },
@@ -67,17 +66,16 @@ export class SupplierRepository implements OnModuleInit {
 				id: true,
 				balance: true,
 				fullname: true,
-				arrivals: {
-					select: {
-						totalCost: true,
-						date: true,
-						payment: {
-							select: { total: true, card: true, cash: true, other: true, transfer: true, description: true, createdAt: true },
-						},
-						products: { select: { cost: true, count: true, price: true } },
+			arrivals: {
+				select: {
+					totals: { select: { totalCost: true } },
+					date: true,
+					payment: {
+						select: { total: true, card: true, cash: true, other: true, transfer: true, description: true, createdAt: true },
 					},
-					orderBy: { date: 'desc' },
 				},
+				orderBy: { date: 'desc' },
+			},
 				payments: {
 					where: { type: ServiceTypeEnum.supplier, deletedAt: null },
 					select: { total: true, card: true, cash: true, other: true, transfer: true, description: true, createdAt: true },

@@ -1,11 +1,11 @@
-// generator client {
-//   provider = "prisma-client-js"
-// }
+generator client {
+  provider = "prisma-client-js"
+}
 
-// datasource db {
-//   provider = "postgresql"
-//   url      = env("DATABASE_URL")
-// }
+datasource db {
+  provider = "postgresql"
+  // url      = env("DATABASE_URL")
+}
 
 
 // enum ActionMethodEnum {
@@ -458,3 +458,17 @@
 //   @@id([ id ])
 //   @@map("day_close_log")
 // }
+
+//================================new model structure================================
+
+
+model Product {
+  id          String  @map("id")          @db.Uuid      @default(dbgenerated("GEN_RANDOM_UUID()"))
+  name        String  @map("name")        @db.VarChar()
+  count       Int     @map("count")       @db.Integer   @default(1)
+  minAmount   Int     @map("min_amount")  @db.Integer   @default(1)
+  description String? @map("description") @db.VarChar() @default("")
+
+  @@id([ id ])
+  @@map("product")
+}

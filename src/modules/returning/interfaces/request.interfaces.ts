@@ -1,7 +1,7 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
 import { ReturningOptional, ReturningRequired } from './fields.interfaces'
-import { ProductMVRequired } from '../../product-mv'
 import { PaymentModel } from '@prisma/client'
+import { Decimal } from '@prisma/client/runtime/library'
 
 export declare interface ReturningFindManyRequest
 	extends Pick<ReturningOptional, 'clientId' | 'staffId' | 'status'>,
@@ -14,16 +14,24 @@ export declare interface ReturningGetManyRequest extends ReturningOptional, Pagi
 
 export declare interface ReturningGetOneRequest extends ReturningOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 
-export declare interface ReturningPayment extends Pick<PaymentModel, 'fromBalance' | 'cash' | 'total'> {}
+export declare interface ReturningPayment extends Pick<PaymentModel, 'fromBalance' | 'cash'> {
+	total?: PaymentModel['total']
+}
 
-export declare interface ReturningProduct extends Pick<ProductMVRequired, 'price' | 'count' | 'totalPrice' | 'productId'> {}
+export declare interface ReturningProduct {
+	productId: string
+	count: number
+	price: Decimal
+	currencyId: string
+	totalPrice?: Decimal
+}
 
-export declare interface ReturningCreateOneRequest extends Pick<ReturningRequired, 'clientId' | 'date'>, Pick<ReturningOptional, 'staffId' | 'status' | 'totalPrice'> {
+export declare interface ReturningCreateOneRequest extends Pick<ReturningRequired, 'clientId' | 'date'>, Pick<ReturningOptional, 'staffId' | 'status'> {
 	payment?: ReturningPayment
 	products?: ReturningProduct[]
 }
 
-export declare interface ReturningUpdateOneRequest extends Pick<ReturningOptional, 'deletedAt' | 'clientId' | 'date' | 'staffId' | 'status' | 'totalPrice'> {
+export declare interface ReturningUpdateOneRequest extends Pick<ReturningOptional, 'deletedAt' | 'clientId' | 'date' | 'staffId' | 'status'> {
 	payment?: ReturningPayment
 	products?: ReturningProduct[]
 	productIdsToRemove?: string[]

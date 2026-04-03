@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { ReturningOptional, ReturningRequired } from '../interfaces'
-import { IsDateString, IsNotEmpty, IsOptional, IsUUID } from 'class-validator'
+import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsUUID } from 'class-validator'
+import { $Enums, SellingStatusEnum } from '@prisma/client'
 
 export class ReturningRequiredDto extends DefaultRequiredFieldsDto implements ReturningRequired {
 	@ApiProperty({ type: String })
@@ -18,6 +19,11 @@ export class ReturningRequiredDto extends DefaultRequiredFieldsDto implements Re
 	@IsNotEmpty()
 	@IsUUID('4')
 	staffId: string
+
+	@ApiProperty({ enum: SellingStatusEnum })
+	@IsNotEmpty()
+	@IsEnum(SellingStatusEnum)
+	status: $Enums.SellingStatusEnum
 }
 
 export class ReturningOptionalDto extends DefaultOptionalFieldsDto implements ReturningOptional {
@@ -35,4 +41,9 @@ export class ReturningOptionalDto extends DefaultOptionalFieldsDto implements Re
 	@IsOptional()
 	@IsUUID('4')
 	staffId?: string
+
+	@ApiPropertyOptional({ enum: SellingStatusEnum })
+	@IsOptional()
+	@IsEnum(SellingStatusEnum)
+	status?: $Enums.SellingStatusEnum
 }

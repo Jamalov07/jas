@@ -6,11 +6,30 @@ import {
 	ReturningFindOneData,
 	ReturningFindOneResponse,
 	ReturningModifyResponse,
+	ReturningTotalData,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ReturningRequiredDto } from './fields.dtos'
+import { Decimal } from '@prisma/client/runtime/library'
 
-export class ReturningFindOneDataDto extends PickType(ReturningRequiredDto, ['id', 'date', 'createdAt']) implements ReturningFindOneData {}
+export class ReturningTotalDataDto implements ReturningTotalData {
+	@ApiProperty({ type: String })
+	id: string
+
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty()
+	currency: { id: string; symbol: string; name: string }
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+}
+
+export class ReturningFindOneDataDto extends PickType(ReturningRequiredDto, ['id', 'status', 'date', 'createdAt']) implements ReturningFindOneData {
+	@ApiProperty({ type: ReturningTotalDataDto, isArray: true })
+	totals?: ReturningTotalData[]
+}
 
 export class ReturningFindManyDataDto extends PaginationResponseDto implements ReturningFindManyData {
 	@ApiProperty({ type: ReturningFindOneDataDto, isArray: true })

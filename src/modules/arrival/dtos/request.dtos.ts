@@ -1,4 +1,4 @@
-import { PickType, IntersectionType, ApiPropertyOptional } from '@nestjs/swagger'
+import { PickType, IntersectionType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
 	ArrivalCreateOneRequest,
 	ArrivalDeleteOneRequest,
@@ -8,12 +8,12 @@ import {
 	ArrivalProduct,
 	ArrivalUpdateOneRequest,
 } from '../interfaces'
-import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
+import { IsDecimalIntOrBigInt, PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { ArrivalOptionalDto, ArrivalRequiredDto } from './fields.dtos'
 import { Type } from 'class-transformer'
-import { IsArray, IsOptional, IsUUID, ValidateNested } from 'class-validator'
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
 import { SupplierPaymentOptionalDto, SupplierPaymentRequiredDto } from '../../supplier-payment'
-import { ProductMVRequiredDto } from '../../product-mv'
+import { Decimal } from '@prisma/client/runtime/library'
 
 export class ArrivalFindManyRequestDto
 	extends IntersectionType(PickType(ArrivalOptionalDto, ['supplierId', 'staffId']), PaginationRequestDto, PickType(RequestOtherFieldsDto, ['search', 'endDate', 'startDate']))
@@ -25,7 +25,37 @@ export class ArrivalPaymentDto
 	extends IntersectionType(PickType(SupplierPaymentRequiredDto, ['card', 'cash', 'other', 'transfer']), PickType(SupplierPaymentOptionalDto, ['description']))
 	implements ArrivalPayment {}
 
-export class ArrivalProductDto extends PickType(ProductMVRequiredDto, ['count', 'price', 'cost', 'productId']) implements ArrivalProduct {}
+export class ArrivalProductDto implements ArrivalProduct {
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	productId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsNumber()
+	count: number
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	cost: Decimal
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	costCurrencyId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	price: Decimal
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	priceCurrencyId: string
+}
 
 export class ArrivalCreateOneRequestDto extends IntersectionType(PickType(ArrivalRequiredDto, ['supplierId', 'date'])) implements ArrivalCreateOneRequest {
 	@ApiPropertyOptional({ type: ArrivalPaymentDto })

@@ -1,10 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { SellingOptional, SellingRequired } from '../interfaces'
-import { IsBoolean, IsDateString, IsEnum, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID } from 'class-validator'
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID } from 'class-validator'
 import { $Enums, SellingStatusEnum, UserTypeEnum } from '@prisma/client'
 
 export class SellingRequiredDto extends DefaultRequiredFieldsDto implements SellingRequired {
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsInt()
+	publicId: number
+
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
 	@IsUUID('4')
@@ -37,6 +42,11 @@ export class SellingRequiredDto extends DefaultRequiredFieldsDto implements Sell
 }
 
 export class SellingOptionalDto extends DefaultOptionalFieldsDto implements SellingOptional {
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsInt()
+	publicId?: number
+
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()
 	@IsUUID('4')

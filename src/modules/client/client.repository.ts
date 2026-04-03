@@ -45,23 +45,22 @@ export class ClientRepository implements OnModuleInit {
 					where: { type: ServiceTypeEnum.client, deletedAt: null },
 					select: { card: true, cash: true, other: true, transfer: true, total: true },
 				},
-				sellings: {
-					where: { status: SellingStatusEnum.accepted },
-					select: {
-						date: true,
-						totalPrice: true,
-						payment: { select: { card: true, cash: true, other: true, transfer: true, total: true } },
-						products: { select: { count: true, price: true } },
-					},
-					orderBy: { date: 'desc' },
+			sellings: {
+				where: { status: SellingStatusEnum.accepted },
+				select: {
+					date: true,
+					totals: { select: { total: true } },
+					payment: { select: { card: true, cash: true, other: true, transfer: true, total: true } },
 				},
-				returnings: {
-					where: { status: SellingStatusEnum.accepted },
-					select: {
-						payment: { select: { fromBalance: true } },
-					},
-					orderBy: { date: 'desc' },
+				orderBy: { date: 'desc' },
+			},
+			returnings: {
+				where: { status: SellingStatusEnum.accepted },
+				select: {
+					payment: { select: { fromBalance: true } },
 				},
+				orderBy: { date: 'desc' },
+			},
 			},
 			...paginationOptions,
 		})
@@ -134,13 +133,11 @@ export class ClientRepository implements OnModuleInit {
 				...(query.endDate && { date: { lte: query.endDate } }),
 			},
 			_count: { clientId: true },
-			_sum: { totalPrice: true },
 		})
 
 		for (const s of sellingStats) {
 			const c = getClient(s.clientId)
 			c.selling.count = Number(s._count.clientId)
-			c.selling.totalPrice = Number(s._sum.totalPrice ?? 0)
 		}
 
 		// --- PAYMENT STATS ---
@@ -180,7 +177,6 @@ export class ClientRepository implements OnModuleInit {
 		for (const r of returningStats) {
 			const c = getClient(r.clientId)
 			c.returning.count += 1
-			c.returning.totalPrice += Number(r.totalPrice ?? 0)
 			c.returning.payment.totalFromBalance += Number(r.payment?.fromBalance ?? 0)
 			c.returning.payment.totalCash += Number(r.payment?.cash ?? 0)
 		}
@@ -204,18 +200,17 @@ export class ClientRepository implements OnModuleInit {
 					where: { type: ServiceTypeEnum.client, deletedAt: null },
 					select: { card: true, total: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
 				},
-				sellings: {
-					where: { status: SellingStatusEnum.accepted },
-					select: {
-						date: true,
-						totalPrice: true,
-						products: { select: { cost: true, count: true, price: true } },
-						payment: {
-							select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-						},
+			sellings: {
+				where: { status: SellingStatusEnum.accepted },
+				select: {
+					date: true,
+					totals: { select: { total: true } },
+					payment: {
+						select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
 					},
-					orderBy: { date: 'desc' },
 				},
+				orderBy: { date: 'desc' },
+			},
 				returnings: {
 					where: { status: SellingStatusEnum.accepted },
 					select: {

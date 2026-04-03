@@ -61,12 +61,12 @@ export class ProductRepository {
 				name: true,
 				minAmount: true,
 				productPrices: { select: PRICE_SELECT },
-				productMVs: {
-					where: { type: ServiceTypeEnum.selling },
-					orderBy: { selling: { date: 'desc' } },
-					take: 1,
-					select: { count: true, price: true, selling: { select: { date: true } } },
-				},
+			productMVs: {
+				where: { type: ServiceTypeEnum.selling },
+				orderBy: { selling: { date: 'desc' } },
+				take: 1,
+				select: { count: true, productMVPrices: { select: { price: true, type: true } }, selling: { select: { date: true } } },
+			},
 			},
 			...paginationOptions,
 		})
@@ -89,7 +89,7 @@ export class ProductRepository {
 					where: { type: ServiceTypeEnum.selling },
 					orderBy: { selling: { date: 'desc' } },
 					take: 1,
-					select: { price: true, count: true, selling: { select: { date: true } } },
+					select: { count: true, productMVPrices: { select: { price: true, type: true } }, selling: { select: { date: true } } },
 				},
 			},
 		})

@@ -1,7 +1,7 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
 import { SellingOptional, SellingRequired } from './fields.interfaces'
 import { ClientPaymentOptional, ClientPaymentRequired } from '../../client-payment'
-import { ProductMVOptional, ProductMVRequired } from '../../product-mv'
+import { Decimal } from '@prisma/client/runtime/library'
 import { StatsTypeEnum } from '../enums'
 
 export declare interface SellingFindManyRequest
@@ -17,15 +17,21 @@ export declare interface SellingGetOneRequest extends SellingOptional, Pick<Requ
 
 export declare interface SellingPayment extends Pick<ClientPaymentRequired, 'card' | 'cash' | 'other' | 'transfer'>, Pick<ClientPaymentOptional, 'description' | 'total'> {}
 
-export declare interface SellingProduct extends Pick<ProductMVRequired, 'price' | 'count' | 'productId'>, Pick<ProductMVOptional, 'totalPrice'> {}
+export declare interface SellingProduct {
+	productId: string
+	count: number
+	price: Decimal
+	currencyId: string
+	totalPrice?: Decimal
+}
 
-export declare interface SellingCreateOneRequest extends Pick<SellingRequired, 'clientId' | 'date'>, Pick<SellingOptional, 'staffId' | 'status' | 'totalPrice'> {
+export declare interface SellingCreateOneRequest extends Pick<SellingRequired, 'clientId' | 'date'>, Pick<SellingOptional, 'staffId' | 'status'> {
 	payment?: SellingPayment
 	products?: SellingProduct[]
 	send?: boolean
 }
 
-export declare interface SellingUpdateOneRequest extends Pick<SellingOptional, 'deletedAt' | 'clientId' | 'date' | 'status' | 'staffId' | 'totalPrice'> {
+export declare interface SellingUpdateOneRequest extends Pick<SellingOptional, 'deletedAt' | 'clientId' | 'date' | 'status' | 'staffId'> {
 	payment?: SellingPayment
 	send?: boolean
 }

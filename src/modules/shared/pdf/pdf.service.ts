@@ -47,7 +47,10 @@ export class PdfService {
 								{ text: 'Цена', bold: true },
 								{ text: 'Сумма', bold: true },
 							],
-							...selling.products.map((item, index) => [index + 1, item.product.name, item.count, item.price.toNumber(), item.price.mul(item.count).toNumber()]),
+							...selling.products.map((item, index) => {
+								const price = item.productMVPrices?.[0]?.price?.toNumber() ?? 0
+								return [index + 1, item.product.name, item.count, price, price * item.count]
+							}),
 						],
 					},
 					layout: {
@@ -81,7 +84,7 @@ export class PdfService {
 					margin: [0, 10, 0, 10],
 				},
 				{
-					text: `Итого: ${selling.totalPrice?.toNumber() || 0}`,
+					text: `Итого: ${selling.totalPrices?.map((t) => `${t.total.toNumber()} ${t.currency?.symbol ?? ''}`).join(' + ') || 0}`,
 					fontSize: 13,
 					bold: true,
 					color: 'red',
@@ -146,17 +149,18 @@ export class PdfService {
 								{ text: 'Цена', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 								{ text: 'Сумма', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 							],
-							...selling.products
-								.filter((pro) => pro.status !== BotSellingProductTitleEnum.deleted)
-								.map((item, index) => {
-									return [
-										{ text: index + 1, fontSize: 12, alignment: 'center' },
-										{ text: item.product.name, fontSize: 12, alignment: 'left' },
-										{ text: item.count.toString(), fontSize: 12, alignment: 'center' },
-										{ text: item.price.toNumber().toString(), fontSize: 12, alignment: 'right' },
-										{ text: item.price.mul(item.count).toNumber().toString(), fontSize: 12, alignment: 'right' },
-									]
-								}),
+						...selling.products
+							.filter((pro) => pro.status !== BotSellingProductTitleEnum.deleted)
+							.map((item, index) => {
+								const price = item.productMVPrices?.[0]?.price?.toNumber() ?? 0
+								return [
+									{ text: index + 1, fontSize: 12, alignment: 'center' },
+									{ text: item.product.name, fontSize: 12, alignment: 'left' },
+									{ text: item.count.toString(), fontSize: 12, alignment: 'center' },
+									{ text: price.toString(), fontSize: 12, alignment: 'right' },
+									{ text: (price * item.count).toString(), fontSize: 12, alignment: 'right' },
+								]
+							}),
 						],
 					},
 					layout: {
@@ -188,7 +192,7 @@ export class PdfService {
 					margin: [0, 10, 0, 10],
 				},
 				{
-					text: `Итого: ${selling.totalPrice?.toNumber() || 0}`,
+					text: `Итого: ${selling.totalPrices?.map((t) => `${t.total.toNumber()} ${t.currency?.symbol ?? ''}`).join(' + ') || 0}`,
 					fontSize: 13,
 					bold: true,
 					color: 'red',

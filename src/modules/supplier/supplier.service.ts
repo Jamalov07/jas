@@ -31,7 +31,8 @@ export class SupplierService {
 
 		const mappedSuppliers = suppliers.map((s) => {
 			const arrivalPayment = s.arrivals.reduce((acc, arr) => {
-				return acc.plus(arr.totalCost).minus(arr.payment?.total || 0)
+				const totalCost = arr.totals?.reduce((a, t) => a.plus(t.totalCost), new Decimal(0)) ?? new Decimal(0)
+				return acc.plus(totalCost).minus(arr.payment?.total || 0)
 			}, new Decimal(0))
 			return {
 				...s,
@@ -106,10 +107,11 @@ export class SupplierService {
 		console.log('totalPayment', payment)
 
 		const arrivalPayment = supplier.arrivals.reduce((acc, arr) => {
-			console.log('arrival', arr.payment.total, arr.totalCost)
+			const arrTotalCost = arr.totals?.reduce((a, t) => a.plus(t.totalCost), new Decimal(0)) ?? new Decimal(0)
+			console.log('arrival', arr.payment.total, arrTotalCost)
 			if ((!deedStartDate || arr.date >= deedStartDate) && (!deedEndDate || arr.date <= deedEndDate)) {
-				deeds.push({ type: 'debit', action: 'arrival', value: arr.totalCost, date: arr.date, description: '' })
-				totalDebit = totalDebit.plus(arr.totalCost)
+				deeds.push({ type: 'debit', action: 'arrival', value: arrTotalCost, date: arr.date, description: '' })
+				totalDebit = totalDebit.plus(arrTotalCost)
 			}
 
 			if ((!deedStartDate || arr.payment.createdAt >= deedStartDate) && (!deedEndDate || arr.payment.createdAt <= deedEndDate)) {
@@ -117,7 +119,7 @@ export class SupplierService {
 				totalCredit = totalCredit.plus(arr.payment.total)
 			}
 
-			return acc.plus(arr.totalCost).minus(arr.payment?.total || 0)
+			return acc.plus(arrTotalCost).minus(arr.payment?.total || 0)
 		}, new Decimal(0))
 		console.log('arrivalPayment', arrivalPayment)
 		console.log(supplier.balance, arrivalPayment)

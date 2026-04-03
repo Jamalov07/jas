@@ -114,11 +114,20 @@ export class BotService {
 		}
 	}
 
+	private formatTotalPrices(selling: SellingFindOneData): string {
+		if (!selling.totalPrices?.length) return '0'
+		return selling.totalPrices.map((t) => `${t.total.toNumber()} ${t.currency?.symbol ?? ''}`).join(' + ')
+	}
+
+	private getProductPrice(product: { productMVPrices?: { price: any }[] }): number {
+		return product.productMVPrices?.[0]?.price?.toNumber() ?? 0
+	}
+
 	async sendSellingToClient(selling: SellingFindOneData) {
 		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling)
 
 		let caption = ''
-		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${selling.totalPrice.toNumber()}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
+		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
 
 		const clientInfo = `👤 Клиент: ${selling.client.fullname}\n` + `📊 Общий долг: ${selling.client.debt.toNumber()}`
 
@@ -134,7 +143,7 @@ export class BotService {
 			case BotSellingTitleEnum.added: {
 				const newProduct = findProductByStatus(BotSellingProductTitleEnum.new)
 				if (newProduct) {
-					productInfo = `\n📦 Товар добавлен\n` + `• Название: ${newProduct.product.name}\n` + `• Цена: ${newProduct.price.toNumber()}\n` + `• Кол-во: ${newProduct.count}`
+					productInfo = `\n📦 Товар добавлен\n` + `• Название: ${newProduct.product.name}\n` + `• Цена: ${this.getProductPrice(newProduct)}\n` + `• Кол-во: ${newProduct.count}`
 				}
 				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
 				break
@@ -144,7 +153,7 @@ export class BotService {
 				const updatedProduct = findProductByStatus(BotSellingProductTitleEnum.updated)
 				if (updatedProduct) {
 					productInfo =
-						`\n♻️ Товар обновлён\n` + `• Название: ${updatedProduct.product.name}\n` + `• Цена: ${updatedProduct.price.toNumber()}\n` + `• Кол-во: ${updatedProduct.count}`
+						`\n♻️ Товар обновлён\n` + `• Название: ${updatedProduct.product.name}\n` + `• Цена: ${this.getProductPrice(updatedProduct)}\n` + `• Кол-во: ${updatedProduct.count}`
 				}
 				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
 				break
@@ -154,7 +163,7 @@ export class BotService {
 				const deletedProduct = findProductByStatus(BotSellingProductTitleEnum.deleted)
 				if (deletedProduct) {
 					productInfo =
-						`\n🗑️ Товар удалён\n` + `• Название: ${deletedProduct.product.name}\n` + `• Цена: ${deletedProduct.price.toNumber()}\n` + `• Кол-во: ${deletedProduct.count}`
+						`\n🗑️ Товар удалён\n` + `• Название: ${deletedProduct.product.name}\n` + `• Цена: ${this.getProductPrice(deletedProduct)}\n` + `• Кол-во: ${deletedProduct.count}`
 				}
 				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
 				break
@@ -174,7 +183,7 @@ export class BotService {
 		if (!chatInfo) return
 
 		let caption = ''
-		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${selling.totalPrice.toNumber()}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
+		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
 
 		const clientInfo = `👤 Клиент: ${selling.client.fullname}\n` + `📊 Общий долг: ${selling.client.debt.toNumber()}`
 
@@ -191,7 +200,7 @@ export class BotService {
 		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling)
 
 		let caption = ''
-		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${selling.totalPrice.toNumber()}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
+		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
 
 		const clientInfo = `👤 Клиент: ${selling.client.fullname}\n` + `📊 Общий долг: ${selling.client.debt.toNumber()}`
 
@@ -207,7 +216,7 @@ export class BotService {
 			case BotSellingTitleEnum.added: {
 				const newProduct = findProductByStatus(BotSellingProductTitleEnum.new)
 				if (newProduct) {
-					productInfo = `\n📦 Товар добавлен\n` + `• Название: ${newProduct.product.name}\n` + `• Цена: ${newProduct.price.toNumber()}\n` + `• Кол-во: ${newProduct.count}`
+					productInfo = `\n📦 Товар добавлен\n` + `• Название: ${newProduct.product.name}\n` + `• Цена: ${this.getProductPrice(newProduct)}\n` + `• Кол-во: ${newProduct.count}`
 				}
 				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
 				break
@@ -217,7 +226,7 @@ export class BotService {
 				const updatedProduct = findProductByStatus(BotSellingProductTitleEnum.updated)
 				if (updatedProduct) {
 					productInfo =
-						`\n♻️ Товар обновлён\n` + `• Название: ${updatedProduct.product.name}\n` + `• Цена: ${updatedProduct.price.toNumber()}\n` + `• Кол-во: ${updatedProduct.count}`
+						`\n♻️ Товар обновлён\n` + `• Название: ${updatedProduct.product.name}\n` + `• Цена: ${this.getProductPrice(updatedProduct)}\n` + `• Кол-во: ${updatedProduct.count}`
 				}
 				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
 				break
@@ -227,7 +236,7 @@ export class BotService {
 				const deletedProduct = findProductByStatus(BotSellingProductTitleEnum.deleted)
 				if (deletedProduct) {
 					productInfo =
-						`\n🗑️ Товар удалён\n` + `• Название: ${deletedProduct.product.name}\n` + `• Цена: ${deletedProduct.price.toNumber()}\n` + `• Кол-во: ${deletedProduct.count}`
+						`\n🗑️ Товар удалён\n` + `• Название: ${deletedProduct.product.name}\n` + `• Цена: ${this.getProductPrice(deletedProduct)}\n` + `• Кол-во: ${deletedProduct.count}`
 				}
 				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
 				break

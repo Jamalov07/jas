@@ -1,6 +1,6 @@
 import { BadRequestException, forwardRef, Inject, Injectable } from '@nestjs/common'
 import { ArrivalRepository } from './arrival.repository'
-import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG } from '@common'
+import { createResponse, CRequest, ERROR_MSG } from '@common'
 import {
 	ArrivalGetOneRequest,
 	ArrivalCreateOneRequest,
@@ -32,21 +32,15 @@ export class ArrivalService {
 		const arrivalsCount = await this.arrivalRepository.countFindMany(query)
 
 		const calc = {
-			totalPrice: new Decimal(0),
-			totalCost: new Decimal(0),
 			totalPayment: new Decimal(0),
 			totalCardPayment: new Decimal(0),
 			totalCashPayment: new Decimal(0),
 			totalOtherPayment: new Decimal(0),
 			totalTransferPayment: new Decimal(0),
-			totalDebt: new Decimal(0),
 		}
 
 		const mappedArrivals = arrivals.map((arrival) => {
-			calc.totalPrice = calc.totalPrice.plus(arrival.totalPrice)
-			calc.totalCost = calc.totalCost.plus(arrival.totalCost)
 			calc.totalPayment = calc.totalPayment.plus(arrival.payment.total)
-			calc.totalDebt = calc.totalDebt.plus(arrival.totalCost.minus(arrival.payment.total))
 			calc.totalCardPayment = calc.totalCardPayment.plus(arrival.payment.card)
 			calc.totalCashPayment = calc.totalCashPayment.plus(arrival.payment.cash)
 			calc.totalOtherPayment = calc.totalOtherPayment.plus(arrival.payment.other)
@@ -55,10 +49,8 @@ export class ArrivalService {
 			return {
 				...arrival,
 				payment: arrival.payment.total.toNumber() ? arrival.payment : null,
-				debt: arrival.totalCost.minus(arrival.payment.total),
 				totalPayment: arrival.payment.total,
-				totalCost: arrival.totalCost,
-				totalPrice: arrival.totalPrice,
+				totals: arrival.totals,
 			}
 		})
 
@@ -90,7 +82,7 @@ export class ArrivalService {
 			throw new BadRequestException(ERROR_MSG.ARRIVAL.NOT_FOUND.UZ)
 		}
 
-		return createResponse({ data: { ...arrival }, success: { messages: ['find one success'] } })
+		return createResponse({ data: { ...arrival, totals: arrival.totals }, success: { messages: ['find one success'] } })
 	}
 
 	async getMany(query: ArrivalGetManyRequest) {
@@ -126,46 +118,28 @@ export class ArrivalService {
 			.plus(body.payment?.other ?? 0)
 			.plus(body.payment?.transfer ?? 0)
 
-		let totalCost = new Decimal(0)
-		let totalPrice = new Decimal(0)
-
-		const products = body.products.map((product) => {
-			const cost = new Decimal(product.cost ?? 0)
-			const price = new Decimal(product.price ?? 0)
-			const count = new Decimal(product.count ?? 0)
-
-			const totalCostForProduct = cost.mul(count)
-			const totalPriceForProduct = price.mul(count)
-
-			totalCost = totalCost.plus(totalCostForProduct)
-			totalPrice = totalPrice.plus(totalPriceForProduct)
-
-			return { ...product, totalCost: totalCostForProduct, totalPrice: totalPriceForProduct }
-		})
-
 		const arrival = await this.arrivalRepository.createOne({
 			...body,
 			staffId: request.user.id,
 			payment: { ...body.payment, total: total },
-			products,
-			totalCost,
-			totalPrice,
 		})
 
 		return createResponse({ data: arrival, success: { messages: ['create one success'] } })
 	}
 
 	async updateOne(query: ArrivalGetOneRequest, body: ArrivalUpdateOneRequest) {
-		const arrival = await this.getOne(query)
+		await this.getOne(query)
 
 		const newTotal = new Decimal(body.payment?.card ?? 0)
 			.plus(body.payment?.cash ?? 0)
 			.plus(body.payment?.other ?? 0)
 			.plus(body.payment?.transfer ?? 0)
 
+		const arrival = await this.arrivalRepository.getOne(query)
+
 		body = {
 			...body,
-			payment: { ...body.payment, total: !newTotal.equals(arrival.data.payment.total) ? newTotal : undefined },
+			payment: { ...body.payment, total: !newTotal.equals(arrival.payment.total) ? newTotal : undefined },
 		}
 
 		await this.arrivalRepository.updateOne(query, body)
@@ -175,11 +149,7 @@ export class ArrivalService {
 
 	async deleteOne(query: ArrivalDeleteOneRequest) {
 		await this.getOne(query)
-		// if (query.method === DeleteMethodEnum.hard) {
 		await this.arrivalRepository.deleteOne(query)
-		// } else {
-		// await this.arrivalRepository.updateOne(query, { deletedAt: new Date() })
-		// }
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
 	}
 }
