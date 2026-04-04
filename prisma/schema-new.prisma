@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // url      = env("DATABASE_URL")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -31,6 +31,16 @@ enum PriceTypeEnum {
   wholesale @map("wholesale")
 
   @@map("price_type")
+}
+
+enum PaymentMethodEnum {
+  cash         @map("cash")
+  card         @map("card")
+  other        @map("other")
+  transfer     @map("transfer")
+  fromBalance  @map("from_balance")
+
+  @@map("client_payment_method")
 }
 
 enum PageEnum {
@@ -62,10 +72,24 @@ model CurrencyModel {
   exchangeRate Decimal @map("exchange_rate") @db.Decimal(10, 3) @default(0)
 
   staffs            StaffModel[]
+
   productPrices     ProductPriceModel[]
+
   sellingMVPrices   SellingProductMVPriceModel[]
   arrivalMVPrices   ArrivalProductMVPriceModel[]
   returningMVPrices ReturningProductMVPriceModel[]
+
+  clientPaymentMethods ClientPaymentMethodModel[]
+  supplierPaymentMethods SupplierPaymentMethodModel[]
+  staffPaymentMethods StaffPaymentMethodModel[]
+
+  clientSellingPaymentMethods ClientSellingPaymentMethodModel[]
+  supplierArrivalPaymentMethods SupplierArrivalPaymentMethodModel[]
+  clientReturningPaymentMethods ClientReturningPaymentMethodModel[]
+
+
+
+
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -89,7 +113,9 @@ model ClientModel {
 
   sellings   SellingModel[]
   returnings ReturningModel[]
-  payments   ClientPaymentModel[]
+  clientPayments   ClientPaymentModel[]
+  clientSellingPayments ClientSellingPaymentModel[]
+  clientReturningPayments ClientReturningPaymentModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -112,7 +138,8 @@ model SupplierModel {
   phone    String  @map("phone")    @db.VarChar()      @unique
 
   arrivals ArrivalModel[]
-  payments SupplierPaymentModel[]
+  supplierPayments SupplierPaymentModel[]
+  supplierArrivalPayments  SupplierArrivalPaymentModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -144,11 +171,22 @@ model StaffModel {
   sellings     SellingModel[]
   arrivals     ArrivalModel[]
   returnings   ReturningModel[]
+
   sellingMVs   SellingProductMVModel[]
   arrivalMVs   ArrivalProductMVModel[]
   returningMVs ReturningProductMVModel[]
+
   clientPayments   ClientPaymentModel[]
   supplierPayments SupplierPaymentModel[]
+  employeePayments StaffPaymentModel[] @relation(name:"employee")
+  staffPayments    StaffPaymentModel[] @relation(name: "staff")
+
+  clientSellingPayments ClientSellingPaymentModel[]
+  supplierArrivalPayments  SupplierArrivalPaymentModel[]
+  clientReturningPayments ClientReturningPaymentModel[]
+
+
+
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -161,6 +199,10 @@ model StaffModel {
   @@index([createdAt])
   @@map("staff")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product
+// ─────────────────────────────────────────────────────────────────────────────
 
 model ProductModel {
   id          String  @map("id")          @db.Uuid      @default(dbgenerated("GEN_RANDOM_UUID()"))
@@ -219,8 +261,9 @@ model SellingModel {
 
   client   ClientModel             @relation(fields: [clientId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   staff    StaffModel              @relation(fields: [staffId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
-  payment  ClientPaymentModel?
+  
   products SellingProductMVModel[]
+  clientSellingPayment ClientSellingPaymentModel?
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -278,6 +321,45 @@ model SellingProductMVPriceModel {
   @@map("selling_product_mv_price")
 }
 
+model ClientSellingPaymentModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  sellingId   String  @map("selling_id")   @db.Uuid           @unique
+  clientId    String  @map("client_id")    @db.Uuid
+  staffId     String  @map("staff_id")     @db.Uuid
+  description String? @map("description")  @db.VarChar()      @default("")
+
+  client    ClientModel     @relation(fields: [clientId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
+  staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
+  selling   SellingModel    @relation(fields: [sellingId],   references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  clientSellingPaymentMethods ClientSellingPaymentMethodModel[]
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("client_selling_payment")
+}
+
+model ClientSellingPaymentMethodModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type        PaymentMethodEnum 
+  currencyId  String  @map("currency_id") @db.Uuid
+  amount      Decimal @map("amount")      @db.Decimal(10, 3)
+  clientSellingPaymentId String  @map("client_selling_payment_id") @db.Uuid
+
+  currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  clientSellingPayment ClientSellingPaymentModel @relation(fields: [clientSellingPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("client_selling_payment_method")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Arrival
 // ─────────────────────────────────────────────────────────────────────────────
@@ -291,8 +373,9 @@ model ArrivalModel {
 
   supplier SupplierModel           @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   staff    StaffModel              @relation(fields: [staffId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
-  payment  SupplierPaymentModel?
   products ArrivalProductMVModel[]
+  supplierArrivalPayment  SupplierArrivalPaymentModel?
+
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -349,6 +432,46 @@ model ArrivalProductMVPriceModel {
   @@map("arrival_product_mv_price")
 }
 
+
+model SupplierArrivalPaymentModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  arrivalId   String  @map("arrival_id")   @db.Uuid           @unique
+  supplierId    String  @map("supplier_id")    @db.Uuid
+  staffId     String  @map("staff_id")     @db.Uuid
+  description String? @map("description")  @db.VarChar()      @default("")
+
+  supplier    SupplierModel     @relation(fields: [supplierId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
+  staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
+  arrival   ArrivalModel    @relation(fields: [arrivalId],   references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  supplierArrivalPaymentMethods SupplierArrivalPaymentMethodModel[]
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("supplier_arrival_payment")
+}
+
+model SupplierArrivalPaymentMethodModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type        PaymentMethodEnum 
+  currencyId  String  @map("currency_id") @db.Uuid
+  amount      Decimal @map("amount")      @db.Decimal(10, 3)
+  supplierArrivalPaymentId String  @map("supplier_arrival_payment_id") @db.Uuid
+
+  currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  supplierArrivalPayment SupplierArrivalPaymentModel @relation(fields: [supplierArrivalPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("supplier_arrival_payment_method")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Returning
 // ─────────────────────────────────────────────────────────────────────────────
@@ -363,8 +486,9 @@ model ReturningModel {
 
   client   ClientModel              @relation(fields: [clientId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   staff    StaffModel               @relation(fields: [staffId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
-  payment  ClientPaymentModel?
   products ReturningProductMVModel[]
+  clientReturningPayments ClientReturningPaymentModel?
+
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -423,68 +547,170 @@ model ReturningProductMVPriceModel {
 }
 
 
+model ClientReturningPaymentModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  returningId   String  @map("returning_id")   @db.Uuid           @unique
+  clientId    String  @map("client_id")    @db.Uuid
+  staffId     String  @map("staff_id")     @db.Uuid
+  description String? @map("description")  @db.VarChar()      @default("")
+
+  client    ClientModel     @relation(fields: [clientId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
+  staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
+  returning   ReturningModel    @relation(fields: [returningId],   references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  clientReturningPaymentMethods ClientReturningPaymentMethodModel[]
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("client_returning_payment")
+}
+
+model ClientReturningPaymentMethodModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type        PaymentMethodEnum 
+  currencyId  String  @map("currency_id") @db.Uuid
+  amount      Decimal @map("amount")      @db.Decimal(10, 3)
+  clientReturningPaymentId String  @map("client_returning_payment_id") @db.Uuid
+
+  currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  clientReturningPayment ClientReturningPaymentModel @relation(fields: [clientReturningPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("client_returning_payment_method")
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Payments
+// Client Payments
 // ─────────────────────────────────────────────────────────────────────────────
 
 model ClientPaymentModel {
   id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
-  cash        Decimal @map("cash")         @db.Decimal(10, 3) @default(0)
-  card        Decimal @map("card")         @db.Decimal(10, 3) @default(0)
-  other       Decimal @map("other")        @db.Decimal(10, 3) @default(0)
-  transfer    Decimal @map("transfer")     @db.Decimal(10, 3) @default(0)
-  fromBalance Decimal @map("from_balance") @db.Decimal(10, 3) @default(0)
-  total       Decimal @map("total")        @db.Decimal(10, 3) @default(0)
-  description String? @map("description")  @db.VarChar()      @default("")
   clientId    String  @map("client_id")    @db.Uuid
   staffId     String  @map("staff_id")     @db.Uuid
-  sellingId   String? @map("selling_id")   @db.Uuid           @unique
-  returningId String? @map("returning_id") @db.Uuid           @unique
+  description String? @map("description")  @db.VarChar()      @default("")
 
   client    ClientModel     @relation(fields: [clientId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
   staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
-  selling   SellingModel?   @relation(fields: [sellingId],   references: [id], onDelete: Cascade, onUpdate: NoAction)
-  returning ReturningModel? @relation(fields: [returningId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  clientPaymentMethods ClientPaymentMethodModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
-  @@index([id])
-  @@index([clientId])
-  @@index([sellingId])
-  @@index([returningId])
   @@map("client_payment")
 }
 
-model SupplierPaymentModel {
-  id          String  @map("id")          @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
-  cash        Decimal @map("cash")        @db.Decimal(10, 3) @default(0)
-  card        Decimal @map("card")        @db.Decimal(10, 3) @default(0)
-  other       Decimal @map("other")       @db.Decimal(10, 3) @default(0)
-  transfer    Decimal @map("transfer")    @db.Decimal(10, 3) @default(0)
-  total       Decimal @map("total")       @db.Decimal(10, 3) @default(0)
-  description String? @map("description") @db.VarChar()      @default("")
-  supplierId  String  @map("supplier_id") @db.Uuid
-  staffId     String  @map("staff_id")    @db.Uuid
-  arrivalId   String? @map("arrival_id")  @db.Uuid           @unique
+model ClientPaymentMethodModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type        PaymentMethodEnum 
+  currencyId  String  @map("currency_id") @db.Uuid
+  amount      Decimal @map("amount")      @db.Decimal(10, 3)
+  clientPaymentId String  @map("client_payment_id") @db.Uuid
 
-  supplier SupplierModel @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  staff    StaffModel    @relation(fields: [staffId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
-  arrival  ArrivalModel? @relation(fields: [arrivalId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
+  currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  clientPayment ClientPaymentModel @relation(fields: [clientPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
-  @@index([id])
-  @@index([supplierId])
-  @@index([arrivalId])
+  @@map("client_payment_method")
+}
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Supplier Payments
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SupplierPaymentModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  supplierId    String  @map("supplier_id")    @db.Uuid
+  staffId     String  @map("staff_id")     @db.Uuid
+  description String? @map("description")  @db.VarChar()      @default("")
+
+  supplier    SupplierModel     @relation(fields: [supplierId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
+  staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  supplierPaymentMethods SupplierPaymentMethodModel[]
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
   @@map("supplier_payment")
 }
 
+model SupplierPaymentMethodModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type        PaymentMethodEnum 
+  currencyId  String  @map("currency_id") @db.Uuid
+  amount      Decimal @map("amount")      @db.Decimal(10, 3)
+  supplierPaymentId String  @map("supplier_payment_id") @db.Uuid
+
+  currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  supplierPayment SupplierPaymentModel @relation(fields: [supplierPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("supplier_payment_method")
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Product
+// Staff Payments
 // ─────────────────────────────────────────────────────────────────────────────
+
+model StaffPaymentModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  employeeId    String  @map("employee_id")    @db.Uuid
+  staffId     String  @map("staff_id")     @db.Uuid
+  description String? @map("description")  @db.VarChar()      @default("")
+
+  employee    StaffModel     @relation(name: "employee", fields: [employeeId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
+  staff     StaffModel      @relation(name: "staff", fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  employeePaymentMethods StaffPaymentMethodModel[]
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("employee_payment")
+}
+
+model StaffPaymentMethodModel {
+  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type        PaymentMethodEnum 
+  currencyId  String  @map("currency_id") @db.Uuid
+  amount      Decimal @map("amount")      @db.Decimal(10, 3)
+  employeePaymentId String  @map("employee_payment_id") @db.Uuid
+
+  currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  employeePayment StaffPaymentModel @relation(fields: [employeePaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@map("employee_payment_method")
+}
+
+
