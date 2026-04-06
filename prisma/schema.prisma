@@ -35,9 +35,15 @@ enum PriceTypeEnum {
 
 enum PaymentMethodEnum {
   cash         @map("cash")
-  card         @map("card")
-  other        @map("other")
+  uzcard       @map("uzcard")
+  humo         @map("humo")
   transfer     @map("transfer")
+  click        @map("click")
+  payme        @map("payme")
+  visa         @map("visa")
+  uzum         @map("uzum")
+  other        @map("other")
+  
   fromBalance  @map("from_balance")
 
   @@map("payment_method")
