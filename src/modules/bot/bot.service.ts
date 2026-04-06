@@ -195,7 +195,7 @@ export class BotService {
 
 		const clientInfo = `👤 Клиент: ${selling.client?.fullname ?? ''}\n` + `📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
 
-		await this.bot.telegram.sendMessage(channelId, `🗑️ Продажа удалено\n\n${baseInfo}\n\n${clientInfo}`)
+		await this.bot.telegram.sendMessage(channelId, `🗑️ Продажа удалено \n\n${baseInfo}\n\n${clientInfo}`)
 	}
 
 	// ─── Payment notifications (shared helper) ────────────────────────────────
