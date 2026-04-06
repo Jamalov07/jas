@@ -1,28 +1,37 @@
 import { GlobalResponse, PaginationResponse } from '@common'
 import { ArrivalRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
+import { PaymentMethodEnum } from '@prisma/client'
 
-export declare interface ArrivalTotalData {
-	id: string
+export declare interface ArrivalPaymentMethodData {
+	type: PaymentMethodEnum
 	currencyId: string
-	currency: { id: string; symbol: string; name: string }
-	totalCost: Decimal
-	totalPrice: Decimal
+	amount: Decimal
+}
+
+export declare interface ArrivalPaymentData {
+	id: string
+	description?: string
+	paymentMethods: ArrivalPaymentMethodData[]
+	createdAt: Date
+}
+
+export declare interface ArrivalCalcEntry {
+	type: PaymentMethodEnum
+	currencyId: string
+	total: Decimal
 }
 
 export declare interface ArrivalFindManyData extends PaginationResponse<ArrivalFindOneData> {
-	calc?: {
-		totalPayment: Decimal
-		totalCardPayment: Decimal
-		totalCashPayment: Decimal
-		totalOtherPayment: Decimal
-		totalTransferPayment: Decimal
-	}
+	calc?: ArrivalCalcEntry[]
 }
 
 export declare interface ArrivalFindOneData extends Pick<ArrivalRequired, 'id' | 'date' | 'createdAt'> {
-	totals?: ArrivalTotalData[]
 	totalPayment?: Decimal
+	payment?: ArrivalPaymentData
+	products?: any[]
+	supplier?: any
+	staff?: any
 }
 
 export declare interface ArrivalFindManyResponse extends GlobalResponse {

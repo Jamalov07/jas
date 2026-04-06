@@ -1,14 +1,22 @@
 import { Injectable } from '@nestjs/common'
 import { PdfService, PrismaService } from '../shared'
 import { Context, Markup, Telegraf } from 'telegraf'
-import { Message } from 'telegraf/typings/core/types/typegram'
-import { BotLanguageEnum, PaymentModel, ServiceTypeEnum } from '@prisma/client'
-import { SellingFindOneData } from '../selling'
+import { BotLanguageEnum } from '@prisma/client'
 import { InjectBot } from 'nestjs-telegraf'
 import { MyBotName } from './constants'
 import { ConfigService } from '@nestjs/config'
-import { BotSellingProductTitleEnum, BotSellingTitleEnum } from '../selling/enums'
+import { SellingFindOneData, SellingPaymentData, SellingProductData } from '../selling'
 import { ClientFindOneData } from '../client'
+import { BotSellingProductTitleEnum, BotSellingTitleEnum } from '../selling/enums'
+import { Decimal } from '@prisma/client/runtime/library'
+
+type BotSellingData = Omit<SellingFindOneData, 'products'> & {
+	title?: BotSellingTitleEnum
+	products?: Array<SellingProductData & { status?: BotSellingProductTitleEnum }>
+}
+
+type PaymentMethod = { type: string; amount: Decimal }
+type DebtEntry = { amount: Decimal }
 
 @Injectable()
 export class BotService {
@@ -30,8 +38,8 @@ export class BotService {
 		const user = await this.findBotUserById(context.from.id)
 		if (user) {
 			if (user.language) {
-				if (user.userId) {
-					context.reply(`${user.user.fullname} siz allaqachon ro'yhatdan o'tgansiz!`)
+				if (user.clientId) {
+					context.reply(`${user.client.fullname} siz allaqachon ro'yhatdan o'tgansiz!`)
 				} else {
 					context.reply("Ro'yhatdan o'tish uchun telefon raqam yuborish tugmasini bosing.", {
 						parse_mode: 'HTML',
@@ -63,7 +71,7 @@ export class BotService {
 		const user = await this.findBotUserById(context.from.id)
 
 		if (user) {
-			const user2 = await this.updateBotUserWithId(context.from.id, { language: language })
+			await this.updateBotUserWithId(context.from.id, { language: language })
 			await context.reply("Ro'yhatdan o'tish uchun telefon raqam yuborish tugmasini bosing.", {
 				parse_mode: 'HTML',
 				...Markup.keyboard([[Markup.button.contactRequest('📲 Raqam yuborish')]])
@@ -85,9 +93,9 @@ export class BotService {
 		const user = await this.findBotUserById(context.from.id)
 		if (user && 'contact' in context.message) {
 			if (user.language) {
-				const usr = await this.findUserByPhone(context.message.contact.phone_number)
-				if (usr) {
-					await this.updateBotUserWithId(context.from.id, { userId: usr.id })
+				const client = await this.findClientByPhone(context.message.contact.phone_number)
+				if (client) {
+					await this.updateBotUserWithId(context.from.id, { clientId: client.id })
 					await context.reply("Tabriklaymiz. Muvaffaqiyatli ro'yhatdan o'tdingiz!", {
 						reply_markup: { remove_keyboard: true },
 					})
@@ -114,231 +122,266 @@ export class BotService {
 		}
 	}
 
-	private formatTotalPrices(selling: SellingFindOneData): string {
+	// ─── Selling notifications ────────────────────────────────────────────────
+
+	private formatTotalPrices(selling: BotSellingData): string {
 		if (!selling.totalPrices?.length) return '0'
-		return selling.totalPrices.map((t) => `${t.total.toNumber()} ${t.currency?.symbol ?? ''}`).join(' + ')
+		return selling.totalPrices.map((t) => `${t.total.toNumber()} ${(t as any).currency?.symbol ?? ''}`).join(' + ')
 	}
 
-	private getProductPrice(product: { productMVPrices?: { price: any }[] }): number {
-		return product.productMVPrices?.[0]?.price?.toNumber() ?? 0
+	private getProductPrice(product: SellingProductData): number {
+		return product.prices?.[0]?.price?.toNumber() ?? 0
 	}
 
-	async sendSellingToClient(selling: SellingFindOneData) {
-		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling)
+	private buildSellingCaption(selling: BotSellingData): string {
+		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId ?? selling.id}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n`
 
-		let caption = ''
-		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
+		const clientInfo = `👤 Клиент: ${selling.client?.fullname ?? ''}\n` + `📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
 
-		const clientInfo = `👤 Клиент: ${selling.client.fullname}\n` + `📊 Общий долг: ${selling.client.debt.toNumber()}`
+		const findProductByStatus = (status: BotSellingProductTitleEnum) => selling.products?.find((p) => p.status === status)
 
 		let productInfo = ''
 
-		const findProductByStatus = (status: BotSellingProductTitleEnum) => selling.products.find((prod) => prod.status === status)
-
 		switch (selling.title) {
 			case BotSellingTitleEnum.new:
-				caption = `🧾 Новая продажа\n\n${baseInfo}\n${clientInfo}`
-				break
+				return `🧾 Новая продажа\n\n${baseInfo}\n${clientInfo}`
 
 			case BotSellingTitleEnum.added: {
-				const newProduct = findProductByStatus(BotSellingProductTitleEnum.new)
-				if (newProduct) {
-					productInfo = `\n📦 Товар добавлен\n` + `• Название: ${newProduct.product.name}\n` + `• Цена: ${this.getProductPrice(newProduct)}\n` + `• Кол-во: ${newProduct.count}`
-				}
-				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
-				break
+				const p = findProductByStatus(BotSellingProductTitleEnum.new)
+				if (p) productInfo = `\n📦 Товар добавлен\n` + `• Название: ${p.product.name}\n` + `• Цена: ${this.getProductPrice(p)}\n` + `• Кол-во: ${p.count}`
+				return `${baseInfo}${productInfo}\n\n${clientInfo}`
 			}
 
 			case BotSellingTitleEnum.updated: {
-				const updatedProduct = findProductByStatus(BotSellingProductTitleEnum.updated)
-				if (updatedProduct) {
-					productInfo =
-						`\n♻️ Товар обновлён\n` + `• Название: ${updatedProduct.product.name}\n` + `• Цена: ${this.getProductPrice(updatedProduct)}\n` + `• Кол-во: ${updatedProduct.count}`
-				}
-				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
-				break
+				const p = findProductByStatus(BotSellingProductTitleEnum.updated)
+				if (p) productInfo = `\n♻️ Товар обновлён\n` + `• Название: ${p.product.name}\n` + `• Цена: ${this.getProductPrice(p)}\n` + `• Кол-во: ${p.count}`
+				return `${baseInfo}${productInfo}\n\n${clientInfo}`
 			}
 
 			case BotSellingTitleEnum.deleted: {
-				const deletedProduct = findProductByStatus(BotSellingProductTitleEnum.deleted)
-				if (deletedProduct) {
-					productInfo =
-						`\n🗑️ Товар удалён\n` + `• Название: ${deletedProduct.product.name}\n` + `• Цена: ${this.getProductPrice(deletedProduct)}\n` + `• Кол-во: ${deletedProduct.count}`
-				}
-				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
-				break
+				const p = findProductByStatus(BotSellingProductTitleEnum.deleted)
+				if (p) productInfo = `\n🗑️ Товар удалён\n` + `• Название: ${p.product.name}\n` + `• Цена: ${this.getProductPrice(p)}\n` + `• Кол-во: ${p.count}`
+				return `${baseInfo}${productInfo}\n\n${clientInfo}`
 			}
 
 			default:
-				caption = `${baseInfo}\n${clientInfo}`
-				break
+				return `${baseInfo}\n${clientInfo}`
 		}
-
-		await this.bot.telegram.sendDocument(selling.client.telegram?.id, { source: bufferPdf, filename: `xarid.pdf` }, { caption })
 	}
 
-	async sendDeletedSellingToChannel(selling: SellingFindOneData) {
+	async sendSellingToClient(selling: BotSellingData) {
+		const telegramId = selling.client?.telegram?.id
+		if (!telegramId) return
+
+		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling as any)
+		await this.bot.telegram.sendDocument(telegramId, { source: bufferPdf, filename: `xarid.pdf` }, { caption: this.buildSellingCaption(selling) })
+	}
+
+	async sendSellingToChannel(selling: BotSellingData) {
 		const channelId = this.configService.getOrThrow<string>('bot.sellingChannelId')
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 
-		let caption = ''
-		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
-
-		const clientInfo = `👤 Клиент: ${selling.client.fullname}\n` + `📊 Общий долг: ${selling.client.debt.toNumber()}`
-
-		caption = `🗑️ Продажа удалено\n\n${baseInfo}\n\n${clientInfo}`
-
-		await this.bot.telegram.sendMessage(channelId, caption)
+		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling as any)
+		await this.bot.telegram.sendDocument(channelId, { source: bufferPdf, filename: `${selling.client?.phone ?? 'chek'}.pdf` }, { caption: this.buildSellingCaption(selling) })
 	}
 
-	async sendSellingToChannel(selling: SellingFindOneData) {
+	async sendDeletedSellingToChannel(selling: BotSellingData) {
 		const channelId = this.configService.getOrThrow<string>('bot.sellingChannelId')
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 
-		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling)
+		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId ?? selling.id}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n`
 
-		let caption = ''
-		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n` + `💸 Долг: ${selling.debt.toNumber()}\n`
+		const clientInfo = `👤 Клиент: ${selling.client?.fullname ?? ''}\n` + `📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
 
-		const clientInfo = `👤 Клиент: ${selling.client.fullname}\n` + `📊 Общий долг: ${selling.client.debt.toNumber()}`
-
-		let productInfo = ''
-
-		const findProductByStatus = (status: BotSellingProductTitleEnum) => selling.products.find((prod) => prod.status === status)
-
-		switch (selling.title) {
-			case BotSellingTitleEnum.new:
-				caption = `🧾 Новая продажа\n\n${baseInfo}\n${clientInfo}`
-				break
-
-			case BotSellingTitleEnum.added: {
-				const newProduct = findProductByStatus(BotSellingProductTitleEnum.new)
-				if (newProduct) {
-					productInfo = `\n📦 Товар добавлен\n` + `• Название: ${newProduct.product.name}\n` + `• Цена: ${this.getProductPrice(newProduct)}\n` + `• Кол-во: ${newProduct.count}`
-				}
-				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
-				break
-			}
-
-			case BotSellingTitleEnum.updated: {
-				const updatedProduct = findProductByStatus(BotSellingProductTitleEnum.updated)
-				if (updatedProduct) {
-					productInfo =
-						`\n♻️ Товар обновлён\n` + `• Название: ${updatedProduct.product.name}\n` + `• Цена: ${this.getProductPrice(updatedProduct)}\n` + `• Кол-во: ${updatedProduct.count}`
-				}
-				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
-				break
-			}
-
-			case BotSellingTitleEnum.deleted: {
-				const deletedProduct = findProductByStatus(BotSellingProductTitleEnum.deleted)
-				if (deletedProduct) {
-					productInfo =
-						`\n🗑️ Товар удалён\n` + `• Название: ${deletedProduct.product.name}\n` + `• Цена: ${this.getProductPrice(deletedProduct)}\n` + `• Кол-во: ${deletedProduct.count}`
-				}
-				caption = `${baseInfo}${productInfo}\n\n${clientInfo}`
-				break
-			}
-
-			default:
-				caption = `${baseInfo}\n${clientInfo}`
-				break
-		}
-
-		await this.bot.telegram.sendDocument(channelId, { source: bufferPdf, filename: `${selling.client.phone}.pdf` }, { caption })
+		await this.bot.telegram.sendMessage(channelId, `🗑️ Продажа удалено\n\n${baseInfo}\n\n${clientInfo}`)
 	}
 
-	async sendPaymentToChannel(payment: Partial<PaymentModel>, isModified: boolean = false, client: ClientFindOneData) {
+	// ─── Payment notifications (shared helper) ────────────────────────────────
+
+	private formatDebt(debtByCurrency: DebtEntry[]): string {
+		if (!debtByCurrency.length) return '0'
+		return debtByCurrency.map((d) => d.amount.toNumber()).join(' + ')
+	}
+
+	private buildPaymentMessage(params: {
+		prefix: string
+		person: { fullname: string; phone: string }
+		methods: PaymentMethod[]
+		description?: string | null
+		date: Date
+		debtByCurrency: DebtEntry[]
+	}): string {
+		const total = params.methods.reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
+		const byType = (type: string) => params.methods.filter((m) => m.type === type).reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
+
+		return (
+			`${params.prefix}` +
+			`👤 Клиент: ${params.person.fullname}\n` +
+			`📞 Телефон: ${params.person.phone}\n` +
+			`💰 Сумма: ${total.toNumber()}\n\n` +
+			`💵 Наличными: ${byType('cash').toNumber()}\n` +
+			`💳 Картой: ${byType('card').toNumber()}\n` +
+			`🏦 Переводом: ${byType('transfer').toNumber()}\n` +
+			`📦 Другое: ${byType('other').toNumber()}\n` +
+			`📅 Дата: ${this.formatDate(params.date)}\n` +
+			`📝 Описание: ${params.description ?? '-'}\n` +
+			`📊 Общий долг: ${this.formatDebt(params.debtByCurrency)}`
+		)
+	}
+
+	// ─── Selling payment notifications ────────────────────────────────────────
+
+	async sendPaymentToChannel(payment: SellingPaymentData, isModified: boolean = false, client: ClientFindOneData) {
 		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
-
 		if (!chatInfo) return
 
-		const paymentType: Record<string, string> = {
-			client: 'для клиента',
-			selling: 'для продажи',
-		}
+		const message = this.buildPaymentMessage({
+			prefix: isModified ? '♻️ Обновлено\n\n' : '',
+			person: { fullname: client.fullname, phone: client.phone },
+			methods: payment.paymentMethods ?? [],
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency: client.debtByCurrency ?? [],
+		})
 
-		const totalPayment = payment.card.plus(payment.cash).plus(payment.other).plus(payment.transfer)
-
-		const title =
-			`${isModified ? '♻️ Обновлено\n\n' : ''}` +
-			`📌 Тип: ${paymentType[payment.type] ?? 'неизвестно'}\n` +
-			`👤 Клиент: ${client.fullname}\n` +
-			`📞 Телефон: ${client.phone}\n` +
-			`💰 Сумма: ${totalPayment.toNumber()}\n\n` +
-			`💵 Наличными: ${payment.cash.toNumber()}\n` +
-			`💳 Картой: ${payment.card.toNumber()}\n` +
-			`🏦 Переводом: ${payment.transfer.toNumber()}\n` +
-			`📦 Другое: ${payment.other.toNumber()}\n` +
-			`📅 Дата: ${this.formatDate(payment.createdAt)}\n` +
-			`📝 Описание: ${payment.description ?? '-'}\n` +
-			`📊 Общий долг: ${client.debt.toNumber()}`
-
-		await this.bot.telegram.sendMessage(channelId, title)
+		await this.bot.telegram.sendMessage(channelId, message)
 	}
 
-	async sendDeletedPaymentToChannel(payment: Partial<PaymentModel>, client: ClientFindOneData) {
+	async sendDeletedPaymentToChannel(payment: SellingPaymentData, client: ClientFindOneData) {
 		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
-
 		if (!chatInfo) return
 
-		const paymentType: Record<string, string> = {
-			client: 'для клиента',
-			selling: 'для продажи',
-		}
+		const message = this.buildPaymentMessage({
+			prefix: '🗑️ Удалено\n\n',
+			person: { fullname: client.fullname, phone: client.phone },
+			methods: payment.paymentMethods ?? [],
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency: client.debtByCurrency ?? [],
+		})
 
-		const totalPayment = payment.card.plus(payment.cash).plus(payment.other).plus(payment.transfer)
-
-		const title =
-			`🗑️ Удалено\n\n` +
-			`📌 Тип: ${paymentType[payment.type] ?? 'неизвестно'}\n` +
-			`👤 Клиент: ${client.fullname}\n` +
-			`📞 Телефон: ${client.phone}\n` +
-			`💰 Сумма: ${totalPayment.toNumber()}\n\n` +
-			`💵 Наличными: ${payment.cash.toNumber()}\n` +
-			`💳 Картой: ${payment.card.toNumber()}\n` +
-			`🏦 Переводом: ${payment.transfer.toNumber()}\n` +
-			`📦 Другое: ${payment.other.toNumber()}\n` +
-			`📅 Дата: ${this.formatDate(payment.createdAt)}\n` +
-			`📝 Описание: ${payment.description ?? '-'}\n` +
-			`📊 Общий долг: ${client.debt.toNumber()}`
-
-		await this.bot.telegram.sendMessage(channelId, title)
+		await this.bot.telegram.sendMessage(channelId, message)
 	}
+
+	// ─── Client standalone payment notifications ──────────────────────────────
+
+	async sendClientPaymentToChannel(
+		payment: { description?: string | null; createdAt: Date; clientPaymentMethods: PaymentMethod[]; client: { fullname: string; phone: string } },
+		isModified: boolean,
+		debtByCurrency: DebtEntry[],
+	) {
+		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
+		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!chatInfo) return
+
+		const message = this.buildPaymentMessage({
+			prefix: isModified ? '♻️ Обновлено (оплата клиента)\n\n' : '💳 Оплата клиента\n\n',
+			person: payment.client,
+			methods: payment.clientPaymentMethods,
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency,
+		})
+
+		await this.bot.telegram.sendMessage(channelId, message)
+	}
+
+	async sendDeletedClientPaymentToChannel(
+		payment: { description?: string | null; createdAt: Date; clientPaymentMethods: PaymentMethod[]; client: { fullname: string; phone: string } },
+		debtByCurrency: DebtEntry[],
+	) {
+		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
+		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!chatInfo) return
+
+		const message = this.buildPaymentMessage({
+			prefix: '🗑️ Удалено (оплата клиента)\n\n',
+			person: payment.client,
+			methods: payment.clientPaymentMethods,
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency,
+		})
+
+		await this.bot.telegram.sendMessage(channelId, message)
+	}
+
+	// ─── Supplier payment notifications ───────────────────────────────────────
+
+	async sendSupplierPaymentToChannel(
+		payment: { description?: string | null; createdAt: Date; supplierPaymentMethods: PaymentMethod[]; supplier: { fullname: string; phone: string } },
+		isModified: boolean,
+		debtByCurrency: DebtEntry[],
+	) {
+		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
+		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!chatInfo) return
+
+		const message = this.buildPaymentMessage({
+			prefix: isModified ? '♻️ Обновлено (оплата поставщику)\n\n' : '💳 Оплата поставщику\n\n',
+			person: payment.supplier,
+			methods: payment.supplierPaymentMethods,
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency,
+		})
+
+		await this.bot.telegram.sendMessage(channelId, message)
+	}
+
+	async sendDeletedSupplierPaymentToChannel(
+		payment: { description?: string | null; createdAt: Date; supplierPaymentMethods: PaymentMethod[]; supplier: { fullname: string; phone: string } },
+		debtByCurrency: DebtEntry[],
+	) {
+		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
+		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!chatInfo) return
+
+		const message = this.buildPaymentMessage({
+			prefix: '🗑️ Удалено (оплата поставщику)\n\n',
+			person: payment.supplier,
+			methods: payment.supplierPaymentMethods,
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency,
+		})
+
+		await this.bot.telegram.sendMessage(channelId, message)
+	}
+
+	// ─── Private helpers ──────────────────────────────────────────────────────
 
 	private async findBotUserById(id: number | string) {
-		const user = await this.prisma.botUserModel.findFirst({ where: { id: String(id) }, select: { id: true, language: true, isActive: true, userId: true, user: true } })
+		const user = await this.prisma.botUserModel.findFirst({
+			where: { id: String(id) },
+			select: { id: true, language: true, isActive: true, clientId: true, client: true },
+		})
 		return user
 	}
 
 	private async createBotUserWithId(id: number | string) {
-		const user = await this.prisma.botUserModel.create({ data: { id: String(id) } })
-		return user
+		return this.prisma.botUserModel.create({ data: { id: String(id) } })
 	}
 
-	private async updateBotUserWithId(id: number | string, body: { userId?: string; language?: BotLanguageEnum }) {
-		const user = await this.prisma.botUserModel.update({ where: { id: String(id) }, data: { language: body.language, userId: body.userId } })
-		return user
+	private async updateBotUserWithId(id: number | string, body: { clientId?: string; language?: BotLanguageEnum }) {
+		return this.prisma.botUserModel.update({ where: { id: String(id) }, data: { language: body.language, clientId: body.clientId } })
 	}
 
-	private async findUserByPhone(phone: string) {
+	private async findClientByPhone(phone: string) {
 		const cleanedPhone = phone.replace(/^\+/, '')
-		const user = await this.prisma.userModel.findFirst({ where: { phone: cleanedPhone } })
-		return user
+		return await this.prisma.clientModel.findFirst({ where: { phone: cleanedPhone } })
 	}
 
 	private formatDate(date: Date): string {
 		const dd = String(date.getDate()).padStart(2, '0')
 		const mm = String(date.getMonth() + 1).padStart(2, '0')
 		const yyyy = date.getFullYear()
-
 		const hh = String(date.getHours()).padStart(2, '0')
 		const min = String(date.getMinutes()).padStart(2, '0')
-
 		return `${dd}.${mm}.${yyyy} ${hh}:${min}`
 	}
 }

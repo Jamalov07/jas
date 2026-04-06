@@ -1,8 +1,7 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { CommonRepository } from './common.repository'
 import { createResponse, ERROR_MSG } from '../../common'
 import { DayCloseGetOneRequest, StaffUpdateCurrencyRequest } from './interfaces'
-import { UserTypeEnum } from '@prisma/client'
 
 @Injectable()
 export class CommonService {
@@ -29,18 +28,14 @@ export class CommonService {
 		return createResponse({ data: dayClose, success: { messages: ['get day close success'] } })
 	}
 
-	async updateStaffCurrency(userId: string, body: StaffUpdateCurrencyRequest) {
-		const user = await this.commonRepository.getUserById(userId)
+	async updateStaffCurrency(staffId: string, body: StaffUpdateCurrencyRequest) {
+		const staff = await this.commonRepository.getStaffById(staffId)
 
-		if (!user) {
+		if (!staff) {
 			throw new BadRequestException(ERROR_MSG.STAFF.NOT_FOUND.UZ)
 		}
 
-		if (user.type !== UserTypeEnum.staff) {
-			throw new ForbiddenException(ERROR_MSG.AUTH.PERMISSION_NOT_GRANTED.UZ)
-		}
-
-		await this.commonRepository.updateStaffCurrency(userId, body.currencyId)
+		await this.commonRepository.updateStaffCurrency(staffId, body.currencyId)
 
 		return createResponse({ data: null, success: { messages: ['update staff currency success'] } })
 	}

@@ -32,12 +32,6 @@ export class StaffPaymentController {
 		return this.staffPaymentService.findMany({ ...query, isDeleted: false })
 	}
 
-	@Get('excel-download/many')
-	@ApiOperation({ summary: 'download many supplier payments' })
-	async excelDownloadMany(@Res() res: Response, @Query() query: StaffPaymentFindManyRequestDto) {
-		return this.staffPaymentService.excelDownloadMany(res, query)
-	}
-
 	@Get('one')
 	@ApiOperation({ summary: 'find one staffPayment' })
 	@ApiOkResponse({ type: StaffPaymentFindOneResponseDto })
@@ -65,5 +59,11 @@ export class StaffPaymentController {
 	@ApiOkResponse({ type: StaffPaymentModifyResponseDto })
 	async deleteOne(@Query() query: StaffPaymentDeleteOneRequestDto): Promise<StaffPaymentModifyResponseDto> {
 		return this.staffPaymentService.deleteOne(query)
+	}
+
+	@Get('excel-download/many')
+	@ApiOperation({ summary: 'download many staff payments as excel' })
+	async excelDownloadMany(@Res() res: Response, @Query() query: StaffPaymentFindManyRequestDto) {
+		return this.staffPaymentService.excelDownloadMany(res, query)
 	}
 }

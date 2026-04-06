@@ -1,8 +1,25 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
 import { SellingOptional, SellingRequired } from './fields.interfaces'
-import { ClientPaymentOptional, ClientPaymentRequired } from '../../client-payment'
 import { Decimal } from '@prisma/client/runtime/library'
-import { StatsTypeEnum } from '../enums'
+import { PaymentMethodEnum } from '@prisma/client'
+
+export declare interface SellingPaymentMethod {
+	type: PaymentMethodEnum
+	currencyId: string
+	amount: Decimal
+}
+
+export declare interface SellingPayment {
+	paymentMethods?: SellingPaymentMethod[]
+	description?: string
+}
+
+export declare interface SellingProduct {
+	productId: string
+	count: number
+	price: Decimal
+	currencyId: string
+}
 
 export declare interface SellingFindManyRequest
 	extends Pick<SellingOptional, 'clientId' | 'staffId' | 'status'>,
@@ -14,16 +31,6 @@ export declare interface SellingFindOneRequest extends Pick<SellingOptional, 'id
 export declare interface SellingGetManyRequest extends SellingOptional, PaginationRequest, Pick<RequestOtherFields, 'ids' | 'isDeleted' | 'startDate' | 'endDate'> {}
 
 export declare interface SellingGetOneRequest extends SellingOptional, Pick<RequestOtherFields, 'isDeleted'> {}
-
-export declare interface SellingPayment extends Pick<ClientPaymentRequired, 'card' | 'cash' | 'other' | 'transfer'>, Pick<ClientPaymentOptional, 'description' | 'total'> {}
-
-export declare interface SellingProduct {
-	productId: string
-	count: number
-	price: Decimal
-	currencyId: string
-	totalPrice?: Decimal
-}
 
 export declare interface SellingCreateOneRequest extends Pick<SellingRequired, 'clientId' | 'date'>, Pick<SellingOptional, 'staffId' | 'status'> {
 	payment?: SellingPayment
@@ -37,9 +44,3 @@ export declare interface SellingUpdateOneRequest extends Pick<SellingOptional, '
 }
 
 export declare interface SellingDeleteOneRequest extends Pick<SellingOptional, 'id'>, Pick<RequestOtherFields, 'method'> {}
-
-export declare interface SellingGetTotalStatsRequest {}
-
-export declare interface SellingGetPeriodStatsRequest {
-	type?: StatsTypeEnum
-}

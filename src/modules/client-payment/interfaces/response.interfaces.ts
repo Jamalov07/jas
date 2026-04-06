@@ -1,19 +1,26 @@
 import { GlobalResponse, PaginationResponse } from '@common'
-import { ClientPaymentOptional, ClientPaymentRequired } from './fields.interfaces'
+import { ClientPaymentRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
-export declare interface ClientPaymentCalc {
-	totalCard: Decimal
-	totalCash: Decimal
-	totalOther: Decimal
-	totalTransfer: Decimal
+export declare interface ClientPaymentMethodData {
+	type: string
+	currencyId: string
+	amount: Decimal
+}
+
+export declare interface ClientPaymentCalcByCurrency {
+	currencyId: string
+	total: Decimal
 }
 
 export declare interface ClientPaymentFindManyData extends PaginationResponse<ClientPaymentFindOneData> {
-	calc: ClientPaymentCalc
+	calcByCurrency: ClientPaymentCalcByCurrency[]
 }
 
-export declare interface ClientPaymentFindOneData extends Pick<ClientPaymentRequired, 'id' | 'description'>, Pick<ClientPaymentOptional, 'total'> {}
+export declare interface ClientPaymentFindOneData extends Pick<ClientPaymentRequired, 'id'> {
+	description?: string | null
+	paymentMethods?: ClientPaymentMethodData[]
+}
 
 export declare interface ClientPaymentFindManyResponse extends GlobalResponse {
 	data: ClientPaymentFindManyData

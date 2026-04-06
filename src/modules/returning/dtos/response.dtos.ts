@@ -1,4 +1,4 @@
-import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@nestjs/swagger'
 import {
 	ReturningCreateOneResponse,
 	ReturningFindManyData,
@@ -6,29 +6,22 @@ import {
 	ReturningFindOneData,
 	ReturningFindOneResponse,
 	ReturningModifyResponse,
-	ReturningTotalData,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ReturningRequiredDto } from './fields.dtos'
-import { Decimal } from '@prisma/client/runtime/library'
-
-export class ReturningTotalDataDto implements ReturningTotalData {
-	@ApiProperty({ type: String })
-	id: string
-
-	@ApiProperty({ type: String })
-	currencyId: string
-
-	@ApiProperty()
-	currency: { id: string; symbol: string; name: string }
-
-	@ApiProperty({ type: Number })
-	total: Decimal
-}
 
 export class ReturningFindOneDataDto extends PickType(ReturningRequiredDto, ['id', 'status', 'date', 'createdAt']) implements ReturningFindOneData {
-	@ApiProperty({ type: ReturningTotalDataDto, isArray: true })
-	totals?: ReturningTotalData[]
+	@ApiPropertyOptional()
+	payment?: any
+
+	@ApiPropertyOptional()
+	products?: any[]
+
+	@ApiPropertyOptional()
+	client?: any
+
+	@ApiPropertyOptional()
+	staff?: any
 }
 
 export class ReturningFindManyDataDto extends PaginationResponseDto implements ReturningFindManyData {

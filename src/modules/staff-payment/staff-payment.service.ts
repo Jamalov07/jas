@@ -9,6 +9,7 @@ import {
 	StaffPaymentFindManyRequest,
 	StaffPaymentFindOneRequest,
 	StaffPaymentDeleteOneRequest,
+	StaffPaymentCalcByCurrency,
 } from './interfaces'
 import { StaffService } from '../staff'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -24,113 +25,93 @@ export class StaffPaymentService {
 	) {}
 
 	async findMany(query: StaffPaymentFindManyRequest) {
-		const staffPayments = await this.staffPaymentRepository.findMany(query)
-		const staffPaymentsCount = await this.staffPaymentRepository.countFindMany(query)
+		const payments = await this.staffPaymentRepository.findMany(query)
+		const paymentsCount = await this.staffPaymentRepository.countFindMany(query)
 
-		const calc = {
-			sum: new Decimal(0),
+		const calcMap = new Map<string, Decimal>()
+		for (const payment of payments) {
+			for (const method of payment.employeePaymentMethods) {
+				const curr = calcMap.get(method.currencyId) ?? new Decimal(0)
+				calcMap.set(method.currencyId, curr.plus(method.amount))
+			}
 		}
-
-		for (const payment of staffPayments) {
-			calc.sum = calc.sum.plus(payment.sum)
-		}
+		const calcByCurrency: StaffPaymentCalcByCurrency[] = Array.from(calcMap.entries()).map(([currencyId, total]) => ({ currencyId, total }))
 
 		const result = query.pagination
 			? {
-					totalCount: staffPaymentsCount,
-					pagesCount: Math.ceil(staffPaymentsCount / query.pageSize),
-					pageSize: staffPayments.length,
-					data: staffPayments,
-					calc: calc,
+					totalCount: paymentsCount,
+					pagesCount: Math.ceil(paymentsCount / query.pageSize),
+					pageSize: payments.length,
+					data: payments,
+					calcByCurrency,
 				}
-			: { data: staffPayments, calc: calc }
+			: { data: payments, calcByCurrency }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
 
-	async excelDownloadMany(res: Response, query: StaffPaymentFindManyRequest) {
-		return this.excelService.staffPaymentDownloadMany(res, query)
-	}
-
 	async findOne(query: StaffPaymentFindOneRequest) {
-		const staffPayment = await this.staffPaymentRepository.findOne(query)
+		const payment = await this.staffPaymentRepository.findOne(query)
 
-		if (!staffPayment) {
+		if (!payment) {
 			throw new BadRequestException(ERROR_MSG.STAFF_PAYMENT.NOT_FOUND.UZ)
 		}
 
-		return createResponse({ data: { ...staffPayment }, success: { messages: ['find one success'] } })
+		return createResponse({ data: payment, success: { messages: ['find one success'] } })
 	}
 
 	async getMany(query: StaffPaymentGetManyRequest) {
-		const staffPayments = await this.staffPaymentRepository.getMany(query)
-		const staffPaymentsCount = await this.staffPaymentRepository.countGetMany(query)
+		const payments = await this.staffPaymentRepository.getMany(query)
+		const paymentsCount = await this.staffPaymentRepository.countGetMany(query)
 
 		const result = query.pagination
 			? {
-					pagesCount: Math.ceil(staffPaymentsCount / query.pageSize),
-					pageSize: staffPayments.length,
-					data: staffPayments,
+					pagesCount: Math.ceil(paymentsCount / query.pageSize),
+					pageSize: payments.length,
+					data: payments,
 				}
-			: { data: staffPayments }
+			: { data: payments }
 
 		return createResponse({ data: result, success: { messages: ['get many success'] } })
 	}
 
 	async getOne(query: StaffPaymentGetOneRequest) {
-		const staffPayment = await this.staffPaymentRepository.getOne(query)
+		const payment = await this.staffPaymentRepository.getOne(query)
 
-		if (!staffPayment) {
+		if (!payment) {
 			throw new BadRequestException(ERROR_MSG.STAFF_PAYMENT.NOT_FOUND.UZ)
 		}
 
-		return createResponse({ data: staffPayment, success: { messages: ['get one success'] } })
+		return createResponse({ data: payment, success: { messages: ['get one success'] } })
 	}
 
 	async createOne(request: CRequest, body: StaffPaymentCreateOneRequest) {
-		const payment = await this.staffService.findOne({ id: body.userId })
+		await this.staffService.getOne({ id: body.employeeId })
 
-		const staffPayment = await this.staffPaymentRepository.createOne({ ...body, staffId: request.user.id })
+		const payment = await this.staffPaymentRepository.createOne({ ...body, staffId: request.user.id })
 
-		if (!body.sum) {
-			await this.staffService.updateOne({ id: staffPayment.user.id }, { balance: staffPayment.user.balance.plus(staffPayment.sum) })
-		}
-
-		return createResponse({ data: staffPayment, success: { messages: ['create one success'] } })
+		return createResponse({ data: payment, success: { messages: ['create one success'] } })
 	}
 
 	async updateOne(query: StaffPaymentGetOneRequest, body: StaffPaymentUpdateOneRequest) {
-		const payment = await this.getOne(query)
+		await this.getOne(query)
 
-		const hasPaymentFields = body.sum !== undefined
-
-		let sumDiff = new Decimal(0)
-
-		if (hasPaymentFields) {
-			const oldSum = new Decimal(payment.data.sum ?? 0)
-			const newSum = new Decimal(body.sum ?? 0)
-			sumDiff = newSum.minus(oldSum)
-		}
-
-		await this.staffPaymentRepository.updateOne(query, { ...body })
-
-		if (!sumDiff.isZero()) {
-			await this.staffService.updateOne({ id: payment.data.user.id }, { balance: payment.data.user.balance.minus(sumDiff) })
-		}
+		await this.staffPaymentRepository.updateOne(query, body)
 
 		return createResponse({ data: null, success: { messages: ['update one success'] } })
 	}
 
 	async deleteOne(query: StaffPaymentDeleteOneRequest) {
-		const payment = await this.getOne(query)
+		await this.getOne(query)
 		if (query.method === DeleteMethodEnum.hard) {
-			if (!payment.data.total.isZero()) {
-				await this.staffService.updateOne({ id: payment.data.user.id }, { balance: payment.data.user.balance.minus(payment.data.total) })
-			}
 			await this.staffPaymentRepository.deleteOne(query)
 		} else {
 			await this.staffPaymentRepository.updateOne(query, { deletedAt: new Date() })
 		}
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
+	}
+
+	async excelDownloadMany(res: Response, query: StaffPaymentFindManyRequest) {
+		return this.excelService.staffPaymentDownloadMany(res, query)
 	}
 }

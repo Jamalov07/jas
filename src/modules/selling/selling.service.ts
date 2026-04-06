@@ -1,7 +1,7 @@
-import { BadRequestException, forwardRef, Inject, Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable } from '@nestjs/common'
 import { SellingRepository } from './selling.repository'
-import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG } from '@common'
-import { SellingStatusEnum, ServiceTypeEnum, UserTypeEnum } from '@prisma/client'
+import { createResponse, CRequest, ERROR_MSG } from '@common'
+import { SellingStatusEnum } from '@prisma/client'
 import {
 	SellingGetOneRequest,
 	SellingCreateOneRequest,
@@ -10,75 +10,84 @@ import {
 	SellingFindManyRequest,
 	SellingFindOneRequest,
 	SellingDeleteOneRequest,
-	SellingGetTotalStatsRequest,
-	SellingGetPeriodStatsRequest,
-	TotalStatsByCurrency,
+	SellingCalcEntry,
+	SellingPaymentData,
 } from './interfaces'
+import { PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
-import { ArrivalService } from '../arrival'
-import { ClientService } from '../client'
-import { ExcelService } from '../shared/excel'
+import { CommonService } from '../common'
+import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { BotService } from '../bot'
 import { BotSellingProductTitleEnum, BotSellingTitleEnum } from './enums'
-import { PrismaService } from '../shared'
-import pLimit from 'p-limit'
-import { CommonService } from '../common'
+import { ClientService } from '../client'
 
 @Injectable()
 export class SellingService {
 	constructor(
 		private readonly sellingRepository: SellingRepository,
-		@Inject(forwardRef(() => ArrivalService)) private readonly arrivalService: ArrivalService,
-		private readonly clientService: ClientService,
 		private readonly commonService: CommonService,
 		private readonly excelService: ExcelService,
 		private readonly botService: BotService,
-		private readonly prisma: PrismaService,
+		private readonly clientService: ClientService,
 	) {}
+
+	private calcTotalPricesFromProducts(products: { prices: { type: string; currencyId: string; totalPrice: Decimal; currency?: { symbol: string } }[] }[]) {
+		const map = new Map<string, { total: Decimal; currency?: { symbol: string } }>()
+		for (const product of products) {
+			for (const price of product.prices) {
+				if (price.type === 'selling') {
+					const existing = map.get(price.currencyId) ?? { total: new Decimal(0), currency: price.currency }
+					map.set(price.currencyId, { total: existing.total.plus(price.totalPrice), currency: existing.currency || price.currency })
+				}
+			}
+		}
+		return Array.from(map.entries()).map(([currencyId, { total, currency }]) => ({ currencyId, total, currency }))
+	}
+
+	private buildPaymentData(
+		csp: { id: string; description?: string | null; createdAt: Date; clientSellingPaymentMethods: { type: string; currencyId: string; amount: Decimal }[] } | null | undefined,
+	): SellingPaymentData | undefined {
+		if (!csp) return undefined
+		return {
+			id: csp.id,
+			description: csp.description,
+			paymentMethods: csp.clientSellingPaymentMethods as any,
+			createdAt: csp.createdAt,
+		}
+	}
+
+	private calcPaymentTotal(csp: { clientSellingPaymentMethods: { amount: Decimal }[] } | null | undefined): Decimal {
+		return csp?.clientSellingPaymentMethods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+	}
 
 	async findMany(query: SellingFindManyRequest) {
 		const sellings = await this.sellingRepository.findMany(query)
 		const sellingsCount = await this.sellingRepository.countFindMany(query)
 
-		const calc = {
-			totalPayment: new Decimal(0),
-			totalCardPayment: new Decimal(0),
-			totalCashPayment: new Decimal(0),
-			totalOtherPayment: new Decimal(0),
-			totalTransferPayment: new Decimal(0),
-		}
-
+		const calcMap = new Map<string, Decimal>()
 		const mappedSellings = sellings.map((selling) => {
-			calc.totalPayment = calc.totalPayment.plus(selling.payment.total)
-			calc.totalCardPayment = calc.totalCardPayment.plus(selling.payment.card)
-			calc.totalCashPayment = calc.totalCashPayment.plus(selling.payment.cash)
-			calc.totalOtherPayment = calc.totalOtherPayment.plus(selling.payment.other)
-			calc.totalTransferPayment = calc.totalTransferPayment.plus(selling.payment.transfer)
-
-			return {
-				...selling,
-				payment: selling.payment.total.toNumber() ? selling.payment : null,
-				totalPayment: selling.payment.total,
-				totalPrices: selling.totals,
+			for (const method of selling.clientSellingPayment?.clientSellingPaymentMethods ?? []) {
+				const key = `${method.type}_${method.currencyId}`
+				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(method.amount))
 			}
+
+			const totalPrices = this.calcTotalPricesFromProducts(selling.products)
+			const payment = this.buildPaymentData(selling.clientSellingPayment)
+
+			return { ...selling, payment, totalPrices }
+		})
+
+		const calc: SellingCalcEntry[] = Array.from(calcMap.entries()).map(([key, total]) => {
+			const [type, currencyId] = key.split('_')
+			return { type: type as PaymentMethodEnum, currencyId, total }
 		})
 
 		const result = query.pagination
-			? {
-					totalCount: sellingsCount,
-					pagesCount: Math.ceil(sellingsCount / query.pageSize),
-					pageSize: sellings.length,
-					data: mappedSellings,
-					calc: calc,
-				}
-			: { data: mappedSellings, calc: calc }
+			? { totalCount: sellingsCount, pagesCount: Math.ceil(sellingsCount / query.pageSize), pageSize: sellings.length, data: mappedSellings, calc }
+			: { data: mappedSellings, calc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
-	}
-
-	async excelDownloadMany(res: Response, query: SellingFindManyRequest) {
-		return this.excelService.sellingDownloadMany(res, query)
 	}
 
 	async findOne(query: SellingFindOneRequest) {
@@ -88,27 +97,20 @@ export class SellingService {
 			throw new BadRequestException(ERROR_MSG.SELLING.NOT_FOUND.UZ)
 		}
 
+		const totalPrices = this.calcTotalPricesFromProducts(selling.products)
+		const payment = this.buildPaymentData(selling.clientSellingPayment)
+
 		return createResponse({
-			data: { ...selling, totalPayment: selling.payment.total, totalPrices: selling.totals },
+			data: { ...selling, payment, totalPrices },
 			success: { messages: ['find one success'] },
 		})
-	}
-
-	async excelDownloadOne(res: Response, query: SellingFindOneRequest) {
-		return this.excelService.sellingDownloadOne(res, query)
 	}
 
 	async getMany(query: SellingGetManyRequest) {
 		const sellings = await this.sellingRepository.getMany(query)
 		const sellingsCount = await this.sellingRepository.countGetMany(query)
 
-		const result = query.pagination
-			? {
-					pagesCount: Math.ceil(sellingsCount / query.pageSize),
-					pageSize: sellings.length,
-					data: sellings,
-				}
-			: { data: sellings }
+		const result = query.pagination ? { pagesCount: Math.ceil(sellingsCount / query.pageSize), pageSize: sellings.length, data: sellings } : { data: sellings }
 
 		return createResponse({ data: result, success: { messages: ['get many success'] } })
 	}
@@ -124,31 +126,8 @@ export class SellingService {
 	}
 
 	async createOne(request: CRequest, body: SellingCreateOneRequest) {
-		let client = await this.clientService.findOne({ id: body.clientId })
-
-		let total = new Decimal(0)
-		if (body.payment) {
-			if (Object.values(body.payment).some((value) => value !== 0)) {
-				body.status = SellingStatusEnum.accepted
-				if (body.date) {
-					const inputDate = new Date(body.date)
-					const now = new Date()
-					const isToday =
-						inputDate.getFullYear() === now.getFullYear() && inputDate.getMonth() === now.getMonth() && inputDate.getDate() === now.getDate()
-					if (isToday) {
-						body.date = now
-					} else {
-						body.date = new Date(inputDate.setHours(0, 0, 0, 0))
-					}
-				} else {
-					body.date = new Date()
-				}
-			}
-
-			total = new Decimal(body.payment.card ?? 0)
-				.plus(body.payment.cash ?? 0)
-				.plus(body.payment.other ?? 0)
-				.plus(body.payment.transfer ?? 0)
+		if (body.payment?.paymentMethods?.length) {
+			body.status = SellingStatusEnum.accepted
 		}
 
 		if (body.status === SellingStatusEnum.accepted) {
@@ -161,43 +140,42 @@ export class SellingService {
 			} else {
 				body.date = new Date()
 			}
+		} else if (body.date) {
+			const inputDate = new Date(body.date)
+			const now = new Date()
+			const isToday = inputDate.getFullYear() === now.getFullYear() && inputDate.getMonth() === now.getMonth() && inputDate.getDate() === now.getDate()
+			body.date = isToday ? now : new Date(inputDate.setHours(0, 0, 0, 0))
 		}
 
-		body = {
-			...body,
-			staffId: request.user.id,
-			payment: { ...body.payment, total: total },
-		}
+		body.staffId = request.user.id
 
 		const selling = await this.sellingRepository.createOne(body)
 
-		if (body.send) {
-			if (selling.status === SellingStatusEnum.accepted) {
-				client = await this.clientService.findOne({ id: body.clientId })
+		if (body.send && selling.status === SellingStatusEnum.accepted) {
+			try {
+				const clientResult = await this.clientService.findOne({ id: body.clientId })
+				const totalPrices = this.calcTotalPricesFromProducts(selling.products)
+				const payment = this.buildPaymentData(selling.clientSellingPayment)
+
 				const sellingInfo = {
 					...selling,
-					client: client.data,
+					client: clientResult.data,
 					title: BotSellingTitleEnum.new,
-					totalPayment: total,
-					totalPrices: selling.totals,
-					products: selling.products.map((p) => ({
-						...p,
-						status: BotSellingProductTitleEnum.new,
-					})),
+					totalPrices,
+					payment,
+					products: selling.products.map((p) => ({ ...p, status: BotSellingProductTitleEnum.new })),
 				} as any
 
-				if (client.data.telegram?.id) {
-					await this.botService.sendSellingToClient(sellingInfo).catch((e) => {
-						console.log('user', e)
-					})
+				if (clientResult.data.telegram?.id) {
+					await this.botService.sendSellingToClient(sellingInfo).catch((e) => console.log('bot client error:', e))
 				}
-				await this.botService.sendSellingToChannel(sellingInfo).catch((e) => {
-					console.log('channel', e)
-				})
+				await this.botService.sendSellingToChannel(sellingInfo).catch((e) => console.log('bot channel error:', e))
 
-				if (!total.isZero()) {
-					await this.botService.sendPaymentToChannel(sellingInfo.payment, false, client.data)
+				if (payment?.paymentMethods?.length) {
+					await this.botService.sendPaymentToChannel(payment, false, clientResult.data).catch((e) => console.log('bot payment error:', e))
 				}
+			} catch (e) {
+				console.log('bot send error:', e)
 			}
 		}
 
@@ -205,86 +183,54 @@ export class SellingService {
 	}
 
 	async updateOne(request: CRequest, query: SellingGetOneRequest, body: SellingUpdateOneRequest) {
-		const selling = await this.getOne(query)
-
-		if (selling.data.status === SellingStatusEnum.accepted) {
-			body.date = undefined
+		const existingSelling = await this.sellingRepository.findOne({ id: query.id })
+		if (!existingSelling) {
+			throw new BadRequestException(ERROR_MSG.SELLING.NOT_FOUND.UZ)
 		}
 
-		let total = new Decimal(0)
-		let shouldSend = true
-		let isFirstSend = false
+		body.staffId = request.user.id
 
-		const hasValidPayment = body.payment && ['card', 'cash', 'other', 'transfer'].some((key) => !!body.payment?.[key] && +body.payment[key] !== 0)
+		await this.sellingRepository.updateOne(query, body)
 
-		if (body.status !== SellingStatusEnum.accepted) {
-			if (hasValidPayment) {
-				body.status = SellingStatusEnum.accepted
-				body.date = new Date()
-				total = new Decimal(body.payment?.card ?? 0)
-					.plus(body.payment?.cash ?? 0)
-					.plus(body.payment?.other ?? 0)
-					.plus(body.payment?.transfer ?? 0)
-			}
-		} else {
-			if (selling.data.status !== SellingStatusEnum.accepted) {
-				isFirstSend = true
-			}
-			body.date = new Date()
-			shouldSend = true
-			total = new Decimal(body.payment?.card ?? 0)
-				.plus(body.payment?.cash ?? 0)
-				.plus(body.payment?.other ?? 0)
-				.plus(body.payment?.transfer ?? 0)
-		}
+		const updatedSelling = await this.sellingRepository.findOne({ id: query.id })
+		const wasAccepted = existingSelling.status === SellingStatusEnum.accepted
+		const isAcceptedNow = updatedSelling.status === SellingStatusEnum.accepted
 
-		body = {
-			...body,
-			status: body.status,
-			staffId: request.user.id || selling.data.staff.id,
-			payment: hasValidPayment
-				? { ...body.payment, total: total }
-				: selling.data.payment,
-		}
+		if (wasAccepted || isAcceptedNow) {
+			try {
+				const clientResult = await this.clientService.findOne({ id: existingSelling.client.id })
+				const totalPrices = this.calcTotalPricesFromProducts(updatedSelling.products)
+				const payment = this.buildPaymentData(updatedSelling.clientSellingPayment)
+				const isFirstAccept = !wasAccepted && isAcceptedNow
 
-		const updatedSelling = await this.sellingRepository.updateOne(query, body)
+				const sellingInfo = {
+					...updatedSelling,
+					client: clientResult.data,
+					title: isFirstAccept ? BotSellingTitleEnum.new : BotSellingTitleEnum.updated,
+					totalPrices,
+					payment,
+					products: updatedSelling.products.map((p) => ({ ...p, status: BotSellingProductTitleEnum.new })),
+				} as any
 
-		const client = await this.clientService.findOne({ id: selling.data.client.id })
-
-		const sellingInfo = {
-			...updatedSelling,
-			client: client.data,
-			title: isFirstSend ? BotSellingTitleEnum.new : undefined,
-			totalPayment: total,
-			totalPrices: updatedSelling.totals,
-			products: updatedSelling.products.map((p) => ({
-				...p,
-				status: BotSellingProductTitleEnum.new,
-			})),
-		} as any
-
-		console.log(shouldSend, selling.data.status, body.status, updatedSelling.status, total, sellingInfo.payment.total)
-
-		if (selling.data.status === SellingStatusEnum.accepted || body.status === SellingStatusEnum.accepted || updatedSelling.status === SellingStatusEnum.accepted) {
-			if (body.send) {
-				if (updatedSelling.client?.telegram?.id) {
-					await this.botService.sendSellingToClient(sellingInfo).catch(console.log)
+				if (body.send && clientResult.data.telegram?.id) {
+					await this.botService.sendSellingToClient(sellingInfo).catch((e) => console.log('bot client error:', e))
 				}
-			}
-			const wasAccepted = selling.data.status === SellingStatusEnum.accepted
-			const prevPaymentTotal = selling.data.payment?.total ?? new Decimal(0)
-			const isAcceptedNow = updatedSelling.status === SellingStatusEnum.accepted
-			const newPaymentTotal = updatedSelling.payment?.total ?? new Decimal(0)
-			const paymentChanged = !prevPaymentTotal.equals(newPaymentTotal)
-			const hadPaymentBefore = !prevPaymentTotal.isZero()
-			const shouldSendPayment =
-				(!wasAccepted && isAcceptedNow && !newPaymentTotal.isZero()) || (wasAccepted && paymentChanged)
-			const isModified = hadPaymentBefore && paymentChanged
 
-			await this.botService.sendSellingToChannel(sellingInfo).catch(console.log)
+				await this.botService.sendSellingToChannel(sellingInfo).catch((e) => console.log('bot channel error:', e))
 
-			if (shouldSendPayment) {
-				await this.botService.sendPaymentToChannel(sellingInfo.payment, isModified, client.data)
+				const prevPaymentTotal = this.calcPaymentTotal(existingSelling.clientSellingPayment)
+				const newPaymentTotal = this.calcPaymentTotal(updatedSelling.clientSellingPayment)
+				const paymentChanged = !prevPaymentTotal.equals(newPaymentTotal)
+				const hadPaymentBefore = !prevPaymentTotal.isZero()
+				const isModified = hadPaymentBefore && paymentChanged
+
+				const shouldSendPayment = (isFirstAccept && payment?.paymentMethods?.length) || (wasAccepted && paymentChanged && payment?.paymentMethods?.length)
+
+				if (shouldSendPayment) {
+					await this.botService.sendPaymentToChannel(payment, isModified, clientResult.data).catch((e) => console.log('bot payment error:', e))
+				}
+			} catch (e) {
+				console.log('bot send error:', e)
 			}
 		}
 
@@ -292,171 +238,55 @@ export class SellingService {
 	}
 
 	async deleteOne(query: SellingDeleteOneRequest) {
-		const selling = await this.findOne(query)
-		if (query.method === DeleteMethodEnum.hard) {
-			await this.sellingRepository.deleteOne(query)
-			const client = await this.clientService.findOne({ id: selling.data.client.id })
-		const sellingInfo = {
-			...selling.data,
-			products: selling.data.products,
-			client: client.data,
-		} as any
-		if (selling.data.status === SellingStatusEnum.accepted) {
-			await this.botService.sendDeletedSellingToChannel(sellingInfo)
-				const totalPayment = selling.data.payment.card.plus(selling.data.payment.cash).plus(selling.data.payment.other).plus(selling.data.payment.transfer)
-				if (totalPayment.toNumber()) {
-					await this.botService.sendDeletedPaymentToChannel(selling.data.payment, client.data)
-				}
+		const selling = await this.sellingRepository.findOne({ id: query.id })
+		if (!selling) {
+			throw new BadRequestException(ERROR_MSG.SELLING.NOT_FOUND.UZ)
+		}
+
+		const wasAccepted = selling.status === SellingStatusEnum.accepted
+		let clientResult: Awaited<ReturnType<typeof this.clientService.findOne>> | undefined
+
+		if (wasAccepted) {
+			try {
+				clientResult = await this.clientService.findOne({ id: selling.client.id })
+			} catch (e) {
+				console.log('bot client fetch error:', e)
 			}
 		}
+
+		await this.sellingRepository.deleteOne(query)
+
+		if (wasAccepted && clientResult) {
+			try {
+				const totalPrices = this.calcTotalPricesFromProducts(selling.products)
+				const payment = this.buildPaymentData(selling.clientSellingPayment)
+
+				const sellingInfo = {
+					...selling,
+					client: clientResult.data,
+					title: BotSellingTitleEnum.deleted,
+					totalPrices,
+					payment,
+				} as any
+
+				await this.botService.sendDeletedSellingToChannel(sellingInfo).catch((e) => console.log('bot channel error:', e))
+
+				if (payment?.paymentMethods?.length) {
+					await this.botService.sendDeletedPaymentToChannel(payment, clientResult.data).catch((e) => console.log('bot payment error:', e))
+				}
+			} catch (e) {
+				console.log('bot send error:', e)
+			}
+		}
+
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
 	}
 
-	async getTotalStats(query: SellingGetTotalStatsRequest) {
-		const now = new Date()
-
-		const getDateRange = (type: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
-			const start = new Date(now)
-			const end = new Date(now)
-			if (type === 'weekly') {
-				start.setDate(now.getDate() - now.getDay())
-				end.setDate(start.getDate() + 6)
-			} else if (type === 'monthly') {
-				start.setDate(1)
-				end.setMonth(start.getMonth() + 1, 0)
-			} else if (type === 'yearly') {
-				start.setMonth(0, 1)
-				end.setMonth(11, 31)
-			}
-			return { startDate: start, endDate: end }
-		}
-
-		const statTypes = ['daily', 'weekly', 'monthly', 'yearly'] as const
-		const limit = pLimit(2)
-
-		const statsPromises = statTypes.map((type) =>
-			limit(async () => {
-				const { startDate, endDate } = getDateRange(type)
-				const totals = await this.prisma.sellingTotalModel.findMany({
-					where: {
-						selling: {
-							date: {
-								gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
-								lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
-							},
-							client: { deletedAt: null },
-							status: SellingStatusEnum.accepted,
-						},
-					},
-					select: { total: true, currencyId: true, currency: { select: { symbol: true } } },
-				})
-
-				const map = new Map<string, TotalStatsByCurrency>()
-				for (const t of totals) {
-					const existing = map.get(t.currencyId)
-					if (existing) {
-						existing.total = existing.total.plus(t.total)
-					} else {
-						map.set(t.currencyId, { currencyId: t.currencyId, symbol: t.currency.symbol, total: new Decimal(t.total) })
-					}
-				}
-				return Array.from(map.values())
-			}),
-		)
-
-		const [daily, weekly, monthly, yearly] = await Promise.all(statsPromises)
-
-		const supplierDebt = await this.getSupplierDebtStats()
-		const clientDebt = await this.getClientDebtStats()
-
-		return createResponse({
-			data: { daily, weekly, monthly, yearly, client: clientDebt, supplier: supplierDebt },
-			success: { messages: ['get total stats success'] },
-		})
+	async excelDownloadMany(res: Response, query: SellingFindManyRequest) {
+		return this.excelService.sellingDownloadMany(res, query)
 	}
 
-	private async getClientDebtStats() {
-		const clients = await this.prisma.userModel.findMany({
-			where: { type: UserTypeEnum.client, deletedAt: null },
-			select: {
-				balance: true,
-				sellings: {
-					where: { status: SellingStatusEnum.accepted },
-					select: {
-						totals: { select: { total: true } },
-						payment: { select: { total: true } },
-					},
-				},
-				returnings: {
-					where: { status: SellingStatusEnum.accepted },
-					select: { payment: { select: { fromBalance: true } } },
-				},
-			},
-		})
-
-		let theirDebt = new Decimal(0)
-		let ourDebt = new Decimal(0)
-
-		for (const c of clients) {
-			const sellingDebt = c.sellings.reduce((acc, s) => {
-				const sellingTotal = s.totals.reduce((sum, t) => sum.plus(t.total), new Decimal(0))
-				return acc.plus(sellingTotal).minus(s.payment.total)
-			}, new Decimal(0))
-
-			c.returnings.map((returning) => {
-				c.balance = c.balance.minus(returning.payment.fromBalance)
-			})
-
-			const totalDebt = sellingDebt.plus(c.balance ?? 0)
-
-			if (totalDebt.gt(0)) {
-				theirDebt = theirDebt.plus(totalDebt)
-			} else if (totalDebt.lt(0)) {
-				ourDebt = ourDebt.plus(totalDebt.abs())
-			}
-		}
-
-		return { theirDebt, ourDebt }
-	}
-
-	private async getSupplierDebtStats() {
-		const suppliers = await this.prisma.userModel.findMany({
-			where: { type: UserTypeEnum.supplier, deletedAt: null },
-			select: {
-				balance: true,
-				arrivals: {
-					where: { deletedAt: null },
-					select: {
-						totals: { select: { totalCost: true } },
-						payment: { select: { total: true } },
-					},
-				},
-			},
-		})
-
-		let ourDebt = new Decimal(0)
-		let theirDebt = new Decimal(0)
-
-		for (const s of suppliers) {
-			const arrivalDebt = s.arrivals.reduce((acc, a) => {
-				const costTotal = a.totals.reduce((sum, t) => sum.plus(t.totalCost), new Decimal(0))
-				return acc.plus(costTotal).minus(a.payment?.total ?? 0)
-			}, new Decimal(0))
-
-			const totalDebt = s.balance.plus(arrivalDebt ?? 0)
-
-			if (totalDebt.gt(0)) {
-				ourDebt = ourDebt.plus(totalDebt)
-			} else if (totalDebt.lt(0)) {
-				theirDebt = theirDebt.plus(totalDebt.abs())
-			}
-		}
-
-		return { ourDebt, theirDebt }
-	}
-
-	async getPeriodStats(query: SellingGetPeriodStatsRequest) {
-		const result = await this.sellingRepository.getPeriodStats(query)
-		return createResponse({ data: result, success: { messages: ['get period stats success'] } })
+	async excelDownloadOne(res: Response, query: SellingFindOneRequest) {
+		return this.excelService.sellingDownloadOne(res, query)
 	}
 }

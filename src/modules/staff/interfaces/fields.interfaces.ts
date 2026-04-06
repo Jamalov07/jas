@@ -1,5 +1,5 @@
-import { UserModel } from '@prisma/client'
+import { StaffModel } from '@prisma/client'
 
-export declare interface StaffRequired extends Required<UserModel> {}
+export declare interface StaffRequired extends Required<StaffModel> {}
 
-export declare interface StaffOptional extends Partial<UserModel> {}
+export declare interface StaffOptional extends Partial<StaffModel> {}

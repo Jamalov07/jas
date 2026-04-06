@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../shared/prisma'
 import {
 	StaffCreateOneRequest,
@@ -9,11 +9,10 @@ import {
 	StaffGetOneRequest,
 	StaffUpdateOneRequest,
 } from './interfaces'
-import { StaffController } from './staff.controller'
-import { PageEnum, UserTypeEnum } from '@prisma/client'
+import { PageEnum } from '@prisma/client'
 
 @Injectable()
-export class StaffRepository implements OnModuleInit {
+export class StaffRepository {
 	private readonly prisma: PrismaService
 	constructor(prisma: PrismaService) {
 		this.prisma = prisma
@@ -25,10 +24,9 @@ export class StaffRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const users = await this.prisma.userModel.findMany({
+		const staffs = await this.prisma.staffModel.findMany({
 			where: {
 				fullname: query.fullname,
-				type: { in: [UserTypeEnum.staff, UserTypeEnum.admin] },
 				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
 			},
 			select: {
@@ -44,11 +42,11 @@ export class StaffRepository implements OnModuleInit {
 			...paginationOptions,
 		})
 
-		return users
+		return staffs
 	}
 
 	async findOne(query: StaffFindOneRequest) {
-		const user = await this.prisma.userModel.findFirst({
+		const staff = await this.prisma.staffModel.findFirst({
 			where: { id: query.id },
 			select: {
 				id: true,
@@ -62,19 +60,18 @@ export class StaffRepository implements OnModuleInit {
 			},
 		})
 
-		return user
+		return staff
 	}
 
 	async countFindMany(query: StaffFindManyRequest) {
-		const usersCount = await this.prisma.userModel.count({
+		const staffsCount = await this.prisma.staffModel.count({
 			where: {
 				fullname: query.fullname,
-				type: { in: [UserTypeEnum.staff, UserTypeEnum.admin] },
 				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
 			},
 		})
 
-		return usersCount
+		return staffsCount
 	}
 
 	async getMany(query: StaffGetManyRequest) {
@@ -83,46 +80,43 @@ export class StaffRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const users = await this.prisma.userModel.findMany({
+		const staffs = await this.prisma.staffModel.findMany({
 			where: {
 				id: { in: query.ids },
-				type: { in: [UserTypeEnum.staff, UserTypeEnum.admin] },
 				fullname: query.fullname,
 			},
 			...paginationOptions,
 		})
 
-		return users
+		return staffs
 	}
 
 	async getOne(query: StaffGetOneRequest) {
-		const user = await this.prisma.userModel.findFirst({
+		const staff = await this.prisma.staffModel.findFirst({
 			where: { id: query.id, fullname: query.fullname, phone: query.phone },
 			select: { id: true, fullname: true, phone: true, currency: true, createdAt: true, deletedAt: true, password: true, token: true, pages: true },
 		})
 
-		return user
+		return staff
 	}
 
 	async countGetMany(query: StaffGetManyRequest) {
-		const usersCount = await this.prisma.userModel.count({
+		const staffsCount = await this.prisma.staffModel.count({
 			where: {
 				id: { in: query.ids },
-				type: { in: [UserTypeEnum.staff, UserTypeEnum.admin] },
 				fullname: query.fullname,
 			},
 		})
 
-		return usersCount
+		return staffsCount
 	}
 
 	async createOne(body: StaffCreateOneRequest) {
-		const user = await this.prisma.userModel.create({
+		const staff = await this.prisma.staffModel.create({
 			data: {
 				fullname: body.fullname,
 				password: body.password,
 				phone: body.phone,
-				type: UserTypeEnum.staff,
 				actions: { connect: body.actionsToConnect.map((r) => ({ id: r })) },
 				pages: body.pagesToConnect,
 			},
@@ -134,17 +128,17 @@ export class StaffRepository implements OnModuleInit {
 				actions: { select: { id: true, description: true, method: true, url: true, name: true, permission: true } },
 			},
 		})
-		return user
+		return staff
 	}
 
 	async updateOne(query: StaffGetOneRequest, body: StaffUpdateOneRequest) {
-		const u = await this.getOne(query)
+		const s = await this.getOne(query)
 
 		const pagesToConnect = body.pagesToConnect ? (Array.isArray(body.pagesToConnect) ? body.pagesToConnect : []) : []
 
 		const pagesToDisconnect = body.pagesToDisconnect ? (Array.isArray(body.pagesToDisconnect) ? body.pagesToDisconnect : []) : []
 
-		let pagesToSet: PageEnum[] = Array.isArray(u.pages) ? [...u.pages] : []
+		let pagesToSet: PageEnum[] = Array.isArray(s.pages) ? [...s.pages] : []
 
 		for (const page of pagesToConnect) {
 			if (!pagesToSet.includes(page)) {
@@ -156,14 +150,14 @@ export class StaffRepository implements OnModuleInit {
 			pagesToSet = pagesToSet.filter((page) => !pagesToDisconnect.includes(page))
 		}
 
-		const user = await this.prisma.userModel.update({
+		const staff = await this.prisma.staffModel.update({
 			where: { id: query.id },
 			data: {
 				fullname: body.fullname,
 				password: body.password,
 				phone: body.phone,
 				token: body.token,
-				balance: body.balance,
+				currencyId: body.currencyId,
 				deletedAt: body.deletedAt,
 				actions: {
 					connect: (body.actionsToConnect ?? []).map((r) => ({ id: r })),
@@ -173,18 +167,22 @@ export class StaffRepository implements OnModuleInit {
 			},
 		})
 
-		return user
+		return staff
 	}
 
 	async deleteOne(query: StaffDeleteOneRequest) {
-		const user = await this.prisma.userModel.delete({
+		const staff = await this.prisma.staffModel.delete({
 			where: { id: query.id },
 		})
 
-		return user
+		return staff
 	}
 
-	async onModuleInit() {
-		await this.prisma.createActionMethods(StaffController)
+	async updateCurrency(staffId: string, currencyId: string) {
+		await this.prisma.staffModel.update({
+			where: { id: staffId },
+			data: { currencyId },
+		})
 	}
+
 }

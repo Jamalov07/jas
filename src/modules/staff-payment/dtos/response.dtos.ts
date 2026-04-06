@@ -1,30 +1,48 @@
 import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
 import {
-	StaffPaymentCalc,
+	StaffPaymentCalcByCurrency,
 	StaffPaymentCreateOneResponse,
 	StaffPaymentFindManyData,
 	StaffPaymentFindManyResponse,
 	StaffPaymentFindOneData,
 	StaffPaymentFindOneResponse,
+	StaffPaymentMethodData,
 	StaffPaymentModifyResponse,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { StaffPaymentRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
 
-export class StaffPaymentFindOneDataDto extends PickType(StaffPaymentRequiredDto, ['id', 'sum', 'createdAt']) implements StaffPaymentFindOneData {}
+export class StaffPaymentMethodDataDto implements StaffPaymentMethodData {
+	@ApiProperty({ type: String })
+	type: string
 
-export class StaffPaymentCalcDto implements StaffPaymentCalc {
+	@ApiProperty({ type: String })
+	currencyId: string
+
 	@ApiProperty({ type: Number })
-	sum: Decimal
+	amount: Decimal
+}
+
+export class StaffPaymentCalcByCurrencyDto implements StaffPaymentCalcByCurrency {
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+}
+
+export class StaffPaymentFindOneDataDto extends PickType(StaffPaymentRequiredDto, ['id', 'createdAt']) implements StaffPaymentFindOneData {
+	@ApiProperty({ type: StaffPaymentMethodDataDto, isArray: true })
+	paymentMethods?: StaffPaymentMethodData[]
 }
 
 export class StaffPaymentFindManyDataDto extends PaginationResponseDto implements StaffPaymentFindManyData {
 	@ApiProperty({ type: StaffPaymentFindOneDataDto, isArray: true })
 	data: StaffPaymentFindOneData[]
 
-	@ApiProperty({ type: StaffPaymentCalcDto })
-	calc: StaffPaymentCalc
+	@ApiProperty({ type: StaffPaymentCalcByCurrencyDto, isArray: true })
+	calcByCurrency: StaffPaymentCalcByCurrency[]
 }
 
 export class StaffPaymentFindManyResponseDto extends GlobalResponseDto implements StaffPaymentFindManyResponse {

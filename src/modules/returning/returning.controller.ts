@@ -19,11 +19,7 @@ import { Response } from 'express'
 @Controller('returning')
 @UseGuards(CheckPermissionGuard)
 export class ReturningController {
-	private readonly returningService: ReturningService
-
-	constructor(returningService: ReturningService) {
-		this.returningService = returningService
-	}
+	constructor(private readonly returningService: ReturningService) {}
 
 	@Get('many')
 	@ApiOkResponse({ type: ReturningFindManyResponseDto })
@@ -32,23 +28,11 @@ export class ReturningController {
 		return this.returningService.findMany({ ...query, isDeleted: false })
 	}
 
-	@Get('excel-download/many')
-	@ApiOperation({ summary: 'download many returning' })
-	async excelDownloadMany(@Res() res: Response, @Query() query: ReturningFindManyRequestDto) {
-		return this.returningService.excelDownloadMany(res, query)
-	}
-
 	@Get('one')
 	@ApiOperation({ summary: 'find one returning' })
 	@ApiOkResponse({ type: ReturningFindOneResponseDto })
 	async findOne(@Query() query: ReturningFindOneRequestDto): Promise<ReturningFindOneResponseDto> {
 		return this.returningService.findOne(query)
-	}
-
-	@Get('excel-download/one')
-	@ApiOperation({ summary: 'download one returning' })
-	async excelDownloadOne(@Res() res: Response, @Query() query: ReturningFindOneRequestDto) {
-		return this.returningService.excelDownloadOne(res, query)
 	}
 
 	@Post('one')
@@ -70,5 +54,17 @@ export class ReturningController {
 	@ApiOkResponse({ type: ReturningModifyResponseDto })
 	async deleteOne(@Query() query: ReturningDeleteOneRequestDto): Promise<ReturningModifyResponseDto> {
 		return this.returningService.deleteOne(query)
+	}
+
+	@Get('excel-download/many')
+	@ApiOperation({ summary: 'download many returnings as excel' })
+	async excelDownloadMany(@Res() res: Response, @Query() query: ReturningFindManyRequestDto) {
+		return this.returningService.excelDownloadMany(res, query)
+	}
+
+	@Get('excel-download/one')
+	@ApiOperation({ summary: 'download one returning as excel' })
+	async excelDownloadOne(@Res() res: Response, @Query() query: ReturningFindOneRequestDto) {
+		return this.returningService.excelDownloadOne(res, query)
 	}
 }

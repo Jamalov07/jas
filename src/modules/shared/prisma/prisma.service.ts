@@ -5,6 +5,18 @@ import { ConfigService } from '@nestjs/config'
 import { ActionMethodEnum, PrismaClient } from '@prisma/client'
 import { actionDescriptionConverter } from '../../../common/helper'
 
+const MODELS_WITHOUT_CREATED_AT = ['ActionModel', 'BotUserModel', 'ProductPriceModel', 'SellingProductMVPriceModel', 'ArrivalProductMVPriceModel', 'ReturningProductMVPriceModel']
+
+const MODELS_WITHOUT_DELETED_AT = [
+	'ActionModel',
+	'BotUserModel',
+	'ProductPriceModel',
+	'SellingProductMVPriceModel',
+	'ArrivalProductMVPriceModel',
+	'ReturningProductMVPriceModel',
+	'DayCloseLog',
+]
+
 @Global()
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -14,20 +26,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 		this.config = config
 
 		this.$use(async (params, next) => {
-			if (['findMany', 'findFirst'].includes(params.action) && !['ActionModel', 'BotUserModel', 'CurrencyModel', 'ProductPriceModel'].includes(params.model)) {
+			if (['findMany', 'findFirst'].includes(params.action) && !MODELS_WITHOUT_CREATED_AT.includes(params.model)) {
 				if (!params.args) params.args = {}
 				if (!params?.args?.orderBy) {
 					params.args.orderBy = [{ createdAt: 'desc' }]
 				} else {
-					if (!['PublicIdModel', 'CurrencyModel', 'ProductPriceModel'].includes(params.model)) {
-						if (Array.isArray(params.args.orderBy)) {
-							params.args.orderBy.push({ createdAt: 'desc' })
-						} else {
-							params.args.orderBy = { createdAt: 'desc' }
-						}
+					if (Array.isArray(params.args.orderBy)) {
+						params.args.orderBy.push({ createdAt: 'desc' })
+					} else {
+						params.args.orderBy = { createdAt: 'desc' }
 					}
 				}
-				if (!['DayCloseLog', 'CurrencyModel', 'ProductPriceModel'].includes(params.model)) {
+
+				if (!MODELS_WITHOUT_DELETED_AT.includes(params.model)) {
+					if (!params.args.where) params.args.where = {}
 					if (!params.args.where.deletedAt) {
 						params.args.where.deletedAt = null
 					}

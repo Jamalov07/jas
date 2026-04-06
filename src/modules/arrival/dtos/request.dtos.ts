@@ -5,25 +5,46 @@ import {
 	ArrivalFindManyRequest,
 	ArrivalFindOneRequest,
 	ArrivalPayment,
+	ArrivalPaymentMethod,
 	ArrivalProduct,
 	ArrivalUpdateOneRequest,
 } from '../interfaces'
 import { IsDecimalIntOrBigInt, PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { ArrivalOptionalDto, ArrivalRequiredDto } from './fields.dtos'
 import { Type } from 'class-transformer'
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
-import { SupplierPaymentOptionalDto, SupplierPaymentRequiredDto } from '../../supplier-payment'
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
 import { Decimal } from '@prisma/client/runtime/library'
+import { PaymentMethodEnum } from '@prisma/client'
 
-export class ArrivalFindManyRequestDto
-	extends IntersectionType(PickType(ArrivalOptionalDto, ['supplierId', 'staffId']), PaginationRequestDto, PickType(RequestOtherFieldsDto, ['search', 'endDate', 'startDate']))
-	implements ArrivalFindManyRequest {}
+export class ArrivalPaymentMethodDto implements ArrivalPaymentMethod {
+	@ApiProperty({ enum: PaymentMethodEnum })
+	@IsNotEmpty()
+	@IsEnum(PaymentMethodEnum)
+	type: PaymentMethodEnum
 
-export class ArrivalFindOneRequestDto extends IntersectionType(PickType(ArrivalRequiredDto, ['id'])) implements ArrivalFindOneRequest {}
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
 
-export class ArrivalPaymentDto
-	extends IntersectionType(PickType(SupplierPaymentRequiredDto, ['card', 'cash', 'other', 'transfer']), PickType(SupplierPaymentOptionalDto, ['description']))
-	implements ArrivalPayment {}
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	amount: Decimal
+}
+
+export class ArrivalPaymentDto implements ArrivalPayment {
+	@ApiPropertyOptional({ type: ArrivalPaymentMethodDto, isArray: true })
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => ArrivalPaymentMethodDto)
+	paymentMethods?: ArrivalPaymentMethod[]
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	description?: string
+}
 
 export class ArrivalProductDto implements ArrivalProduct {
 	@ApiProperty({ type: String })
@@ -56,6 +77,12 @@ export class ArrivalProductDto implements ArrivalProduct {
 	@IsUUID('4')
 	priceCurrencyId: string
 }
+
+export class ArrivalFindManyRequestDto
+	extends IntersectionType(PickType(ArrivalOptionalDto, ['supplierId', 'staffId']), PaginationRequestDto, PickType(RequestOtherFieldsDto, ['search', 'endDate', 'startDate']))
+	implements ArrivalFindManyRequest {}
+
+export class ArrivalFindOneRequestDto extends IntersectionType(PickType(ArrivalRequiredDto, ['id'])) implements ArrivalFindOneRequest {}
 
 export class ArrivalCreateOneRequestDto extends IntersectionType(PickType(ArrivalRequiredDto, ['supplierId', 'date'])) implements ArrivalCreateOneRequest {
 	@ApiPropertyOptional({ type: ArrivalPaymentDto })

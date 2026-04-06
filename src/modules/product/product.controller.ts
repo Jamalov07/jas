@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Patch, Post, Query, Res, UseGuards } fro
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ProductService } from './product.service'
 import { AuthOptions, CheckPermissionGuard } from '@common'
+import { Response } from 'express'
 import {
 	ProductFindManyRequestDto,
 	ProductCreateOneRequestDto,
@@ -11,7 +12,6 @@ import {
 	ProductFindOneResponseDto,
 	ProductModifyResponseDto,
 } from './dtos'
-import { Response } from 'express'
 
 @ApiTags('Product')
 @UseGuards(CheckPermissionGuard)
@@ -25,12 +25,6 @@ export class ProductController {
 	@AuthOptions(false, false)
 	async findMany(@Query() query: ProductFindManyRequestDto): Promise<ProductFindManyResponseDto> {
 		return this.productService.findMany({ ...query, isDeleted: false })
-	}
-
-	@Get('excel-download/many')
-	@ApiOperation({ summary: 'download many clients' })
-	async excelDownloadMany(@Res() res: Response, @Query() query: ProductFindManyRequestDto) {
-		return this.productService.excelDownloadMany(res, query)
 	}
 
 	@Get('one')
@@ -55,9 +49,15 @@ export class ProductController {
 	}
 
 	@Delete('one')
-	@ApiOperation({ summary: 'update one product' })
+	@ApiOperation({ summary: 'delete one product' })
 	@ApiOkResponse({ type: ProductModifyResponseDto })
 	async deleteOne(@Query() query: ProductFindOneRequestDto): Promise<ProductModifyResponseDto> {
 		return this.productService.deleteOne(query)
+	}
+
+	@Get('excel-download/many')
+	@ApiOperation({ summary: 'download many products as excel' })
+	async excelDownloadMany(@Res() res: Response, @Query() query: ProductFindManyRequestDto) {
+		return this.productService.excelDownloadMany(res, query)
 	}
 }

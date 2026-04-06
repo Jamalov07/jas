@@ -2,26 +2,32 @@ import { GlobalResponse, PaginationResponse } from '@common'
 import { SupplierRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
+export declare interface SupplierDebtByCurrency {
+	currencyId: string
+	amount: Decimal
+}
+
 export declare interface SupplierDeed {
 	type: 'debit' | 'credit'
 	date: Date
 	action?: 'payment' | 'arrival'
 	value: Decimal
 	description: string
+	currencyId?: string
 }
 
 export declare interface SupplierDeedInfo {
 	deeds: SupplierDeed[]
-	totalCredit: Decimal
-	totalDebit: Decimal
-	debt: Decimal
+	totalCreditByCurrency: SupplierDebtByCurrency[]
+	totalDebitByCurrency: SupplierDebtByCurrency[]
+	debtByCurrency: SupplierDebtByCurrency[]
 }
 
 export declare interface SupplierFindManyData extends PaginationResponse<SupplierFindOneData> {}
 
 export declare interface SupplierFindOneData extends Pick<SupplierRequired, 'id' | 'fullname' | 'createdAt' | 'phone'> {
 	lastArrivalDate?: Date
-	debt?: Decimal
+	debtByCurrency?: SupplierDebtByCurrency[]
 	deedInfo?: SupplierDeedInfo
 }
 

@@ -1,20 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto, IsDecimalIntOrBigInt } from '../../../common'
-import { StaffPaymentOptional, StaffPaymentRequired } from '../interfaces'
-import { IsDecimal, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator'
+import { StaffPaymentMethod, StaffPaymentOptional, StaffPaymentRequired } from '../interfaces'
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator'
+import { $Enums, PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
+export class StaffPaymentMethodDto implements StaffPaymentMethod {
+	@ApiProperty({ enum: PaymentMethodEnum })
+	@IsNotEmpty()
+	@IsEnum(PaymentMethodEnum)
+	type: $Enums.PaymentMethodEnum
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	amount: Decimal
+}
+
 export class StaffPaymentRequiredDto extends DefaultRequiredFieldsDto implements StaffPaymentRequired {
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	total: Decimal
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	sum: Decimal
-
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
 	@IsUUID('4')
@@ -23,7 +31,7 @@ export class StaffPaymentRequiredDto extends DefaultRequiredFieldsDto implements
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
 	@IsUUID('4')
-	userId: string
+	employeeId: string
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
@@ -32,11 +40,6 @@ export class StaffPaymentRequiredDto extends DefaultRequiredFieldsDto implements
 }
 
 export class StaffPaymentOptionalDto extends DefaultOptionalFieldsDto implements StaffPaymentOptional {
-	@ApiPropertyOptional({ type: Number })
-	@IsOptional()
-	@IsDecimalIntOrBigInt()
-	sum?: Decimal
-
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()
 	@IsUUID('4')
@@ -45,7 +48,7 @@ export class StaffPaymentOptionalDto extends DefaultOptionalFieldsDto implements
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()
 	@IsUUID('4')
-	userId?: string
+	employeeId?: string
 
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()

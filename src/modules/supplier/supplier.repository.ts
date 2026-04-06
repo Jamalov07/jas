@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../shared/prisma'
 import {
 	SupplierCreateOneRequest,
@@ -9,12 +9,8 @@ import {
 	SupplierGetOneRequest,
 	SupplierUpdateOneRequest,
 } from './interfaces'
-import { ServiceTypeEnum, UserTypeEnum } from '@prisma/client'
-import * as bcrypt from 'bcryptjs'
-import { SupplierController } from './supplier.controller'
-
 @Injectable()
-export class SupplierRepository implements OnModuleInit {
+export class SupplierRepository {
 	private readonly prisma: PrismaService
 	constructor(prisma: PrismaService) {
 		this.prisma = prisma
@@ -26,32 +22,44 @@ export class SupplierRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const suppliers = await this.prisma.userModel.findMany({
+		const suppliers = await this.prisma.supplierModel.findMany({
 			where: {
-				type: UserTypeEnum.supplier,
 				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
 			},
 			select: {
 				id: true,
 				fullname: true,
-				balance: true,
 				phone: true,
-			arrivals: {
-				select: {
-					date: true,
-					totals: { select: { totalCost: true } },
-					payment: { select: { card: true, cash: true, other: true, transfer: true, total: true } },
-				},
-				orderBy: { date: 'desc' },
-			},
-				payments: {
-					where: { type: ServiceTypeEnum.supplier },
-					select: { card: true, cash: true, other: true, transfer: true, total: true },
-				},
-				actions: true,
-				updatedAt: true,
 				createdAt: true,
-				deletedAt: true,
+				arrivals: {
+					select: {
+						date: true,
+						products: {
+							select: {
+								prices: {
+									where: { type: 'cost' },
+									select: { totalPrice: true, currencyId: true },
+								},
+							},
+						},
+						supplierArrivalPayment: {
+							select: {
+								supplierArrivalPaymentMethods: {
+									select: { amount: true, currencyId: true },
+								},
+							},
+						},
+					},
+					orderBy: { date: 'desc' },
+				},
+				supplierPayments: {
+					where: { deletedAt: null },
+					select: {
+						supplierPaymentMethods: {
+							select: { amount: true, currencyId: true },
+						},
+					},
+				},
 			},
 			...paginationOptions,
 		})
@@ -60,31 +68,48 @@ export class SupplierRepository implements OnModuleInit {
 	}
 
 	async findOne(query: SupplierFindOneRequest) {
-		const supplier = await this.prisma.userModel.findFirst({
-			where: { id: query.id, type: UserTypeEnum.supplier },
+		const supplier = await this.prisma.supplierModel.findFirst({
+			where: { id: query.id },
 			select: {
 				id: true,
-				balance: true,
 				fullname: true,
-			arrivals: {
-				select: {
-					totals: { select: { totalCost: true } },
-					date: true,
-					payment: {
-						select: { total: true, card: true, cash: true, other: true, transfer: true, description: true, createdAt: true },
+				phone: true,
+				createdAt: true,
+				updatedAt: true,
+				deletedAt: true,
+				arrivals: {
+					select: {
+						date: true,
+						products: {
+							select: {
+								prices: {
+									where: { type: 'cost' },
+									select: { totalPrice: true, currencyId: true },
+								},
+							},
+						},
+						supplierArrivalPayment: {
+							select: {
+								createdAt: true,
+								description: true,
+								supplierArrivalPaymentMethods: {
+									select: { amount: true, currencyId: true, type: true },
+								},
+							},
+						},
+					},
+					orderBy: { date: 'desc' },
+				},
+				supplierPayments: {
+					where: { deletedAt: null },
+					select: {
+						createdAt: true,
+						description: true,
+						supplierPaymentMethods: {
+							select: { amount: true, currencyId: true, type: true },
+						},
 					},
 				},
-				orderBy: { date: 'desc' },
-			},
-				payments: {
-					where: { type: ServiceTypeEnum.supplier, deletedAt: null },
-					select: { total: true, card: true, cash: true, other: true, transfer: true, description: true, createdAt: true },
-				},
-				phone: true,
-				actions: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
 			},
 		})
 
@@ -92,14 +117,13 @@ export class SupplierRepository implements OnModuleInit {
 	}
 
 	async countFindMany(query: SupplierFindManyRequest) {
-		const suppliersCount = await this.prisma.userModel.count({
+		const count = await this.prisma.supplierModel.count({
 			where: {
-				type: UserTypeEnum.supplier,
 				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
 			},
 		})
 
-		return suppliersCount
+		return count
 	}
 
 	async getMany(query: SupplierGetManyRequest) {
@@ -108,11 +132,10 @@ export class SupplierRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const suppliers = await this.prisma.userModel.findMany({
+		const suppliers = await this.prisma.supplierModel.findMany({
 			where: {
 				id: { in: query.ids },
 				fullname: query.fullname,
-				type: UserTypeEnum.supplier,
 			},
 			...paginationOptions,
 		})
@@ -121,35 +144,30 @@ export class SupplierRepository implements OnModuleInit {
 	}
 
 	async getOne(query: SupplierGetOneRequest) {
-		const supplier = await this.prisma.userModel.findFirst({
+		const supplier = await this.prisma.supplierModel.findFirst({
 			where: { id: query.id, fullname: query.fullname, phone: query.phone },
-			select: { id: true, fullname: true, phone: true, createdAt: true, deletedAt: true, password: true, token: true },
+			select: { id: true, fullname: true, phone: true, createdAt: true, deletedAt: true },
 		})
 
 		return supplier
 	}
 
 	async countGetMany(query: SupplierGetManyRequest) {
-		const suppliersCount = await this.prisma.userModel.count({
+		const count = await this.prisma.supplierModel.count({
 			where: {
 				id: { in: query.ids },
 				fullname: query.fullname,
-				type: UserTypeEnum.supplier,
 			},
 		})
 
-		return suppliersCount
+		return count
 	}
 
 	async createOne(body: SupplierCreateOneRequest) {
-		const password = await bcrypt.hash(body.phone, 7)
-
-		const supplier = await this.prisma.userModel.create({
+		const supplier = await this.prisma.supplierModel.create({
 			data: {
 				fullname: body.fullname,
-				password: password,
 				phone: body.phone,
-				type: UserTypeEnum.supplier,
 			},
 			select: {
 				id: true,
@@ -162,12 +180,11 @@ export class SupplierRepository implements OnModuleInit {
 	}
 
 	async updateOne(query: SupplierGetOneRequest, body: SupplierUpdateOneRequest) {
-		const supplier = await this.prisma.userModel.update({
+		const supplier = await this.prisma.supplierModel.update({
 			where: { id: query.id },
 			data: {
 				fullname: body.fullname,
 				phone: body.phone,
-				balance: body.balance,
 				deletedAt: body.deletedAt,
 			},
 		})
@@ -176,14 +193,11 @@ export class SupplierRepository implements OnModuleInit {
 	}
 
 	async deleteOne(query: SupplierDeleteOneRequest) {
-		const supplier = await this.prisma.userModel.delete({
+		const supplier = await this.prisma.supplierModel.delete({
 			where: { id: query.id },
 		})
 
 		return supplier
 	}
 
-	async onModuleInit() {
-		await this.prisma.createActionMethods(SupplierController)
-	}
 }

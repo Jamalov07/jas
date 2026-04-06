@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Patch, Post, Query, Req, UseGuards } from '@nestjs/common'
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { StaffService } from './staff.service'
 import {
@@ -12,7 +12,8 @@ import {
 	StaffCreateOneRequestDto,
 	StaffCreateOneResponseDto,
 } from './dtos'
-import { CheckPermissionGuard } from '../../common'
+import { AuthOptions, CheckPermissionGuard, CRequest } from '../../common'
+import { StaffUpdateCurrencyRequestDto, StaffUpdateCurrencyResponseDto } from '../common/dtos'
 
 @ApiTags('Staff')
 @Controller('staff')

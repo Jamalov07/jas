@@ -2,15 +2,25 @@ import { GlobalResponse, PaginationResponse } from '@common'
 import { StaffPaymentRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
-export declare interface StaffPaymentCalc {
-	sum: Decimal
+export declare interface StaffPaymentMethodData {
+	type: string
+	currencyId: string
+	amount: Decimal
+}
+
+export declare interface StaffPaymentCalcByCurrency {
+	currencyId: string
+	total: Decimal
 }
 
 export declare interface StaffPaymentFindManyData extends PaginationResponse<StaffPaymentFindOneData> {
-	calc: StaffPaymentCalc
+	calcByCurrency: StaffPaymentCalcByCurrency[]
 }
 
-export declare interface StaffPaymentFindOneData extends Pick<StaffPaymentRequired, 'id' | 'sum' | 'createdAt'> {}
+export declare interface StaffPaymentFindOneData extends Pick<StaffPaymentRequired, 'id'> {
+	description?: string | null
+	paymentMethods?: StaffPaymentMethodData[]
+}
 
 export declare interface StaffPaymentFindManyResponse extends GlobalResponse {
 	data: StaffPaymentFindManyData

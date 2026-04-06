@@ -1,11 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ProductRepository } from './product.repository'
 import { createResponse, ERROR_MSG } from '@common'
-import { ProductGetOneRequest, ProductCreateOneRequest, ProductUpdateOneRequest, ProductGetManyRequest, ProductFindManyRequest, ProductFindOneRequest } from './interfaces'
+import { ProductCreateOneRequest, ProductFindManyRequest, ProductFindOneRequest, ProductGetManyRequest, ProductGetOneRequest, ProductUpdateOneRequest } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
+import { PriceTypeEnum } from '@prisma/client'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
-import { PriceTypeEnum } from '@prisma/client'
 
 @Injectable()
 export class ProductService {
@@ -19,19 +19,19 @@ export class ProductService {
 		const productsCount = await this.productRepository.countFindMany(query)
 
 		const mappedProducts = products.map((p) => {
-			const lastSelling = p.productMVs?.length ? p.productMVs[0] : null
+			const lastSellingMV = p.sellingMVs?.length ? p.sellingMVs[0] : null
 
-			delete p.productMVs
+			const { sellingMVs: _, ...rest } = p
 
 			return {
-				...p,
-			lastSellingDate: lastSelling?.selling?.date ?? null,
-			lastSellingPrice: lastSelling?.productMVPrices?.find((p) => p.type === 'selling')?.price ?? lastSelling?.productMVPrices?.[0]?.price ?? null,
-			lastSellingCount: lastSelling?.count ?? null,
+				...rest,
+				lastSellingDate: lastSellingMV?.selling?.date ?? null,
+				lastSellingPrice: lastSellingMV?.prices?.find((pr) => pr.type === PriceTypeEnum.selling)?.price ?? lastSellingMV?.prices?.[0]?.price ?? null,
+				lastSellingCount: lastSellingMV?.count ?? null,
 				prices: {
-					cost: p.productPrices.find((pri) => pri.type === PriceTypeEnum.cost),
-					selling: p.productPrices.find((pri) => pri.type === PriceTypeEnum.selling),
-					wholesale: p.productPrices.find((pri) => pri.type === PriceTypeEnum.wholesale),
+					cost: p.prices.find((pri) => pri.type === PriceTypeEnum.cost),
+					selling: p.prices.find((pri) => pri.type === PriceTypeEnum.selling),
+					wholesale: p.prices.find((pri) => pri.type === PriceTypeEnum.wholesale),
 				},
 			}
 		})
@@ -55,36 +55,30 @@ export class ProductService {
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
 
-	async excelDownloadMany(res: Response, query: ProductFindManyRequest) {
-		return this.excelService.productDownloadMany(res, query)
-	}
-
 	async findOne(query: ProductFindOneRequest) {
 		const product = await this.productRepository.findOne(query)
 
 		if (!product) {
 			throw new BadRequestException(ERROR_MSG.PRODUCT.NOT_FOUND.UZ)
 		}
-		const lastSelling = product.productMVs?.length ? product.productMVs[0] : null
+
+		const lastSellingMV = product.sellingMVs?.length ? product.sellingMVs[0] : null
+
+		const { sellingMVs: _, ...rest } = product
 
 		const result = {
-			...product,
-			lastSellingDate: lastSelling.selling.date ?? null,
-			lastSellingPrice: lastSelling?.productMVPrices?.find((p) => p.type === 'selling')?.price ?? lastSelling?.productMVPrices?.[0]?.price ?? null,
-			lastSellingCount: lastSelling?.count ?? null,
+			...rest,
+			lastSellingDate: lastSellingMV?.selling?.date ?? null,
+			lastSellingPrice: lastSellingMV?.prices?.find((pr) => pr.type === PriceTypeEnum.selling)?.price ?? lastSellingMV?.prices?.[0]?.price ?? null,
+			lastSellingCount: lastSellingMV?.count ?? null,
 			prices: {
-				cost: product.productPrices.find((pri) => pri.type === PriceTypeEnum.cost),
-				selling: product.productPrices.find((pri) => pri.type === PriceTypeEnum.selling),
-				wholesale: product.productPrices.find((pri) => pri.type === PriceTypeEnum.wholesale),
+				cost: product.prices.find((pri) => pri.type === PriceTypeEnum.cost),
+				selling: product.prices.find((pri) => pri.type === PriceTypeEnum.selling),
+				wholesale: product.prices.find((pri) => pri.type === PriceTypeEnum.wholesale),
 			},
 		}
 
-		delete result.productMVs
-
-		return createResponse({
-			data: result,
-			success: { messages: ['find one success'] },
-		})
+		return createResponse({ data: result, success: { messages: ['find one success'] } })
 	}
 
 	async getMany(query: ProductGetManyRequest) {
@@ -139,11 +133,10 @@ export class ProductService {
 		await this.productRepository.updateOne(query, body)
 
 		const newCount = body.count !== undefined ? body.count : current.count
-
 		const needPriceUpdate = body.count !== undefined || body.prices
 
 		if (needPriceUpdate) {
-			for (const priceRecord of current.productPrices) {
+			for (const priceRecord of current.prices) {
 				const typeKey = priceRecord.type as 'cost' | 'selling' | 'wholesale'
 				const priceInput = body.prices?.[typeKey]
 
@@ -163,5 +156,9 @@ export class ProductService {
 		await this.productRepository.deleteOne(query)
 
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
+	}
+
+	async excelDownloadMany(res: Response, query: ProductFindManyRequest) {
+		return this.excelService.productDownloadMany(res, query)
 	}
 }

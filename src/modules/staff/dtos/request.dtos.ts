@@ -15,7 +15,7 @@ export class StaffCreateOneRequestDto
 
 export class StaffUpdateOneRequestDto
 	extends IntersectionType(
-		PickType(StaffOptionalDto, ['deletedAt', 'fullname', 'password', 'phone', 'token']),
+		PickType(StaffOptionalDto, ['deletedAt', 'fullname', 'password', 'phone', 'token', 'currencyId']),
 		PickType(RequestOtherFieldsDto, ['actionsToConnect', 'actionsToDisconnect', 'pagesToConnect', 'pagesToDisconnect']),
 	)
 	implements StaffUpdateOneRequest {}

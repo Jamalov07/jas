@@ -1,39 +1,48 @@
 import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
 import {
-	SupplierPaymentCalc,
+	SupplierPaymentCalcByCurrency,
 	SupplierPaymentCreateOneResponse,
 	SupplierPaymentFindManyData,
 	SupplierPaymentFindManyResponse,
 	SupplierPaymentFindOneData,
 	SupplierPaymentFindOneResponse,
+	SupplierPaymentMethodData,
 	SupplierPaymentModifyResponse,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { SupplierPaymentRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
 
-export class SupplierPaymentFindOneDataDto extends PickType(SupplierPaymentRequiredDto, ['id', 'description', 'createdAt']) implements SupplierPaymentFindOneData {}
+export class SupplierPaymentMethodDataDto implements SupplierPaymentMethodData {
+	@ApiProperty({ type: String })
+	type: string
 
-export class SupplierPaymentCalcDto implements SupplierPaymentCalc {
-	@ApiProperty({ type: Number })
-	totalCard: Decimal
-
-	@ApiProperty({ type: Number })
-	totalCash: Decimal
+	@ApiProperty({ type: String })
+	currencyId: string
 
 	@ApiProperty({ type: Number })
-	totalOther: Decimal
+	amount: Decimal
+}
+
+export class SupplierPaymentCalcByCurrencyDto implements SupplierPaymentCalcByCurrency {
+	@ApiProperty({ type: String })
+	currencyId: string
 
 	@ApiProperty({ type: Number })
-	totalTransfer: Decimal
+	total: Decimal
+}
+
+export class SupplierPaymentFindOneDataDto extends PickType(SupplierPaymentRequiredDto, ['id', 'createdAt']) implements SupplierPaymentFindOneData {
+	@ApiProperty({ type: SupplierPaymentMethodDataDto, isArray: true })
+	paymentMethods?: SupplierPaymentMethodData[]
 }
 
 export class SupplierPaymentFindManyDataDto extends PaginationResponseDto implements SupplierPaymentFindManyData {
 	@ApiProperty({ type: SupplierPaymentFindOneDataDto, isArray: true })
 	data: SupplierPaymentFindOneData[]
 
-	@ApiProperty({ type: SupplierPaymentCalcDto })
-	calc: SupplierPaymentCalc
+	@ApiProperty({ type: SupplierPaymentCalcByCurrencyDto, isArray: true })
+	calcByCurrency: SupplierPaymentCalcByCurrency[]
 }
 
 export class SupplierPaymentFindManyResponseDto extends GlobalResponseDto implements SupplierPaymentFindManyResponse {

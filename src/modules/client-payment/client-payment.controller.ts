@@ -32,12 +32,6 @@ export class ClientPaymentController {
 		return this.clientPaymentService.findMany(query)
 	}
 
-	@Get('excel-download/many')
-	@ApiOperation({ summary: 'download many client payments' })
-	async excelDownloadMany(@Res() res: Response, @Query() query: ClientPaymentFindManyRequestDto) {
-		return this.clientPaymentService.excelDownloadMany(res, query)
-	}
-
 	@Get('one')
 	@ApiOperation({ summary: 'find one clientPayment' })
 	@ApiOkResponse({ type: ClientPaymentFindOneResponseDto })
@@ -65,5 +59,11 @@ export class ClientPaymentController {
 	@ApiOkResponse({ type: ClientPaymentModifyResponseDto })
 	async deleteOne(@Query() query: ClientPaymentDeleteOneRequestDto): Promise<ClientPaymentModifyResponseDto> {
 		return this.clientPaymentService.deleteOne(query)
+	}
+
+	@Get('excel-download/many')
+	@ApiOperation({ summary: 'download many client payments as excel' })
+	async excelDownloadMany(@Res() res: Response, @Query() query: ClientPaymentFindManyRequestDto) {
+		return this.clientPaymentService.excelDownloadMany(res, query)
 	}
 }

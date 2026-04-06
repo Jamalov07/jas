@@ -16,12 +16,12 @@ export class ClientFindOneRequestDto extends IntersectionType(PickType(ClientReq
 	@ApiPropertyOptional({ description: 'Start date in ISO format (YYYY-MM-DD)' })
 	@IsOptional()
 	@IsDateString()
-	deedStartDate?: Date = this.deedStartDate ? new Date(new Date(this.deedStartDate).setHours(0, 0, 0, 0)) : undefined
+	deedStartDate?: Date
 
-	@ApiPropertyOptional({ description: 'Start date in ISO format (YYYY-MM-DD)' })
+	@ApiPropertyOptional({ description: 'End date in ISO format (YYYY-MM-DD)' })
 	@IsOptional()
 	@IsDateString()
-	deedEndDate?: Date = this.deedStartDate ? new Date(new Date(this.deedStartDate).setHours(0, 0, 0, 0)) : undefined
+	deedEndDate?: Date
 }
 
 export class ClientCreateOneRequestDto extends IntersectionType(PickType(ClientRequiredDto, ['fullname', 'phone'])) implements ClientCreateOneRequest {}

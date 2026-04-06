@@ -1,6 +1,8 @@
+import { Decimal } from '@prisma/client/runtime/library'
 import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
 import {
 	SupplierCreateOneResponse,
+	SupplierDebtByCurrency,
 	SupplierDeed,
 	SupplierDeedInfo,
 	SupplierFindManyData,
@@ -11,16 +13,23 @@ import {
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { SupplierRequiredDto } from './fields.dtos'
-import { Decimal } from '@prisma/client/runtime/library'
+
+export class SupplierDebtByCurrencyDto implements SupplierDebtByCurrency {
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	amount: Decimal
+}
 
 export class SupplierDeedDto implements SupplierDeed {
 	@ApiProperty({ type: Date })
 	date: Date
 
-	@ApiProperty({ enum: ['debit', 'kredit'] })
+	@ApiProperty({ enum: ['debit', 'credit'] })
 	type: 'debit' | 'credit'
 
-	@ApiProperty({ type: Decimal })
+	@ApiProperty({ type: Number })
 	value: Decimal
 
 	@ApiProperty({ type: String })
@@ -28,25 +37,28 @@ export class SupplierDeedDto implements SupplierDeed {
 
 	@ApiProperty({ enum: ['payment', 'arrival'] })
 	action?: 'payment' | 'arrival'
+
+	@ApiProperty({ type: String })
+	currencyId?: string
 }
 
 export class SupplierDeedInfoDto implements SupplierDeedInfo {
 	@ApiProperty({ type: SupplierDeedDto, isArray: true })
-	deeds: SupplierDeedDto[]
+	deeds: SupplierDeed[]
 
-	@ApiProperty({ type: Decimal })
-	debt: Decimal
+	@ApiProperty({ type: SupplierDebtByCurrencyDto, isArray: true })
+	debtByCurrency: SupplierDebtByCurrency[]
 
-	@ApiProperty({ type: Decimal })
-	totalCredit: Decimal
+	@ApiProperty({ type: SupplierDebtByCurrencyDto, isArray: true })
+	totalCreditByCurrency: SupplierDebtByCurrency[]
 
-	@ApiProperty({ type: Decimal })
-	totalDebit: Decimal
+	@ApiProperty({ type: SupplierDebtByCurrencyDto, isArray: true })
+	totalDebitByCurrency: SupplierDebtByCurrency[]
 }
 
 export class SupplierFindOneDataDto extends PickType(SupplierRequiredDto, ['id', 'fullname', 'createdAt', 'phone']) implements SupplierFindOneData {
-	@ApiProperty({ type: Number })
-	debt?: Decimal
+	@ApiProperty({ type: SupplierDebtByCurrencyDto, isArray: true })
+	debtByCurrency?: SupplierDebtByCurrency[]
 
 	@ApiProperty({ type: Date })
 	lastArrivalDate?: Date

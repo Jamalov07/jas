@@ -17,6 +17,6 @@ export declare interface ClientGetOneRequest extends ClientOptional, Pick<Reques
 
 export declare interface ClientCreateOneRequest extends Pick<ClientRequired, 'fullname' | 'phone'> {}
 
-export declare interface ClientUpdateOneRequest extends Pick<ClientOptional, 'fullname' | 'phone' | 'deletedAt' | 'balance'> {}
+export declare interface ClientUpdateOneRequest extends Pick<ClientOptional, 'fullname' | 'phone' | 'deletedAt'> {}
 
 export declare interface ClientDeleteOneRequest extends Pick<ClientOptional, 'id'>, Pick<RequestOtherFields, 'method'> {}

@@ -10,10 +10,6 @@ import {
 	SellingDeleteOneRequestDto,
 	SellingCreateOneRequestDto,
 	SellingCreateOneResponseDto,
-	SellingGetTotalStatsResponseDto,
-	SellingGetTotalStatsRequestDto,
-	SellingGetPeriodStatsResponseDto,
-	SellingGetPeriodStatsRequestDto,
 } from './dtos'
 import { SellingService } from './selling.service'
 import { AuthOptions, CheckPermissionGuard, CRequest } from '../../common'
@@ -32,39 +28,11 @@ export class SellingController {
 		return this.sellingService.findMany({ ...query, isDeleted: false })
 	}
 
-	@Get('excel-download/many')
-	@ApiOperation({ summary: 'download many sellings' })
-	async excelDownloadMany(@Res() res: Response, @Query() query: SellingFindManyRequestDto) {
-		return this.sellingService.excelDownloadMany(res, query)
-	}
-
-	@Get('total-stats')
-	@ApiOkResponse({ type: SellingGetTotalStatsResponseDto })
-	@ApiOperation({ summary: 'get total stats' })
-	@AuthOptions(false, false)
-	async getTotalStats(@Query() query: SellingGetTotalStatsRequestDto): Promise<SellingGetTotalStatsResponseDto> {
-		return this.sellingService.getTotalStats(query)
-	}
-
-	@Get('period-stats')
-	@ApiOkResponse({ type: SellingGetPeriodStatsResponseDto })
-	@ApiOperation({ summary: 'get period stats' })
-	@AuthOptions(false, false)
-	async getPeriodStats(@Query() query: SellingGetPeriodStatsRequestDto): Promise<SellingGetPeriodStatsResponseDto> {
-		return this.sellingService.getPeriodStats(query)
-	}
-
 	@Get('one')
 	@ApiOperation({ summary: 'find one selling' })
 	@ApiOkResponse({ type: SellingFindOneResponseDto })
 	async findOne(@Query() query: SellingFindOneRequestDto): Promise<SellingFindOneResponseDto> {
 		return this.sellingService.findOne(query)
-	}
-
-	@Get('excel-download/one')
-	@ApiOperation({ summary: 'download many sellings' })
-	async excelDownloadOne(@Res() res: Response, @Query() query: SellingFindOneRequestDto) {
-		return this.sellingService.excelDownloadOne(res, query)
 	}
 
 	@Post('one')
@@ -88,5 +56,17 @@ export class SellingController {
 	@ApiOkResponse({ type: SellingModifyResponseDto })
 	async deleteOne(@Query() query: SellingDeleteOneRequestDto): Promise<SellingModifyResponseDto> {
 		return this.sellingService.deleteOne(query)
+	}
+
+	@Get('excel-download/many')
+	@ApiOperation({ summary: 'download many sellings as excel' })
+	async excelDownloadMany(@Res() res: Response, @Query() query: SellingFindManyRequestDto) {
+		return this.sellingService.excelDownloadMany(res, query)
+	}
+
+	@Get('excel-download/one')
+	@ApiOperation({ summary: 'download one selling as excel' })
+	async excelDownloadOne(@Res() res: Response, @Query() query: SellingFindOneRequestDto) {
+		return this.sellingService.excelDownloadOne(res, query)
 	}
 }

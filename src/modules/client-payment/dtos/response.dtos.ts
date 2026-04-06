@@ -1,39 +1,48 @@
 import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
 import {
-	ClientPaymentCalc,
+	ClientPaymentCalcByCurrency,
 	ClientPaymentCreateOneResponse,
 	ClientPaymentFindManyData,
 	ClientPaymentFindManyResponse,
 	ClientPaymentFindOneData,
 	ClientPaymentFindOneResponse,
+	ClientPaymentMethodData,
 	ClientPaymentModifyResponse,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ClientPaymentRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
 
-export class ClientPaymentFindOneDataDto extends PickType(ClientPaymentRequiredDto, ['id', 'description', 'createdAt']) implements ClientPaymentFindOneData {}
+export class ClientPaymentMethodDataDto implements ClientPaymentMethodData {
+	@ApiProperty({ type: String })
+	type: string
 
-export class ClientPaymentCalcDto implements ClientPaymentCalc {
-	@ApiProperty({ type: Number })
-	totalCard: Decimal
-
-	@ApiProperty({ type: Number })
-	totalCash: Decimal
+	@ApiProperty({ type: String })
+	currencyId: string
 
 	@ApiProperty({ type: Number })
-	totalOther: Decimal
+	amount: Decimal
+}
+
+export class ClientPaymentCalcByCurrencyDto implements ClientPaymentCalcByCurrency {
+	@ApiProperty({ type: String })
+	currencyId: string
 
 	@ApiProperty({ type: Number })
-	totalTransfer: Decimal
+	total: Decimal
+}
+
+export class ClientPaymentFindOneDataDto extends PickType(ClientPaymentRequiredDto, ['id', 'createdAt']) implements ClientPaymentFindOneData {
+	@ApiProperty({ type: ClientPaymentMethodDataDto, isArray: true })
+	paymentMethods?: ClientPaymentMethodData[]
 }
 
 export class ClientPaymentFindManyDataDto extends PaginationResponseDto implements ClientPaymentFindManyData {
 	@ApiProperty({ type: ClientPaymentFindOneDataDto, isArray: true })
 	data: ClientPaymentFindOneData[]
 
-	@ApiProperty({ type: ClientPaymentCalcDto })
-	calc: ClientPaymentCalc
+	@ApiProperty({ type: ClientPaymentCalcByCurrencyDto, isArray: true })
+	calcByCurrency: ClientPaymentCalcByCurrency[]
 }
 
 export class ClientPaymentFindManyResponseDto extends GlobalResponseDto implements ClientPaymentFindManyResponse {

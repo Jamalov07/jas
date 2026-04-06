@@ -1,9 +1,8 @@
-import { Decimal } from '@prisma/client/runtime/library'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional, PickType } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { StaffOptional, StaffRequired } from '../interfaces'
 import { IsEnum, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID } from 'class-validator'
-import { $Enums, PageEnum, UserTypeEnum } from '@prisma/client'
+import { $Enums, PageEnum, StaffTypeEnum } from '@prisma/client'
 
 export class StaffRequiredDto extends DefaultRequiredFieldsDto implements StaffRequired {
 	@ApiProperty({ type: String })
@@ -26,13 +25,10 @@ export class StaffRequiredDto extends DefaultRequiredFieldsDto implements StaffR
 	@IsJWT()
 	token: string
 
-	@ApiProperty({ enum: UserTypeEnum })
+	@ApiProperty({ enum: StaffTypeEnum })
 	@IsNotEmpty()
-	@IsEnum(UserTypeEnum)
-	type: $Enums.UserTypeEnum
-
-	@ApiProperty({ type: Decimal })
-	balance: Decimal
+	@IsEnum(StaffTypeEnum)
+	type: $Enums.StaffTypeEnum
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
@@ -64,13 +60,10 @@ export class StaffOptionalDto extends DefaultOptionalFieldsDto implements StaffO
 	@IsJWT()
 	token?: string
 
-	@ApiPropertyOptional({ enum: UserTypeEnum })
+	@ApiPropertyOptional({ enum: StaffTypeEnum })
 	@IsOptional()
-	@IsEnum(UserTypeEnum)
-	type?: $Enums.UserTypeEnum
-
-	@ApiPropertyOptional({ type: Decimal })
-	balance?: Decimal
+	@IsEnum(StaffTypeEnum)
+	type?: $Enums.StaffTypeEnum
 
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()

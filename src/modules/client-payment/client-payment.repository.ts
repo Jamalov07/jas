@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../shared/prisma'
 import {
 	ClientPaymentCreateOneRequest,
@@ -9,14 +9,18 @@ import {
 	ClientPaymentGetOneRequest,
 	ClientPaymentUpdateOneRequest,
 } from './interfaces'
-import { ClientPaymentController } from './client-payment.controller'
-import { ServiceTypeEnum } from '@prisma/client'
-
 @Injectable()
-export class ClientPaymentRepository implements OnModuleInit {
+export class ClientPaymentRepository {
 	private readonly prisma: PrismaService
 	constructor(prisma: PrismaService) {
 		this.prisma = prisma
+	}
+
+	private paymentMethodsSelect = {
+		id: true,
+		type: true,
+		currencyId: true,
+		amount: true,
 	}
 
 	async findMany(query: ClientPaymentFindManyRequest) {
@@ -25,26 +29,22 @@ export class ClientPaymentRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const clientPayments = await this.prisma.paymentModel.findMany({
+		const payments = await this.prisma.clientPaymentModel.findMany({
 			where: {
 				staffId: query.staffId,
-				userId: query.userId,
-				type: { in: [ServiceTypeEnum.client, ServiceTypeEnum.selling] },
-				OR: [{ user: { fullname: { contains: query.search, mode: 'insensitive' } } }, { user: { phone: { contains: query.search, mode: 'insensitive' } } }],
+				clientId: query.clientId,
+				deletedAt: null,
+				OR: query.search
+					? [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }]
+					: undefined,
 				createdAt: { gte: query.startDate, lte: query.endDate },
-				NOT: { AND: [{ card: 0 }, { cash: 0 }, { transfer: 0 }, { other: 0 }] },
 			},
 			select: {
 				id: true,
 				staff: { select: { id: true, fullname: true, phone: true } },
-				user: { select: { id: true, fullname: true, phone: true } },
-				total: true,
-				type: true,
-				card: true,
-				cash: true,
+				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				other: true,
-				transfer: true,
+				clientPaymentMethods: { select: this.paymentMethodsSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -52,47 +52,41 @@ export class ClientPaymentRepository implements OnModuleInit {
 			...paginationOptions,
 		})
 
-		return clientPayments
+		return payments
 	}
 
 	async findOne(query: ClientPaymentFindOneRequest) {
-		const clientPayment = await this.prisma.paymentModel.findFirst({
-			where: {
-				id: query.id,
-				type: { in: [ServiceTypeEnum.client, ServiceTypeEnum.selling] },
-				NOT: { AND: [{ card: 0 }, { cash: 0 }, { transfer: 0 }, { other: 0 }] },
-			},
+		const payment = await this.prisma.clientPaymentModel.findFirst({
+			where: { id: query.id, deletedAt: null },
 			select: {
 				id: true,
 				staff: { select: { id: true, fullname: true, phone: true } },
-				user: { select: { id: true, fullname: true, phone: true } },
-				card: true,
-				cash: true,
+				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				other: true,
-				transfer: true,
+				clientPaymentMethods: { select: this.paymentMethodsSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
 			},
 		})
 
-		return clientPayment
+		return payment
 	}
 
 	async countFindMany(query: ClientPaymentFindManyRequest) {
-		const clientPaymentsCount = await this.prisma.paymentModel.count({
+		const count = await this.prisma.clientPaymentModel.count({
 			where: {
 				staffId: query.staffId,
-				type: { in: [ServiceTypeEnum.client, ServiceTypeEnum.selling] },
-				OR: [{ user: { fullname: { contains: query.search, mode: 'insensitive' } } }, { user: { phone: { contains: query.search, mode: 'insensitive' } } }],
+				clientId: query.clientId,
+				deletedAt: null,
+				OR: query.search
+					? [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }]
+					: undefined,
 				createdAt: { gte: query.startDate, lte: query.endDate },
-				userId: query.userId,
-				NOT: { AND: [{ card: 0 }, { cash: 0 }, { transfer: 0 }, { other: 0 }] },
 			},
 		})
 
-		return clientPaymentsCount
+		return count
 	}
 
 	async getMany(query: ClientPaymentGetManyRequest) {
@@ -101,37 +95,40 @@ export class ClientPaymentRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const clientPayments = await this.prisma.paymentModel.findMany({
+		const payments = await this.prisma.clientPaymentModel.findMany({
 			where: {
 				id: { in: query.ids },
-				type: { in: [ServiceTypeEnum.client, ServiceTypeEnum.selling] },
 				staffId: query.staffId,
 			},
 			...paginationOptions,
 		})
 
-		return clientPayments
+		return payments
 	}
 
 	async getOne(query: ClientPaymentGetOneRequest) {
-		const clientPayment = await this.prisma.paymentModel.findFirst({
+		const payment = await this.prisma.clientPaymentModel.findFirst({
 			where: { id: query.id, staffId: query.staffId },
-			select: { id: true, user: true, total: true, type: true },
-		})
-
-		return clientPayment
-	}
-
-	async countGetMany(query: ClientPaymentGetManyRequest) {
-		const clientPaymentsCount = await this.prisma.paymentModel.count({
-			where: {
-				id: { in: query.ids },
-				staffId: query.staffId,
-				type: { in: [ServiceTypeEnum.client, ServiceTypeEnum.selling] },
+			select: {
+				id: true,
+				clientId: true,
+				client: true,
+				clientPaymentMethods: { select: this.paymentMethodsSelect },
 			},
 		})
 
-		return clientPaymentsCount
+		return payment
+	}
+
+	async countGetMany(query: ClientPaymentGetManyRequest) {
+		const count = await this.prisma.clientPaymentModel.count({
+			where: {
+				id: { in: query.ids },
+				staffId: query.staffId,
+			},
+		})
+
+		return count
 	}
 
 	async createOne(body: ClientPaymentCreateOneRequest) {
@@ -143,78 +140,74 @@ export class ClientPaymentRepository implements OnModuleInit {
 			const tomorrow = new Date(today)
 			tomorrow.setDate(today.getDate() + 1)
 			tomorrow.setHours(0, 0, 0, 0)
-
 			date = tomorrow
 		}
-		const clientPayment = await this.prisma.paymentModel.create({
+
+		const payment = await this.prisma.clientPaymentModel.create({
 			data: {
-				total: body.total,
-				card: body.card,
-				cash: body.cash,
-				other: body.other,
-				transfer: body.transfer,
-				userId: body.userId,
+				clientId: body.clientId,
 				staffId: body.staffId,
 				description: body.description,
-				type: ServiceTypeEnum.client,
 				createdAt: dayClose ? date : undefined,
+				clientPaymentMethods: {
+					create: body.paymentMethods.map((m) => ({
+						type: m.type as any,
+						currencyId: m.currencyId,
+						amount: m.amount,
+					})),
+				},
 			},
 			select: {
 				id: true,
 				staff: { select: { id: true, fullname: true, phone: true } },
-				user: { select: { id: true, fullname: true, phone: true, balance: true } },
-				card: true,
-				cash: true,
+				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				type: true,
-				other: true,
-				transfer: true,
-				updatedAt: true,
+				clientPaymentMethods: { select: this.paymentMethodsSelect },
 				createdAt: true,
+				updatedAt: true,
 				deletedAt: true,
 			},
 		})
 
-		return clientPayment
+		return payment
 	}
 
 	async updateOne(query: ClientPaymentGetOneRequest, body: ClientPaymentUpdateOneRequest) {
-		const clientPayment = await this.prisma.paymentModel.update({
+		const payment = await this.prisma.clientPaymentModel.update({
 			where: { id: query.id },
 			data: {
-				card: body.card,
-				cash: body.cash,
-				other: body.other,
-				transfer: body.transfer,
-				userId: body.userId,
+				clientId: body.clientId,
 				description: body.description,
-				total: body.total,
+				deletedAt: body.deletedAt,
+				...(body.paymentMethods
+					? {
+							clientPaymentMethods: {
+								deleteMany: {},
+								create: body.paymentMethods.map((m) => ({
+									type: m.type as any,
+									currencyId: m.currencyId,
+									amount: m.amount,
+								})),
+							},
+						}
+					: {}),
 			},
 			select: {
 				id: true,
-				userId: true,
-				card: true,
-				cash: true,
-				other: true,
-				transfer: true,
-				total: true,
+				clientId: true,
+				client: { select: { id: true, fullname: true, phone: true } },
+				clientPaymentMethods: { select: this.paymentMethodsSelect },
 				createdAt: true,
-				user: { select: { id: true, fullname: true, phone: true } },
 			},
 		})
 
-		return clientPayment
+		return payment
 	}
 
 	async deleteOne(query: ClientPaymentDeleteOneRequest) {
-		const clientPayment = await this.prisma.paymentModel.delete({
+		await this.prisma.clientPaymentModel.delete({
 			where: { id: query.id },
 		})
-
-		return clientPayment
 	}
 
-	async onModuleInit() {
-		await this.prisma.createActionMethods(ClientPaymentController)
-	}
 }

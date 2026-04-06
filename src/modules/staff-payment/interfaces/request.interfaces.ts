@@ -1,8 +1,8 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
-import { StaffPaymentOptional, StaffPaymentRequired } from './fields.interfaces'
+import { StaffPaymentMethod, StaffPaymentOptional, StaffPaymentRequired } from './fields.interfaces'
 
 export declare interface StaffPaymentFindManyRequest
-	extends Pick<StaffPaymentOptional, 'staffId' | 'userId'>,
+	extends Pick<StaffPaymentOptional, 'staffId' | 'employeeId'>,
 		PaginationRequest,
 		Pick<RequestOtherFields, 'isDeleted' | 'startDate' | 'endDate'> {}
 
@@ -12,8 +12,12 @@ export declare interface StaffPaymentGetManyRequest extends StaffPaymentOptional
 
 export declare interface StaffPaymentGetOneRequest extends StaffPaymentOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 
-export declare interface StaffPaymentCreateOneRequest extends Pick<StaffPaymentRequired, 'sum' | 'description' | 'userId'>, Pick<StaffPaymentOptional, 'staffId' | 'total'> {}
+export declare interface StaffPaymentCreateOneRequest extends Pick<StaffPaymentRequired, 'employeeId' | 'description'>, Pick<StaffPaymentOptional, 'staffId'> {
+	paymentMethods: StaffPaymentMethod[]
+}
 
-export declare interface StaffPaymentUpdateOneRequest extends Pick<StaffPaymentOptional, 'userId' | 'sum' | 'description' | 'deletedAt' | 'total'> {}
+export declare interface StaffPaymentUpdateOneRequest extends Pick<StaffPaymentOptional, 'employeeId' | 'description' | 'deletedAt'> {
+	paymentMethods?: StaffPaymentMethod[]
+}
 
 export declare interface StaffPaymentDeleteOneRequest extends Pick<StaffPaymentOptional, 'id'>, Pick<RequestOtherFields, 'method'> {}

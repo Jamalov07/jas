@@ -1,9 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { ArrivalOptional, ArrivalRequired } from '../interfaces'
-import { IsDateString, IsNotEmpty, IsOptional, IsUUID } from 'class-validator'
+import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsUUID } from 'class-validator'
 
 export class ArrivalRequiredDto extends DefaultRequiredFieldsDto implements ArrivalRequired {
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsInt()
+	publicId: number
+
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
 	@IsUUID('4')
@@ -21,6 +26,11 @@ export class ArrivalRequiredDto extends DefaultRequiredFieldsDto implements Arri
 }
 
 export class ArrivalOptionalDto extends DefaultOptionalFieldsDto implements ArrivalOptional {
+	@ApiPropertyOptional({ type: Number })
+	@IsOptional()
+	@IsInt()
+	publicId?: number
+
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()
 	@IsUUID('4')

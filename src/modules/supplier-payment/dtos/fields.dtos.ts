@@ -1,35 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto, IsDecimalIntOrBigInt } from '../../../common'
-import { SupplierPaymentOptional, SupplierPaymentRequired } from '../interfaces'
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator'
+import { SupplierPaymentMethod, SupplierPaymentOptional, SupplierPaymentRequired } from '../interfaces'
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator'
+import { $Enums, PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
+export class SupplierPaymentMethodDto implements SupplierPaymentMethod {
+	@ApiProperty({ enum: PaymentMethodEnum })
+	@IsNotEmpty()
+	@IsEnum(PaymentMethodEnum)
+	type: $Enums.PaymentMethodEnum
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	amount: Decimal
+}
+
 export class SupplierPaymentRequiredDto extends DefaultRequiredFieldsDto implements SupplierPaymentRequired {
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	total: Decimal
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	card: Decimal
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	cash: Decimal
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	other: Decimal
-
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	transfer: Decimal
-
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
 	@IsUUID('4')
@@ -38,7 +31,7 @@ export class SupplierPaymentRequiredDto extends DefaultRequiredFieldsDto impleme
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
 	@IsUUID('4')
-	userId: string
+	supplierId: string
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
@@ -47,26 +40,6 @@ export class SupplierPaymentRequiredDto extends DefaultRequiredFieldsDto impleme
 }
 
 export class SupplierPaymentOptionalDto extends DefaultOptionalFieldsDto implements SupplierPaymentOptional {
-	@ApiPropertyOptional({ type: Number })
-	@IsOptional()
-	@IsDecimalIntOrBigInt()
-	card?: Decimal
-
-	@ApiPropertyOptional({ type: Number })
-	@IsOptional()
-	@IsDecimalIntOrBigInt()
-	cash?: Decimal
-
-	@ApiPropertyOptional({ type: Number })
-	@IsOptional()
-	@IsDecimalIntOrBigInt()
-	other?: Decimal
-
-	@ApiPropertyOptional({ type: Number })
-	@IsOptional()
-	@IsDecimalIntOrBigInt()
-	transfer?: Decimal
-
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()
 	@IsUUID('4')
@@ -75,7 +48,7 @@ export class SupplierPaymentOptionalDto extends DefaultOptionalFieldsDto impleme
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()
 	@IsUUID('4')
-	userId?: string
+	supplierId?: string
 
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()

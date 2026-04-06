@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '@shared'
 import { StaffSignInRequest } from './interfaces'
-import { UserTypeEnum } from '@prisma/client'
 
 @Injectable()
 export class AuthRepository {
@@ -12,8 +11,8 @@ export class AuthRepository {
 	}
 
 	async findOneStaff(body: StaffSignInRequest) {
-		const staff = await this.prisma.userModel.findFirst({
-			where: { phone: body.phone, type: { in: [UserTypeEnum.staff, UserTypeEnum.admin] } },
+		const staff = await this.prisma.staffModel.findFirst({
+			where: { phone: body.phone },
 			select: {
 				id: true,
 				pages: true,
@@ -24,7 +23,6 @@ export class AuthRepository {
 				deletedAt: true,
 				updatedAt: true,
 				actions: true,
-				payments: true,
 			},
 		})
 

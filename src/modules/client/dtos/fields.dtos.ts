@@ -1,9 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { ClientOptional, ClientRequired } from '../interfaces'
-import { IsEnum, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID } from 'class-validator'
-import { $Enums, PageEnum, UserTypeEnum } from '@prisma/client'
-import { Decimal } from '@prisma/client/runtime/library'
+import { IsNotEmpty, IsOptional, IsPhoneNumber, IsString } from 'class-validator'
 
 export class ClientRequiredDto extends DefaultRequiredFieldsDto implements ClientRequired {
 	@ApiProperty({ type: String })
@@ -13,34 +11,8 @@ export class ClientRequiredDto extends DefaultRequiredFieldsDto implements Clien
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
-	@IsString()
-	password: string
-
-	@ApiProperty({ type: String })
-	@IsNotEmpty()
 	@IsPhoneNumber('UZ')
 	phone: string
-
-	@ApiProperty({ type: String })
-	@IsNotEmpty()
-	@IsJWT()
-	token: string
-
-	@ApiProperty({ enum: UserTypeEnum })
-	@IsNotEmpty()
-	@IsEnum(UserTypeEnum)
-	type: $Enums.UserTypeEnum
-
-	@ApiProperty({ type: Decimal })
-	balance: Decimal
-
-	@ApiProperty({ type: String })
-	@IsNotEmpty()
-	@IsUUID('4')
-	currencyId: string
-
-	@ApiProperty({ enum: PageEnum, isArray: true })
-	pages: $Enums.PageEnum[]
 }
 
 export class ClientOptionalDto extends DefaultOptionalFieldsDto implements ClientOptional {
@@ -51,32 +23,6 @@ export class ClientOptionalDto extends DefaultOptionalFieldsDto implements Clien
 
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()
-	@IsString()
-	password?: string
-
-	@ApiPropertyOptional({ type: String })
-	@IsOptional()
 	@IsPhoneNumber('UZ')
 	phone?: string
-
-	@ApiPropertyOptional({ type: String })
-	@IsOptional()
-	@IsJWT()
-	token?: string
-
-	@ApiPropertyOptional({ enum: UserTypeEnum })
-	@IsOptional()
-	@IsEnum(UserTypeEnum)
-	type?: $Enums.UserTypeEnum
-
-	@ApiPropertyOptional({ type: Decimal })
-	balance?: Decimal
-
-	@ApiPropertyOptional({ type: String })
-	@IsOptional()
-	@IsUUID('4')
-	currencyId?: string
-
-	@ApiPropertyOptional({ enum: PageEnum, isArray: true })
-	pages?: $Enums.PageEnum[]
 }

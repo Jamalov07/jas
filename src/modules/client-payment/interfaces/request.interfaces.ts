@@ -1,8 +1,8 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
-import { ClientPaymentOptional, ClientPaymentRequired } from './fields.interfaces'
+import { ClientPaymentMethod, ClientPaymentOptional, ClientPaymentRequired } from './fields.interfaces'
 
 export declare interface ClientPaymentFindManyRequest
-	extends Pick<ClientPaymentOptional, 'staffId' | 'userId'>,
+	extends Pick<ClientPaymentOptional, 'staffId' | 'clientId'>,
 		PaginationRequest,
 		Pick<RequestOtherFields, 'isDeleted' | 'search' | 'startDate' | 'endDate'> {}
 
@@ -12,11 +12,12 @@ export declare interface ClientPaymentGetManyRequest extends ClientPaymentOption
 
 export declare interface ClientPaymentGetOneRequest extends ClientPaymentOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 
-export declare interface ClientPaymentCreateOneRequest
-	extends Pick<ClientPaymentRequired, 'userId' | 'card' | 'cash' | 'other' | 'transfer'>,
-		Pick<ClientPaymentOptional, 'description' | 'staffId' | 'total'> {}
+export declare interface ClientPaymentCreateOneRequest extends Pick<ClientPaymentRequired, 'clientId'>, Pick<ClientPaymentOptional, 'description' | 'staffId'> {
+	paymentMethods: ClientPaymentMethod[]
+}
 
-export declare interface ClientPaymentUpdateOneRequest
-	extends Pick<ClientPaymentOptional, 'userId' | 'card' | 'description' | 'deletedAt' | 'cash' | 'other' | 'transfer' | 'total'> {}
+export declare interface ClientPaymentUpdateOneRequest extends Pick<ClientPaymentOptional, 'clientId' | 'description' | 'deletedAt'> {
+	paymentMethods?: ClientPaymentMethod[]
+}
 
 export declare interface ClientPaymentDeleteOneRequest extends Pick<ClientPaymentOptional, 'id'>, Pick<RequestOtherFields, 'method'> {}

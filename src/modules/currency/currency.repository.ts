@@ -9,8 +9,6 @@ import {
 	CurrencyGetOneRequest,
 	CurrencyUpdateOneRequest,
 } from './interfaces'
-import { CurrencyController } from './currency.controller'
-
 @Injectable()
 export class CurrencyRepository {
 	private readonly prisma: PrismaService
@@ -165,7 +163,4 @@ export class CurrencyRepository {
 		return currency
 	}
 
-	async onModuleInit() {
-		await this.prisma.createActionMethods(CurrencyController)
-	}
 }

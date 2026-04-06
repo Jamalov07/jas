@@ -9,8 +9,7 @@ import {
 	ProductGetOneRequest,
 	ProductUpdateOneRequest,
 } from './interfaces'
-import { ProductController } from './product.controller'
-import { PriceTypeEnum, ServiceTypeEnum } from '@prisma/client'
+import { PriceTypeEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const PRICE_SELECT = {
@@ -29,30 +28,24 @@ export class ProductRepository {
 		this.prisma = prisma
 	}
 
+	private buildSearchFilter(search?: string) {
+		if (!search) return {}
+		const searchWords = search.split(/\s+/).filter(Boolean)
+		return {
+			[searchWords.length > 1 ? 'AND' : 'OR']: searchWords.map((word) => ({
+				name: { contains: word, mode: 'insensitive' as const },
+			})),
+		}
+	}
+
 	async findMany(query: ProductFindManyRequest) {
 		let paginationOptions = {}
 		if (query.pagination) {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		let nameFilter: any = {}
-		if (query.search) {
-			const searchWords = query.search?.split(/\s+/).filter(Boolean) ?? []
-
-			nameFilter = {
-				[searchWords.length > 1 ? 'AND' : 'OR']: searchWords.map((word) => ({
-					name: {
-						contains: word,
-						mode: 'insensitive',
-					},
-				})),
-			}
-		}
-
 		const products = await this.prisma.productModel.findMany({
-			where: {
-				...nameFilter,
-			},
+			where: { ...this.buildSearchFilter(query.search) },
 			select: {
 				id: true,
 				count: true,
@@ -60,13 +53,16 @@ export class ProductRepository {
 				description: true,
 				name: true,
 				minAmount: true,
-				productPrices: { select: PRICE_SELECT },
-			productMVs: {
-				where: { type: ServiceTypeEnum.selling },
-				orderBy: { selling: { date: 'desc' } },
-				take: 1,
-				select: { count: true, productMVPrices: { select: { price: true, type: true } }, selling: { select: { date: true } } },
-			},
+				prices: { select: PRICE_SELECT },
+				sellingMVs: {
+					orderBy: { selling: { date: 'desc' } },
+					take: 1,
+					select: {
+						count: true,
+						prices: { select: { price: true, type: true } },
+						selling: { select: { date: true } },
+					},
+				},
 			},
 			...paginationOptions,
 		})
@@ -84,12 +80,15 @@ export class ProductRepository {
 				description: true,
 				name: true,
 				minAmount: true,
-				productPrices: { select: PRICE_SELECT },
-				productMVs: {
-					where: { type: ServiceTypeEnum.selling },
+				prices: { select: PRICE_SELECT },
+				sellingMVs: {
 					orderBy: { selling: { date: 'desc' } },
 					take: 1,
-					select: { count: true, productMVPrices: { select: { price: true, type: true } }, selling: { select: { date: true } } },
+					select: {
+						count: true,
+						prices: { select: { price: true, type: true } },
+						selling: { select: { date: true } },
+					},
 				},
 			},
 		})
@@ -98,27 +97,11 @@ export class ProductRepository {
 	}
 
 	async countFindMany(query: ProductFindManyRequest) {
-		let nameFilter: any = {}
-		if (query.search) {
-			const searchWords = query.search?.split(/\s+/).filter(Boolean) ?? []
-
-			nameFilter = {
-				[searchWords.length > 1 ? 'AND' : 'OR']: searchWords.map((word) => ({
-					name: {
-						contains: word,
-						mode: 'insensitive',
-					},
-				})),
-			}
-		}
-
-		const productsCount = await this.prisma.productModel.count({
-			where: {
-				...nameFilter,
-			},
+		const count = await this.prisma.productModel.count({
+			where: { ...this.buildSearchFilter(query.search) },
 		})
 
-		return productsCount
+		return count
 	}
 
 	async getMany(query: ProductGetManyRequest) {
@@ -129,7 +112,7 @@ export class ProductRepository {
 
 		const products = await this.prisma.productModel.findMany({
 			where: { id: { in: query.ids }, name: query.name },
-			include: { productPrices: { select: PRICE_SELECT } },
+			include: { prices: { select: PRICE_SELECT } },
 			...paginationOptions,
 		})
 
@@ -147,18 +130,18 @@ export class ProductRepository {
 	async getOneWithPrices(query: ProductGetOneRequest) {
 		const product = await this.prisma.productModel.findFirst({
 			where: { id: query.id, name: query.name },
-			include: { productPrices: true },
+			include: { prices: true },
 		})
 
 		return product
 	}
 
 	async countGetMany(query: ProductGetManyRequest) {
-		const productsCount = await this.prisma.productModel.count({
+		const count = await this.prisma.productModel.count({
 			where: { id: { in: query.ids }, name: query.name },
 		})
 
-		return productsCount
+		return count
 	}
 
 	async createOne(body: ProductCreateOneRequest) {
@@ -177,7 +160,7 @@ export class ProductRepository {
 				count: body.count,
 				minAmount: body.minAmount,
 				description: body.description,
-				productPrices: {
+				prices: {
 					create: [
 						{
 							type: PriceTypeEnum.cost,
@@ -237,7 +220,4 @@ export class ProductRepository {
 		return product
 	}
 
-	async onModuleInit() {
-		await this.prisma.createActionMethods(ProductController)
-	}
 }

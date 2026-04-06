@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional, IntersectionType } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto, GlobalModifyResponseDto, GlobalResponseDto } from '../../../common'
 import {
 	DayCloseCreateOneRequest,
@@ -11,14 +11,14 @@ import {
 } from '../interfaces'
 import { IsDateString, IsNotEmpty, IsOptional } from 'class-validator'
 
-export class DayCloseRequiredDto extends PickType(DefaultRequiredFieldsDto, ['id', 'createdAt']) implements DayCloseRequired {
+export class DayCloseRequiredDto extends DefaultRequiredFieldsDto implements DayCloseRequired {
 	@ApiProperty({ type: Date, example: new Date() })
 	@IsNotEmpty()
 	@IsDateString()
 	closedDate: Date
 }
 
-export class DayCloseOptionalDto extends PickType(DefaultOptionalFieldsDto, ['id', 'createdAt']) implements DayCloseOptional {
+export class DayCloseOptionalDto extends DefaultOptionalFieldsDto implements DayCloseOptional {
 	@ApiPropertyOptional({ type: Date, example: new Date() })
 	@IsOptional()
 	@IsDateString()

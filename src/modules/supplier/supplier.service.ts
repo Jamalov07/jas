@@ -9,6 +9,7 @@ import {
 	SupplierFindManyRequest,
 	SupplierFindOneRequest,
 	SupplierDeleteOneRequest,
+	SupplierDebtByCurrency,
 	SupplierDeed,
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -18,25 +19,63 @@ import { Response } from 'express'
 @Injectable()
 export class SupplierService {
 	private readonly supplierRepository: SupplierRepository
-	private readonly excelService: ExcelService
 
-	constructor(supplierRepository: SupplierRepository, excelService: ExcelService) {
+	constructor(
+		supplierRepository: SupplierRepository,
+		private readonly excelService: ExcelService,
+	) {
 		this.supplierRepository = supplierRepository
-		this.excelService = excelService
+	}
+
+	private calcDebtByCurrency(
+		arrivals: Array<{
+			products: Array<{ prices: Array<{ totalPrice: Decimal; currencyId: string }> }>
+			supplierArrivalPayment?: { supplierArrivalPaymentMethods: Array<{ amount: Decimal; currencyId: string }> } | null
+		}>,
+		supplierPayments: Array<{ supplierPaymentMethods: Array<{ amount: Decimal; currencyId: string }> }>,
+	): Map<string, Decimal> {
+		const debtMap = new Map<string, Decimal>()
+
+		for (const arr of arrivals) {
+			for (const product of arr.products) {
+				for (const price of product.prices) {
+					const curr = debtMap.get(price.currencyId) ?? new Decimal(0)
+					debtMap.set(price.currencyId, curr.plus(price.totalPrice))
+				}
+			}
+			if (arr.supplierArrivalPayment) {
+				for (const method of arr.supplierArrivalPayment.supplierArrivalPaymentMethods) {
+					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
+					debtMap.set(method.currencyId, curr.minus(method.amount))
+				}
+			}
+		}
+
+		for (const payment of supplierPayments) {
+			for (const method of payment.supplierPaymentMethods) {
+				const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
+				debtMap.set(method.currencyId, curr.minus(method.amount))
+			}
+		}
+
+		return debtMap
 	}
 
 	async findMany(query: SupplierFindManyRequest) {
 		const suppliers = await this.supplierRepository.findMany({ ...query, pagination: false })
-		// const suppliersCount = await this.supplierRepository.countFindMany(query)
 
 		const mappedSuppliers = suppliers.map((s) => {
-			const arrivalPayment = s.arrivals.reduce((acc, arr) => {
-				const totalCost = arr.totals?.reduce((a, t) => a.plus(t.totalCost), new Decimal(0)) ?? new Decimal(0)
-				return acc.plus(totalCost).minus(arr.payment?.total || 0)
-			}, new Decimal(0))
+			const debtMap = this.calcDebtByCurrency(s.arrivals, s.supplierPayments)
+			const debtByCurrency: SupplierDebtByCurrency[] = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+			const totalDebt = Array.from(debtMap.values()).reduce((a, b) => a.plus(b), new Decimal(0))
+
 			return {
-				...s,
-				debt: s.balance.plus(arrivalPayment),
+				id: s.id,
+				fullname: s.fullname,
+				phone: s.phone,
+				createdAt: s.createdAt,
+				debtByCurrency,
+				_totalDebt: totalDebt,
 				lastArrivalDate: s.arrivals?.length ? s.arrivals[0].date : null,
 			}
 		})
@@ -46,11 +85,11 @@ export class SupplierService {
 				const value = new Decimal(query.debtValue)
 				switch (query.debtType) {
 					case DebtTypeEnum.gt:
-						return s.debt.gt(value)
+						return s._totalDebt.gt(value)
 					case DebtTypeEnum.lt:
-						return s.debt.lt(value)
+						return s._totalDebt.lt(value)
 					case DebtTypeEnum.eq:
-						return s.debt.eq(value)
+						return s._totalDebt.eq(value)
 					default:
 						return true
 				}
@@ -58,7 +97,9 @@ export class SupplierService {
 			return true
 		})
 
-		const paginatedSuppliers = query.pagination ? filteredSuppliers.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize) : filteredSuppliers
+		const paginatedSuppliers = query.pagination
+			? filteredSuppliers.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize).map(({ _totalDebt, ...rest }) => rest)
+			: filteredSuppliers.map(({ _totalDebt, ...rest }) => rest)
 
 		const result = query.pagination
 			? {
@@ -67,13 +108,9 @@ export class SupplierService {
 					pageSize: paginatedSuppliers.length,
 					data: paginatedSuppliers,
 				}
-			: { data: filteredSuppliers }
+			: { data: paginatedSuppliers }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
-	}
-
-	async excelDownloadMany(res: Response, query: SupplierFindManyRequest) {
-		return this.excelService.supplierDownloadMany(res, query)
 	}
 
 	async findOne(query: SupplierFindOneRequest) {
@@ -87,44 +124,74 @@ export class SupplierService {
 		}
 
 		const deeds: SupplierDeed[] = []
-		let totalDebit: Decimal = new Decimal(0)
-		let totalCredit: Decimal = new Decimal(0)
+		const totalDebitMap = new Map<string, Decimal>()
+		const totalCreditMap = new Map<string, Decimal>()
 
-		const payment = supplier.payments.reduce((acc, curr) => {
-			console.log('payment', curr.total)
-			if ((!deedStartDate || curr.createdAt >= deedStartDate) && (!deedEndDate || curr.createdAt <= deedEndDate)) {
-				if (curr.description === `import qilingan boshlang'ich qiymat ${Number(curr.total).toFixed(2)}`) {
-					deeds.push({ type: 'debit', action: 'arrival', value: curr.total, date: curr.createdAt, description: curr.description })
-					totalDebit = totalDebit.plus(curr.total)
-				} else {
-					deeds.push({ type: 'credit', action: 'payment', value: curr.total, date: curr.createdAt, description: curr.description })
-					totalCredit = totalCredit.plus(curr.total)
+		const addToMap = (map: Map<string, Decimal>, currencyId: string, amount: Decimal) => {
+			const curr = map.get(currencyId) ?? new Decimal(0)
+			map.set(currencyId, curr.plus(amount))
+		}
+
+		for (const arr of supplier.arrivals) {
+			for (const product of arr.products) {
+				for (const price of product.prices) {
+					if ((!deedStartDate || arr.date >= deedStartDate) && (!deedEndDate || arr.date <= deedEndDate)) {
+						deeds.push({ type: 'debit', action: 'arrival', value: price.totalPrice, date: arr.date, description: '', currencyId: price.currencyId })
+						addToMap(totalDebitMap, price.currencyId, price.totalPrice)
+					}
 				}
 			}
 
-			return acc.plus(curr.total)
-		}, new Decimal(0))
-		console.log('totalPayment', payment)
-
-		const arrivalPayment = supplier.arrivals.reduce((acc, arr) => {
-			const arrTotalCost = arr.totals?.reduce((a, t) => a.plus(t.totalCost), new Decimal(0)) ?? new Decimal(0)
-			console.log('arrival', arr.payment.total, arrTotalCost)
-			if ((!deedStartDate || arr.date >= deedStartDate) && (!deedEndDate || arr.date <= deedEndDate)) {
-				deeds.push({ type: 'debit', action: 'arrival', value: arrTotalCost, date: arr.date, description: '' })
-				totalDebit = totalDebit.plus(arrTotalCost)
+			if (arr.supplierArrivalPayment) {
+				for (const method of arr.supplierArrivalPayment.supplierArrivalPaymentMethods) {
+					const payDate = arr.supplierArrivalPayment.createdAt
+					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
+						deeds.push({
+							type: 'credit',
+							action: 'payment',
+							value: method.amount,
+							date: payDate,
+							description: arr.supplierArrivalPayment.description ?? '',
+							currencyId: method.currencyId,
+						})
+						addToMap(totalCreditMap, method.currencyId, method.amount)
+					}
+				}
 			}
+		}
 
-			if ((!deedStartDate || arr.payment.createdAt >= deedStartDate) && (!deedEndDate || arr.payment.createdAt <= deedEndDate)) {
-				deeds.push({ type: 'credit', action: 'payment', value: arr.payment.total, date: arr.payment.createdAt, description: arr.payment.description })
-				totalCredit = totalCredit.plus(arr.payment.total)
+		for (const payment of supplier.supplierPayments) {
+			for (const method of payment.supplierPaymentMethods) {
+				if ((!deedStartDate || payment.createdAt >= deedStartDate) && (!deedEndDate || payment.createdAt <= deedEndDate)) {
+					deeds.push({
+						type: 'credit',
+						action: 'payment',
+						value: method.amount,
+						date: payment.createdAt,
+						description: payment.description ?? '',
+						currencyId: method.currencyId,
+					})
+					addToMap(totalCreditMap, method.currencyId, method.amount)
+				}
 			}
+		}
 
-			return acc.plus(arrTotalCost).minus(arr.payment?.total || 0)
-		}, new Decimal(0))
-		console.log('arrivalPayment', arrivalPayment)
-		console.log(supplier.balance, arrivalPayment)
-		console.log(totalDebit, totalCredit)
 		const filteredDeeds = deeds.filter((d) => !d.value.equals(0)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+		const allCurrencies = new Set([...totalDebitMap.keys(), ...totalCreditMap.keys()])
+		const debtByCurrencyMap = new Map<string, Decimal>()
+		for (const currId of allCurrencies) {
+			const debit = totalDebitMap.get(currId) ?? new Decimal(0)
+			const credit = totalCreditMap.get(currId) ?? new Decimal(0)
+			debtByCurrencyMap.set(currId, debit.minus(credit))
+		}
+
+		const totalCreditByCurrency = Array.from(totalCreditMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+		const totalDebitByCurrency = Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+		const debtByCurrency = Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+
+		const fullDebtMap = this.calcDebtByCurrency(supplier.arrivals, supplier.supplierPayments)
+		const fullDebt = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
 		return createResponse({
 			data: {
@@ -134,26 +201,17 @@ export class SupplierService {
 				createdAt: supplier.createdAt,
 				updatedAt: supplier.updatedAt,
 				deletedAt: supplier.deletedAt,
-				actionIds: supplier.actions.map((a) => a.id),
-				debt: supplier.balance.plus(arrivalPayment),
+				debtByCurrency: fullDebt,
 				deedInfo: {
-					totalDebit: totalDebit,
-					totalCredit: totalCredit,
-					debt: totalDebit.minus(totalCredit),
+					totalDebitByCurrency,
+					totalCreditByCurrency,
+					debtByCurrency,
 					deeds: filteredDeeds,
 				},
 				lastArrivalDate: supplier.arrivals?.length ? supplier.arrivals[0].date : null,
 			},
 			success: { messages: ['find one success'] },
 		})
-	}
-
-	async excelDownloadOne(res: Response, query: SupplierFindOneRequest) {
-		return this.excelService.supplierDeedDownloadOne(res, query)
-	}
-
-	async excelWithProductDownloadOne(res: Response, query: SupplierFindOneRequest) {
-		return this.excelService.supplierDeedWithProductDownloadOne(res, query)
 	}
 
 	async getMany(query: SupplierGetManyRequest) {
@@ -215,5 +273,17 @@ export class SupplierService {
 			await this.supplierRepository.updateOne(query, { deletedAt: new Date() })
 		}
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
+	}
+
+	async excelDownloadMany(res: Response, query: SupplierFindManyRequest) {
+		return this.excelService.supplierDownloadMany(res, query)
+	}
+
+	async excelDownloadOne(res: Response, query: SupplierFindOneRequest) {
+		return this.excelService.supplierDeedDownloadOne(res, query)
+	}
+
+	async excelWithProductDownloadOne(res: Response, query: SupplierFindOneRequest) {
+		return this.excelService.supplierDeedWithProductDownloadOne(res, query)
 	}
 }

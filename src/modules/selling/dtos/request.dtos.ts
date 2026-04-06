@@ -4,33 +4,47 @@ import {
 	SellingDeleteOneRequest,
 	SellingFindManyRequest,
 	SellingFindOneRequest,
-	SellingGetPeriodStatsRequest,
-	SellingGetTotalStatsRequest,
 	SellingPayment,
+	SellingPaymentMethod,
 	SellingProduct,
 	SellingUpdateOneRequest,
 } from '../interfaces'
 import { IsDecimalIntOrBigInt, PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { SellingOptionalDto, SellingRequiredDto } from './fields.dtos'
-import { ClientPaymentOptionalDto, ClientPaymentRequiredDto } from '../../client-payment'
-import { ArrayNotEmpty, IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
+import { ArrayNotEmpty, IsArray, IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { StatsTypeEnum } from '../enums'
 import { Decimal } from '@prisma/client/runtime/library'
+import { PaymentMethodEnum } from '@prisma/client'
 
-export class SellingFindManyRequestDto
-	extends IntersectionType(
-		PickType(SellingOptionalDto, ['clientId', 'staffId', 'status']),
-		PaginationRequestDto,
-		PickType(RequestOtherFieldsDto, ['search', 'startDate', 'endDate']),
-	)
-	implements SellingFindManyRequest {}
+export class SellingPaymentMethodDto implements SellingPaymentMethod {
+	@ApiProperty({ enum: PaymentMethodEnum })
+	@IsNotEmpty()
+	@IsEnum(PaymentMethodEnum)
+	type: PaymentMethodEnum
 
-export class SellingFindOneRequestDto extends IntersectionType(PickType(SellingRequiredDto, ['id'])) implements SellingFindOneRequest {}
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
 
-export class SellingPaymentDto
-	extends IntersectionType(PickType(ClientPaymentRequiredDto, ['card', 'cash', 'other', 'transfer']), PickType(ClientPaymentOptionalDto, ['description']))
-	implements SellingPayment {}
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	amount: Decimal
+}
+
+export class SellingPaymentDto implements SellingPayment {
+	@ApiPropertyOptional({ type: SellingPaymentMethodDto, isArray: true })
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => SellingPaymentMethodDto)
+	paymentMethods?: SellingPaymentMethod[]
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	description?: string
+}
 
 export class SellingProductDto implements SellingProduct {
 	@ApiProperty({ type: String })
@@ -54,8 +68,18 @@ export class SellingProductDto implements SellingProduct {
 	currencyId: string
 }
 
+export class SellingFindManyRequestDto
+	extends IntersectionType(
+		PickType(SellingOptionalDto, ['clientId', 'staffId', 'status']),
+		PaginationRequestDto,
+		PickType(RequestOtherFieldsDto, ['search', 'startDate', 'endDate']),
+	)
+	implements SellingFindManyRequest {}
+
+export class SellingFindOneRequestDto extends IntersectionType(PickType(SellingRequiredDto, ['id'])) implements SellingFindOneRequest {}
+
 export class SellingCreateOneRequestDto
-	extends IntersectionType(PickType(SellingRequiredDto, ['clientId', 'date', 'send']), PickType(SellingOptionalDto, ['staffId']))
+	extends IntersectionType(PickType(SellingRequiredDto, ['clientId', 'date']), PickType(SellingOptionalDto, ['staffId']))
 	implements SellingCreateOneRequest
 {
 	@ApiPropertyOptional({ type: SellingPaymentDto })
@@ -71,10 +95,15 @@ export class SellingCreateOneRequestDto
 	@ValidateNested({ each: true })
 	@Type(() => SellingProductDto)
 	products?: SellingProduct[]
+
+	@ApiPropertyOptional({ type: Boolean })
+	@IsOptional()
+	@IsBoolean()
+	send?: boolean
 }
 
 export class SellingUpdateOneRequestDto
-	extends IntersectionType(PickType(SellingOptionalDto, ['deletedAt', 'clientId', 'date', 'status', 'send']))
+	extends IntersectionType(PickType(SellingOptionalDto, ['deletedAt', 'clientId', 'date', 'status']))
 	implements SellingUpdateOneRequest
 {
 	@ApiPropertyOptional({ type: SellingPaymentDto })
@@ -82,17 +111,13 @@ export class SellingUpdateOneRequestDto
 	@ValidateNested()
 	@Type(() => SellingPaymentDto)
 	payment?: SellingPayment
+
+	@ApiPropertyOptional({ type: Boolean })
+	@IsOptional()
+	@IsBoolean()
+	send?: boolean
 }
 
 export class SellingDeleteOneRequestDto
 	extends IntersectionType(PickType(SellingRequiredDto, ['id']), PickType(RequestOtherFieldsDto, ['method']))
 	implements SellingDeleteOneRequest {}
-
-export class SellingGetTotalStatsRequestDto implements SellingGetTotalStatsRequest {}
-
-export class SellingGetPeriodStatsRequestDto implements SellingGetPeriodStatsRequest {
-	@ApiPropertyOptional({ enum: StatsTypeEnum })
-	@IsOptional()
-	@IsEnum(StatsTypeEnum)
-	type?: StatsTypeEnum = StatsTypeEnum.day
-}

@@ -1,7 +1,8 @@
 import { Decimal } from '@prisma/client/runtime/library'
 import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
 import {
-	ClientCreateOneResponse,
+	ClientCalc,
+	ClientDebtByCurrency,
 	ClientDeed,
 	ClientDeedInfo,
 	ClientFindManyData,
@@ -9,9 +10,18 @@ import {
 	ClientFindOneData,
 	ClientFindOneResponse,
 	ClientModifyResponse,
+	ClientCreateOneResponse,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ClientRequiredDto } from './fields.dtos'
+
+export class ClientDebtByCurrencyDto implements ClientDebtByCurrency {
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	amount: Decimal
+}
 
 export class ClientDeedDto implements ClientDeed {
 	@ApiProperty({ type: Date })
@@ -20,36 +30,39 @@ export class ClientDeedDto implements ClientDeed {
 	@ApiProperty({ enum: ['debit', 'credit'] })
 	type: 'debit' | 'credit'
 
-	@ApiProperty({ enum: ['selling', 'payment', 'returning', 'arrival'] })
-	action: 'selling' | 'payment' | 'returning' | 'arrival'
+	@ApiProperty({ enum: ['selling', 'payment', 'returning'] })
+	action: 'selling' | 'payment' | 'returning'
 
-	@ApiProperty({ type: Decimal })
+	@ApiProperty({ type: Number })
 	value: Decimal
 
 	@ApiProperty({ type: String })
 	description: string
+
+	@ApiProperty({ type: String })
+	currencyId?: string
 }
 
 export class ClientDeedInfoDto implements ClientDeedInfo {
 	@ApiProperty({ type: ClientDeedDto, isArray: true })
 	deeds: ClientDeed[]
 
-	@ApiProperty({ type: Decimal })
-	debt: Decimal
+	@ApiProperty({ type: ClientDebtByCurrencyDto, isArray: true })
+	debtByCurrency: ClientDebtByCurrency[]
 
-	@ApiProperty({ type: Decimal })
-	totalCredit: Decimal
+	@ApiProperty({ type: ClientDebtByCurrencyDto, isArray: true })
+	totalCreditByCurrency: ClientDebtByCurrency[]
 
-	@ApiProperty({ type: Decimal })
-	totalDebit: Decimal
+	@ApiProperty({ type: ClientDebtByCurrencyDto, isArray: true })
+	totalDebitByCurrency: ClientDebtByCurrency[]
 }
 
 export class ClientFindOneDataDto extends PickType(ClientRequiredDto, ['id', 'fullname', 'createdAt', 'phone']) implements ClientFindOneData {
-	@ApiProperty({ type: Number })
-	debt?: Decimal
+	@ApiProperty({ type: ClientDebtByCurrencyDto, isArray: true })
+	debtByCurrency?: ClientDebtByCurrency[]
 
 	@ApiProperty({ type: Date })
-	lastArrivalDate?: Date
+	lastSellingDate?: Date
 
 	@ApiProperty({ type: ClientDeedInfoDto })
 	deedInfo?: ClientDeedInfo

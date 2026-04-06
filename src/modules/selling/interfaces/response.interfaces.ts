@@ -1,40 +1,58 @@
 import { GlobalResponse, PaginationResponse } from '@common'
 import { SellingOptional, SellingRequired } from './fields.interfaces'
-import { ClientFindOneData } from '../../client'
-import { StaffFindOneData } from '../../staff'
 import { Decimal } from '@prisma/client/runtime/library'
-import { ProductMVFindOneData } from '../../product-mv'
-import { BotSellingTitleEnum } from '../enums'
-import { ClientPaymentFindOneData } from '../../client-payment'
+import { PaymentMethodEnum, PriceTypeEnum } from '@prisma/client'
 
-export declare interface SellingTotalData {
-	id: string
+export declare interface SellingPaymentMethodData {
+	type: PaymentMethodEnum
 	currencyId: string
-	currency: { id: string; symbol: string; name: string }
+	amount: Decimal
+}
+
+export declare interface SellingPaymentData {
+	id: string
+	description?: string
+	paymentMethods: SellingPaymentMethodData[]
+	createdAt: Date
+}
+
+export declare interface SellingProductPriceData {
+	type: PriceTypeEnum
+	price: Decimal
+	totalPrice: Decimal
+	currencyId: string
+	currency?: { symbol: string }
+}
+
+export declare interface SellingProductData {
+	id: string
+	count: number
+	createdAt: Date
+	product: { id: string; name: string; createdAt: Date }
+	prices: SellingProductPriceData[]
+}
+
+export declare interface SellingTotalByCurrency {
+	currencyId: string
 	total: Decimal
 }
 
-export declare interface SellingCalc {
-	totalPayment: Decimal
-	totalCardPayment: Decimal
-	totalCashPayment: Decimal
-	totalOtherPayment: Decimal
-	totalTransferPayment: Decimal
+export declare interface SellingCalcEntry {
+	type: PaymentMethodEnum
+	currencyId: string
+	total: Decimal
 }
 
 export declare interface SellingFindManyData extends PaginationResponse<SellingFindOneData> {
-	calc: SellingCalc
+	calc: SellingCalcEntry[]
 }
 
 export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' | 'status' | 'createdAt' | 'date'>, Pick<SellingOptional, 'publicId'> {
-	client?: ClientFindOneData
-	staff?: StaffFindOneData
-	debt?: Decimal
-	totalPayment?: Decimal
-	totalPrices?: SellingTotalData[]
-	products?: ProductMVFindOneData[]
-	title?: BotSellingTitleEnum
-	payment?: ClientPaymentFindOneData
+	client?: any
+	staff?: any
+	totalPrices?: SellingTotalByCurrency[]
+	payment?: SellingPaymentData
+	products?: SellingProductData[]
 }
 
 export declare interface SellingFindManyResponse extends GlobalResponse {
@@ -51,43 +69,4 @@ export declare interface SellingCreateOneResponse extends GlobalResponse {
 
 export declare interface SellingModifyResponse extends GlobalResponse {
 	data: null
-}
-
-export declare interface Debt {
-	ourDebt: Decimal
-	theirDebt: Decimal
-}
-
-export declare interface TotalStatsByCurrency {
-	currencyId: string
-	symbol: string
-	total: Decimal
-}
-
-export declare interface SellingGetTotalStatsData {
-	daily: TotalStatsByCurrency[]
-	weekly: TotalStatsByCurrency[]
-	monthly: TotalStatsByCurrency[]
-	yearly: TotalStatsByCurrency[]
-	client: Debt
-	supplier: Debt
-}
-
-export declare interface SellingGetTotalStatsResponse extends GlobalResponse {
-	data: SellingGetTotalStatsData
-}
-
-export declare interface SellingGetPeriodStatsSum {
-	currencyId: string
-	symbol: string
-	total: Decimal
-}
-
-export declare interface SellingGetPeriodStatsData {
-	date: string
-	sums: SellingGetPeriodStatsSum[]
-}
-
-export declare interface SellingGetPeriodStatsResponse extends GlobalResponse {
-	data: SellingGetPeriodStatsData[]
 }

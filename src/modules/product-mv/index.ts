@@ -1,6 +1,0 @@
-export * from './interfaces'
-export * from './dtos'
-export * from './product-mv.controller'
-export * from './product-mv.module'
-export * from './product-mv.repository'
-export * from './product-mv.service'

@@ -1,4 +1,4 @@
-import { PickType, IntersectionType } from '@nestjs/swagger'
+import { PickType, IntersectionType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
 	SupplierPaymentCreateOneRequest,
 	SupplierPaymentDeleteOneRequest,
@@ -7,21 +7,42 @@ import {
 	SupplierPaymentUpdateOneRequest,
 } from '../interfaces'
 import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
-import { SupplierPaymentOptionalDto, SupplierPaymentRequiredDto } from './fields.dtos'
+import { SupplierPaymentMethodDto, SupplierPaymentOptionalDto, SupplierPaymentRequiredDto } from './fields.dtos'
+import { IsArray, IsOptional, ValidateNested } from 'class-validator'
+import { Type } from 'class-transformer'
 
 export class SupplierPaymentFindManyRequestDto
-	extends IntersectionType(PickType(SupplierPaymentOptionalDto, ['staffId', 'userId']), PaginationRequestDto, PickType(RequestOtherFieldsDto, ['search', 'endDate', 'startDate']))
+	extends IntersectionType(
+		PickType(SupplierPaymentOptionalDto, ['staffId', 'supplierId']),
+		PaginationRequestDto,
+		PickType(RequestOtherFieldsDto, ['search', 'endDate', 'startDate']),
+	)
 	implements SupplierPaymentFindManyRequest {}
 
 export class SupplierPaymentFindOneRequestDto extends IntersectionType(PickType(SupplierPaymentRequiredDto, ['id'])) implements SupplierPaymentFindOneRequest {}
 
 export class SupplierPaymentCreateOneRequestDto
-	extends IntersectionType(PickType(SupplierPaymentRequiredDto, ['userId', 'card', 'cash', 'other', 'transfer']), PickType(SupplierPaymentOptionalDto, ['description']))
-	implements SupplierPaymentCreateOneRequest {}
+	extends IntersectionType(PickType(SupplierPaymentRequiredDto, ['supplierId']), PickType(SupplierPaymentOptionalDto, ['description']))
+	implements SupplierPaymentCreateOneRequest
+{
+	@ApiProperty({ type: SupplierPaymentMethodDto, isArray: true })
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => SupplierPaymentMethodDto)
+	paymentMethods: SupplierPaymentMethodDto[]
+}
 
 export class SupplierPaymentUpdateOneRequestDto
-	extends IntersectionType(PickType(SupplierPaymentOptionalDto, ['deletedAt', 'card', 'cash', 'other', 'transfer']), PickType(SupplierPaymentOptionalDto, ['description']))
-	implements SupplierPaymentUpdateOneRequest {}
+	extends IntersectionType(PickType(SupplierPaymentOptionalDto, ['deletedAt', 'description']))
+	implements SupplierPaymentUpdateOneRequest
+{
+	@ApiPropertyOptional({ type: SupplierPaymentMethodDto, isArray: true })
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => SupplierPaymentMethodDto)
+	paymentMethods?: SupplierPaymentMethodDto[]
+}
 
 export class SupplierPaymentDeleteOneRequestDto
 	extends IntersectionType(PickType(SupplierPaymentRequiredDto, ['id']), PickType(RequestOtherFieldsDto, ['method']))

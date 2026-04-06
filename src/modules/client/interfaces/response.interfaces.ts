@@ -2,26 +2,32 @@ import { GlobalResponse, PaginationResponse } from '@common'
 import { ClientRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
+export declare interface ClientDebtByCurrency {
+	currencyId: string
+	amount: Decimal
+}
+
 export declare interface ClientDeed {
 	type: 'debit' | 'credit'
-	action: 'selling' | 'payment' | 'returning' | 'arrival'
+	action: 'selling' | 'payment' | 'returning'
 	date: Date
 	value: Decimal
 	description: string
+	currencyId?: string
 }
 
 export declare interface ClientDeedInfo {
 	deeds: ClientDeed[]
-	totalCredit: Decimal
-	totalDebit: Decimal
-	debt: Decimal
+	totalCreditByCurrency: ClientDebtByCurrency[]
+	totalDebitByCurrency: ClientDebtByCurrency[]
+	debtByCurrency: ClientDebtByCurrency[]
 }
 
 export declare interface ClientFindManyData extends PaginationResponse<ClientFindOneData> {}
 
 export declare interface ClientFindOneData extends Pick<ClientRequired, 'id' | 'fullname' | 'createdAt' | 'phone'> {
-	debt?: Decimal
-	lastArrivalDate?: Date
+	debtByCurrency?: ClientDebtByCurrency[]
+	lastSellingDate?: Date
 	deedInfo?: ClientDeedInfo
 	telegram?: { id?: string; isActive?: boolean }
 }
@@ -49,18 +55,10 @@ export interface ClientCalc {
 		payment: {
 			count: number
 			total: number
-			totalCard: number
-			totalCash: number
-			totalTransfer: number
-			totalOther: number
 		}
 	}
 	returning: {
 		count: number
 		totalPrice: number
-		payment: {
-			totalFromBalance: number
-			totalCash: number
-		}
 	}
 }

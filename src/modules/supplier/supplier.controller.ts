@@ -12,8 +12,8 @@ import {
 	SupplierCreateOneResponseDto,
 } from './dtos'
 import { SupplierService } from './supplier.service'
-import { Response } from 'express'
 import { CheckPermissionGuard } from '../../common'
+import { Response } from 'express'
 
 @ApiTags('Supplier')
 @Controller('supplier')
@@ -32,29 +32,11 @@ export class SupplierController {
 		return this.supplierService.findMany({ ...query, isDeleted: false })
 	}
 
-	@Get('excel-download/many')
-	@ApiOperation({ summary: 'download many clients' })
-	async excelDownloadMany(@Res() res: Response, @Query() query: SupplierFindManyRequestDto) {
-		return this.supplierService.excelDownloadMany(res, query)
-	}
-
 	@Get('one')
 	@ApiOperation({ summary: 'find one supplier' })
 	@ApiOkResponse({ type: SupplierFindOneResponseDto })
 	async findOne(@Query() query: SupplierFindOneRequestDto): Promise<SupplierFindOneResponseDto> {
 		return this.supplierService.findOne(query)
-	}
-
-	@Get('excel-download/one')
-	@ApiOperation({ summary: 'download one supplier' })
-	async excelDownloadOne(@Res() res: Response, @Query() query: SupplierFindOneRequestDto) {
-		return this.supplierService.excelDownloadOne(res, query)
-	}
-
-	@Get('excel-with-product-download/one')
-	@ApiOperation({ summary: 'download one supplier' })
-	async excelWithProductDownloadOne(@Res() res: Response, @Query() query: SupplierFindOneRequestDto) {
-		return this.supplierService.excelWithProductDownloadOne(res, query)
 	}
 
 	@Post('one')
@@ -76,5 +58,23 @@ export class SupplierController {
 	@ApiOkResponse({ type: SupplierModifyResponseDto })
 	async deleteOne(@Query() query: SupplierDeleteOneRequestDto): Promise<SupplierModifyResponseDto> {
 		return this.supplierService.deleteOne(query)
+	}
+
+	@Get('excel-download/many')
+	@ApiOperation({ summary: 'download many suppliers as excel' })
+	async excelDownloadMany(@Res() res: Response, @Query() query: SupplierFindManyRequestDto) {
+		return this.supplierService.excelDownloadMany(res, query)
+	}
+
+	@Get('excel-download/one')
+	@ApiOperation({ summary: 'download one supplier deed as excel' })
+	async excelDownloadOne(@Res() res: Response, @Query() query: SupplierFindOneRequestDto) {
+		return this.supplierService.excelDownloadOne(res, query)
+	}
+
+	@Get('excel-with-product-download/one')
+	@ApiOperation({ summary: 'download one supplier deed with products as excel' })
+	async excelWithProductDownloadOne(@Res() res: Response, @Query() query: SupplierFindOneRequestDto) {
+		return this.supplierService.excelWithProductDownloadOne(res, query)
 	}
 }

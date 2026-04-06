@@ -12,8 +12,8 @@ import {
 	ClientCreateOneResponseDto,
 } from './dtos'
 import { ClientService } from './client.service'
-import { Response } from 'express'
 import { CheckPermissionGuard } from '../../common'
+import { Response } from 'express'
 
 @ApiTags('Client')
 @Controller('client')
@@ -36,13 +36,7 @@ export class ClientController {
 	@ApiOkResponse({ type: ClientFindManyResponseDto })
 	@ApiOperation({ summary: 'get all client reports' })
 	async findManyReport(@Query() query: ClientFindManyRequestDto): Promise<ClientFindManyResponseDto> {
-		return this.clientService.findManyForReport(query)
-	}
-
-	@Get('excel-download/many')
-	@ApiOperation({ summary: 'download many clients' })
-	async excelDownloadMany(@Res() res: Response, @Query() query: ClientFindManyRequestDto) {
-		return this.clientService.excelDownloadMany(res, query)
+		return await this.clientService.findManyForReport(query)
 	}
 
 	@Get('one')
@@ -50,18 +44,6 @@ export class ClientController {
 	@ApiOkResponse({ type: ClientFindOneResponseDto })
 	async findOne(@Query() query: ClientFindOneRequestDto): Promise<ClientFindOneResponseDto> {
 		return this.clientService.findOne(query)
-	}
-
-	@Get('excel-download/one')
-	@ApiOperation({ summary: 'download one client' })
-	async excelDownloadOne(@Res() res: Response, @Query() query: ClientFindOneRequestDto) {
-		return this.clientService.excelDownloadOne(res, query)
-	}
-
-	@Get('excel-with-product-download/one')
-	@ApiOperation({ summary: 'download one client' })
-	async excelWithProductDownloadOne(@Res() res: Response, @Query() query: ClientFindOneRequestDto) {
-		return this.clientService.excelWithProductDownloadOne(res, query)
 	}
 
 	@Post('one')
@@ -83,5 +65,23 @@ export class ClientController {
 	@ApiOkResponse({ type: ClientModifyResponseDto })
 	async deleteOne(@Query() query: ClientDeleteOneRequestDto): Promise<ClientModifyResponseDto> {
 		return this.clientService.deleteOne(query)
+	}
+
+	@Get('excel-download/many')
+	@ApiOperation({ summary: 'download many clients as excel' })
+	async excelDownloadMany(@Res() res: Response, @Query() query: ClientFindManyRequestDto) {
+		return await this.clientService.excelDownloadMany(res, query)
+	}
+
+	@Get('excel-download/one')
+	@ApiOperation({ summary: 'download one client deed as excel' })
+	async excelDownloadOne(@Res() res: Response, @Query() query: ClientFindOneRequestDto) {
+		return await this.clientService.excelDownloadOne(res, query)
+	}
+
+	@Get('excel-with-product-download/one')
+	@ApiOperation({ summary: 'download one client deed with products as excel' })
+	async excelWithProductDownloadOne(@Res() res: Response, @Query() query: ClientFindOneRequestDto) {
+		return await this.clientService.excelWithProductDownloadOne(res, query)
 	}
 }

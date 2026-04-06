@@ -1,7 +1,25 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
 import { ReturningOptional, ReturningRequired } from './fields.interfaces'
-import { PaymentModel } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
+import { PaymentMethodEnum } from '@prisma/client'
+
+export declare interface ReturningPaymentMethod {
+	type: PaymentMethodEnum
+	currencyId: string
+	amount: Decimal
+}
+
+export declare interface ReturningPayment {
+	paymentMethods?: ReturningPaymentMethod[]
+	description?: string
+}
+
+export declare interface ReturningProduct {
+	productId: string
+	count: number
+	price: Decimal
+	currencyId: string
+}
 
 export declare interface ReturningFindManyRequest
 	extends Pick<ReturningOptional, 'clientId' | 'staffId' | 'status'>,
@@ -13,18 +31,6 @@ export declare interface ReturningFindOneRequest extends Pick<ReturningOptional,
 export declare interface ReturningGetManyRequest extends ReturningOptional, PaginationRequest, Pick<RequestOtherFields, 'ids' | 'isDeleted'> {}
 
 export declare interface ReturningGetOneRequest extends ReturningOptional, Pick<RequestOtherFields, 'isDeleted'> {}
-
-export declare interface ReturningPayment extends Pick<PaymentModel, 'fromBalance' | 'cash'> {
-	total?: PaymentModel['total']
-}
-
-export declare interface ReturningProduct {
-	productId: string
-	count: number
-	price: Decimal
-	currencyId: string
-	totalPrice?: Decimal
-}
 
 export declare interface ReturningCreateOneRequest extends Pick<ReturningRequired, 'clientId' | 'date'>, Pick<ReturningOptional, 'staffId' | 'status'> {
 	payment?: ReturningPayment

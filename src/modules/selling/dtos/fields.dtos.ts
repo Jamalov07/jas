@@ -1,8 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { SellingOptional, SellingRequired } from '../interfaces'
-import { IsBoolean, IsDateString, IsEnum, IsInt, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID } from 'class-validator'
-import { $Enums, SellingStatusEnum, UserTypeEnum } from '@prisma/client'
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsOptional, IsUUID } from 'class-validator'
+import { $Enums, SellingStatusEnum } from '@prisma/client'
 
 export class SellingRequiredDto extends DefaultRequiredFieldsDto implements SellingRequired {
 	@ApiProperty({ type: Number })
@@ -19,16 +19,6 @@ export class SellingRequiredDto extends DefaultRequiredFieldsDto implements Sell
 	@IsNotEmpty()
 	@IsDateString()
 	date: Date
-
-	@ApiProperty({ type: Boolean })
-	@IsNotEmpty()
-	@IsBoolean()
-	send: boolean
-
-	@ApiProperty({ type: Boolean })
-	@IsNotEmpty()
-	@IsBoolean()
-	sended: boolean
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
@@ -56,16 +46,6 @@ export class SellingOptionalDto extends DefaultOptionalFieldsDto implements Sell
 	@IsOptional()
 	@IsDateString()
 	date?: Date
-
-	@ApiPropertyOptional({ type: Boolean })
-	@IsOptional()
-	@IsBoolean()
-	send?: boolean
-
-	@ApiPropertyOptional({ type: Boolean })
-	@IsOptional()
-	@IsBoolean()
-	sended?: boolean
 
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()

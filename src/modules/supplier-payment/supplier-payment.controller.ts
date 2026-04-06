@@ -32,12 +32,6 @@ export class SupplierPaymentController {
 		return this.supplierPaymentService.findMany({ ...query, isDeleted: false })
 	}
 
-	@Get('excel-download/many')
-	@ApiOperation({ summary: 'download many supplier payments' })
-	async excelDownloadMany(@Res() res: Response, @Query() query: SupplierPaymentFindManyRequestDto) {
-		return this.supplierPaymentService.excelDownloadMany(res, query)
-	}
-
 	@Get('one')
 	@ApiOperation({ summary: 'find one supplierPayment' })
 	@ApiOkResponse({ type: SupplierPaymentFindOneResponseDto })
@@ -65,5 +59,11 @@ export class SupplierPaymentController {
 	@ApiOkResponse({ type: SupplierPaymentModifyResponseDto })
 	async deleteOne(@Query() query: SupplierPaymentDeleteOneRequestDto): Promise<SupplierPaymentModifyResponseDto> {
 		return this.supplierPaymentService.deleteOne(query)
+	}
+
+	@Get('excel-download/many')
+	@ApiOperation({ summary: 'download many supplier payments as excel' })
+	async excelDownloadMany(@Res() res: Response, @Query() query: SupplierPaymentFindManyRequestDto) {
+		return this.supplierPaymentService.excelDownloadMany(res, query)
 	}
 }

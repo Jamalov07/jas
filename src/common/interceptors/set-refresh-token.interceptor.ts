@@ -45,7 +45,7 @@ export class RefreshTokenInterceptor implements NestInterceptor {
 			if (!payload || !payload?.id) {
 				throw new UnauthorizedException(ERROR_MSG.AUTH.INVALID_TOKEN_PAYLOAD.UZ)
 			}
-			const user = await this.prismaService.userModel.findFirst({
+			const user = await this.prismaService.staffModel.findFirst({
 				where: { id: payload?.id, token: token },
 			})
 

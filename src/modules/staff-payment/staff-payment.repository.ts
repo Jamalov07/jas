@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../shared/prisma'
 import {
 	StaffPaymentCreateOneRequest,
@@ -9,15 +9,18 @@ import {
 	StaffPaymentGetOneRequest,
 	StaffPaymentUpdateOneRequest,
 } from './interfaces'
-import { StaffPaymentController } from './staff-payment.controller'
-import { ServiceTypeEnum } from '@prisma/client'
-import { Decimal } from '@prisma/client/runtime/library'
-
 @Injectable()
-export class StaffPaymentRepository implements OnModuleInit {
+export class StaffPaymentRepository {
 	private readonly prisma: PrismaService
 	constructor(prisma: PrismaService) {
 		this.prisma = prisma
+	}
+
+	private paymentMethodsSelect = {
+		id: true,
+		type: true,
+		currencyId: true,
+		amount: true,
 	}
 
 	async findMany(query: StaffPaymentFindManyRequest) {
@@ -26,19 +29,19 @@ export class StaffPaymentRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const staffPayments = await this.prisma.paymentModel.findMany({
+		const payments = await this.prisma.staffPaymentModel.findMany({
 			where: {
 				staffId: query.staffId,
-				userId: query.userId,
-				type: ServiceTypeEnum.staff,
+				employeeId: query.employeeId,
+				deletedAt: null,
 				createdAt: { gte: query.startDate, lte: query.endDate },
 			},
 			select: {
 				id: true,
-				user: { select: { id: true, fullname: true, phone: true } },
+				employee: { select: { id: true, fullname: true, phone: true } },
 				staff: { select: { id: true, fullname: true, phone: true } },
-				sum: true,
 				description: true,
+				employeePaymentMethods: { select: this.paymentMethodsSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -46,38 +49,38 @@ export class StaffPaymentRepository implements OnModuleInit {
 			...paginationOptions,
 		})
 
-		return staffPayments
+		return payments
 	}
 
 	async findOne(query: StaffPaymentFindOneRequest) {
-		const staffPayment = await this.prisma.paymentModel.findFirst({
+		const payment = await this.prisma.staffPaymentModel.findFirst({
 			where: { id: query.id },
 			select: {
 				id: true,
-				user: { select: { id: true, fullname: true, phone: true } },
+				employee: { select: { id: true, fullname: true, phone: true } },
 				staff: { select: { id: true, fullname: true, phone: true } },
-				sum: true,
 				description: true,
+				employeePaymentMethods: { select: this.paymentMethodsSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
 			},
 		})
 
-		return staffPayment
+		return payment
 	}
 
 	async countFindMany(query: StaffPaymentFindManyRequest) {
-		const staffPaymentsCount = await this.prisma.paymentModel.count({
+		const count = await this.prisma.staffPaymentModel.count({
 			where: {
 				staffId: query.staffId,
-				userId: query.userId,
-				type: ServiceTypeEnum.staff,
+				employeeId: query.employeeId,
+				deletedAt: null,
 				createdAt: { gte: query.startDate, lte: query.endDate },
 			},
 		})
 
-		return staffPaymentsCount
+		return count
 	}
 
 	async getMany(query: StaffPaymentGetManyRequest) {
@@ -86,85 +89,107 @@ export class StaffPaymentRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const staffPayments = await this.prisma.paymentModel.findMany({
+		const payments = await this.prisma.staffPaymentModel.findMany({
 			where: {
 				id: { in: query.ids },
 				staffId: query.staffId,
-				type: ServiceTypeEnum.staff,
 			},
 			...paginationOptions,
 		})
 
-		return staffPayments
+		return payments
 	}
 
 	async getOne(query: StaffPaymentGetOneRequest) {
-		const staffPayment = await this.prisma.paymentModel.findFirst({
+		const payment = await this.prisma.staffPaymentModel.findFirst({
 			where: { id: query.id, staffId: query.staffId },
-			select: { id: true, total: true, user: true, sum: true },
+			select: {
+				id: true,
+				employeeId: true,
+				employee: true,
+				employeePaymentMethods: { select: this.paymentMethodsSelect },
+			},
 		})
 
-		return staffPayment
+		return payment
 	}
 
 	async countGetMany(query: StaffPaymentGetManyRequest) {
-		const staffPaymentsCount = await this.prisma.paymentModel.count({
+		const count = await this.prisma.staffPaymentModel.count({
 			where: {
 				id: { in: query.ids },
 				staffId: query.staffId,
-				type: ServiceTypeEnum.staff,
 			},
 		})
 
-		return staffPaymentsCount
+		return count
 	}
 
 	async createOne(body: StaffPaymentCreateOneRequest) {
-		const staffPayment = await this.prisma.paymentModel.create({
+		const payment = await this.prisma.staffPaymentModel.create({
 			data: {
-				total: body.sum,
-				sum: body.sum,
-				userId: body.userId,
+				employeeId: body.employeeId,
 				staffId: body.staffId,
 				description: body.description,
-				type: ServiceTypeEnum.staff,
+				employeePaymentMethods: {
+					create: body.paymentMethods.map((m) => ({
+						type: m.type as any,
+						currencyId: m.currencyId,
+						amount: m.amount,
+					})),
+				},
 			},
 			select: {
 				id: true,
-				sum: true,
+				employee: { select: { id: true, fullname: true, phone: true } },
+				staff: { select: { id: true, fullname: true, phone: true } },
 				description: true,
+				employeePaymentMethods: { select: this.paymentMethodsSelect },
 				createdAt: true,
-				user: { select: { id: true, fullname: true, phone: true, balance: true } },
+				updatedAt: true,
+				deletedAt: true,
 			},
 		})
 
-		return staffPayment
+		return payment
 	}
 
 	async updateOne(query: StaffPaymentGetOneRequest, body: StaffPaymentUpdateOneRequest) {
-		const staffPayment = await this.prisma.paymentModel.update({
+		const payment = await this.prisma.staffPaymentModel.update({
 			where: { id: query.id },
 			data: {
-				total: body.total,
-				sum: body.sum,
-				userId: body.userId,
-				deletedAt: body.deletedAt,
+				employeeId: body.employeeId,
 				description: body.description,
+				deletedAt: body.deletedAt,
+				...(body.paymentMethods
+					? {
+							employeePaymentMethods: {
+								deleteMany: {},
+								create: body.paymentMethods.map((m) => ({
+									type: m.type as any,
+									currencyId: m.currencyId,
+									amount: m.amount,
+								})),
+							},
+						}
+					: {}),
+			},
+			select: {
+				id: true,
+				employeeId: true,
+				employee: { select: { id: true, fullname: true, phone: true } },
+				employeePaymentMethods: { select: this.paymentMethodsSelect },
+				createdAt: true,
 			},
 		})
 
-		return staffPayment
+		return payment
 	}
 
 	async deleteOne(query: StaffPaymentDeleteOneRequest) {
-		const staffPayment = await this.prisma.paymentModel.delete({
+		await this.prisma.staffPaymentModel.delete({
 			where: { id: query.id },
 		})
-
-		return staffPayment
 	}
 
-	async onModuleInit() {
-		await this.prisma.createActionMethods(StaffPaymentController)
-	}
 }

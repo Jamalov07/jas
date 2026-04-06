@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Patch, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common'
 import { CommonService } from './common.service'
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
-import { AuthOptions, CheckPermissionGuard, CRequest } from '../../common'
-import { DayCloseGetOneRequestDto, DayCloseGetOneResponseDto, DayCloseModifyResponseDto, StaffUpdateCurrencyRequestDto, StaffUpdateCurrencyResponseDto } from './dtos'
+import { AuthOptions, CheckPermissionGuard } from '../../common'
+import { DayCloseGetOneRequestDto, DayCloseGetOneResponseDto, DayCloseModifyResponseDto } from './dtos'
 
 @Controller('common')
 @ApiTags('Common')
@@ -27,13 +27,5 @@ export class CommonController {
 	@AuthOptions(false, false)
 	async getDayClose(@Query() query: DayCloseGetOneRequestDto): Promise<DayCloseGetOneResponseDto> {
 		return this.commonService.getDayClose(query)
-	}
-
-	@Patch('staff/currency')
-	@ApiOkResponse({ type: StaffUpdateCurrencyResponseDto })
-	@ApiOperation({ summary: "update staff's default currency" })
-	@AuthOptions(true, true)
-	async updateStaffCurrency(@Req() request: CRequest, @Body() body: StaffUpdateCurrencyRequestDto): Promise<StaffUpdateCurrencyResponseDto> {
-		return await this.commonService.updateStaffCurrency(request.user.id, body)
 	}
 }

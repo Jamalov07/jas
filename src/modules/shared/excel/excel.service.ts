@@ -1,26 +1,70 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma'
 import * as ExcelJS from 'exceljs'
 import { Response } from 'express'
-import * as fs from 'fs'
-import * as path from 'path'
 import { SellingFindManyRequest, SellingFindOneRequest } from '../../selling'
 import { ArrivalFindManyRequest, ArrivalFindOneRequest } from '../../arrival'
 import { ReturningFindManyRequest, ReturningFindOneRequest } from '../../returning'
-import { Decimal } from '@prisma/client/runtime/library'
 import { ClientPaymentFindManyRequest } from '../../client-payment'
-import { PriceTypeEnum, SellingStatusEnum, ServiceTypeEnum, UserTypeEnum } from '@prisma/client'
-import { ClientDeed, ClientFindManyRequest, ClientFindOneRequest } from '../../client'
-import { DebtTypeEnum, ERROR_MSG } from '../../../common'
+import { SupplierPaymentFindManyRequest } from '../../supplier-payment'
+import { ClientFindManyRequest, ClientFindOneRequest } from '../../client'
 import { StaffPaymentFindManyRequest } from '../../staff-payment'
 import { ProductFindManyRequest } from '../../product'
+import { SupplierFindManyRequest } from '../../supplier'
+import { SellingStatusEnum } from '@prisma/client'
+import { Decimal } from '@prisma/client/runtime/library'
+import { SupplierFindOneRequest } from '../../supplier'
+
 @Injectable()
 export class ExcelService {
-	private readonly prisma: PrismaService
+	constructor(private readonly prisma: PrismaService) {}
 
-	constructor(prisma: PrismaService) {
-		this.prisma = prisma
+	private formatDate(date: Date): string {
+		const dd = String(date.getDate()).padStart(2, '0')
+		const mm = String(date.getMonth() + 1).padStart(2, '0')
+		const yyyy = date.getFullYear()
+		const hh = String(date.getHours()).padStart(2, '0')
+		const min = String(date.getMinutes()).padStart(2, '0')
+		return `${dd}.${mm}.${yyyy} ${hh}:${min}`
 	}
+
+	private allBorder(): Partial<ExcelJS.Borders> {
+		return {
+			top: { style: 'thin', color: { argb: 'FF000000' } },
+			left: { style: 'thin', color: { argb: 'FF000000' } },
+			bottom: { style: 'thin', color: { argb: 'FF000000' } },
+			right: { style: 'thin', color: { argb: 'FF000000' } },
+		}
+	}
+
+	private formatPaymentMethods(methods: { amount: Decimal; currency?: { symbol: string } | null }[]): string {
+		if (!methods || methods.length === 0) return '0'
+		const map = new Map<string, Decimal>()
+		for (const m of methods) {
+			const sym = m.currency?.symbol ?? '?'
+			map.set(sym, (map.get(sym) ?? new Decimal(0)).plus(m.amount))
+		}
+		return Array.from(map.entries())
+			.map(([sym, total]) => `${total.toFixed(2)} ${sym}`)
+			.join(' + ')
+	}
+
+	private styleHeaderRow(row: ExcelJS.Row) {
+		row.eachCell((cell) => {
+			cell.font = { bold: true }
+			cell.alignment = { vertical: 'middle', horizontal: 'center' }
+			cell.border = this.allBorder()
+		})
+	}
+
+	private styleDataRow(row: ExcelJS.Row) {
+		row.eachCell((cell) => {
+			cell.alignment = { vertical: 'middle', horizontal: 'center' }
+			cell.border = this.allBorder()
+		})
+	}
+
+	// ─── Selling ──────────────────────────────────────────────────────────────
 
 	async sellingDownloadMany(res: Response, query: SellingFindManyRequest) {
 		const startDate = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
@@ -31,16 +75,24 @@ export class ExcelService {
 				deletedAt: null,
 				clientId: query.clientId,
 				staffId: query.staffId,
-				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
 				status: SellingStatusEnum.accepted,
+				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
 				date: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
-		include: {
-			client: true,
-			staff: true,
-			products: { include: { product: true, productMVPrices: true } },
-			payment: true,
-		},
+			select: {
+				date: true,
+				client: { select: { fullname: true, phone: true } },
+				staff: { select: { fullname: true } },
+				clientSellingPayment: {
+					select: {
+						description: true,
+						clientSellingPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } },
+					},
+				},
+				products: {
+					select: { prices: { where: { type: 'selling' }, select: { totalPrice: true, currency: { select: { symbol: true } } } } },
+				},
+			},
 			orderBy: { date: 'desc' },
 		})
 
@@ -51,70 +103,52 @@ export class ExcelService {
 			{ key: 'no', width: 5 },
 			{ key: 'client', width: 35 },
 			{ key: 'phone', width: 20 },
-			{ key: 'summa', width: 15 },
+			{ key: 'summa', width: 30 },
+			{ key: 'paid', width: 25 },
 			{ key: 'staff', width: 25 },
-			{ key: 'info', width: 40 },
-			{ key: 'debt', width: 15 },
-			{ key: 'date', width: 30 },
+			{ key: 'info', width: 35 },
+			{ key: 'date', width: 25 },
 		]
 
-		let total = 0
-		worksheet.insertRow(1, [`Общая сумма: 0`])
+		worksheet.insertRow(1, ['Sotuvlar hisoboti'])
 		worksheet.mergeCells('A1:H1')
-		const cellA1 = worksheet.getCell('A1')
-		cellA1.font = { bold: true }
-		cellA1.border = {
-			top: { style: 'thin', color: { argb: 'FF000000' } },
-			left: { style: 'thin', color: { argb: 'FF000000' } },
-			bottom: { style: 'thin', color: { argb: 'FF000000' } },
-			right: { style: 'thin', color: { argb: 'FF000000' } },
-		}
+		const titleCell = worksheet.getCell('A1')
+		titleCell.font = { bold: true, size: 14 }
+		titleCell.alignment = { vertical: 'middle', horizontal: 'center' }
+		titleCell.border = this.allBorder()
+
 		worksheet.insertRow(2, [])
 
-		const headers = ['№', 'Клиент', 'Тел', 'Сумма', 'Продавец', 'Информация', 'Долг', 'Дата продажи']
-		worksheet.insertRow(3, headers)
-		worksheet.getRow(3).eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		})
+		const headers = ['№', 'Клиент', 'Тел', 'Сумма', 'Оплачено', 'Продавец', 'Информация', 'Дата продажи']
+		const headerRow = worksheet.insertRow(3, headers)
+		this.styleHeaderRow(headerRow)
 
 		sellingList.forEach((item, index) => {
-			const totalSum = item.products.reduce((sum, p) => sum + (p.productMVPrices?.[0]?.price?.toNumber() ?? 0) * p.count, 0)
-			const paidSum =
-				(item.payment?.cash?.toNumber() ?? 0) + (item.payment?.card?.toNumber() ?? 0) + (item.payment?.transfer?.toNumber() ?? 0) + (item.payment?.other?.toNumber() ?? 0)
-
-			const debt = totalSum - paidSum
-			total += totalSum
+			const totalMap = new Map<string, Decimal>()
+			for (const p of item.products) {
+				for (const pr of p.prices) {
+					const sym = pr.currency?.symbol ?? '?'
+					totalMap.set(sym, (totalMap.get(sym) ?? new Decimal(0)).plus(pr.totalPrice))
+				}
+			}
+			const totalStr =
+				Array.from(totalMap.entries())
+					.map(([s, t]) => `${t.toFixed(2)} ${s}`)
+					.join(' + ') || '0'
+			const paidStr = this.formatPaymentMethods(item.clientSellingPayment?.clientSellingPaymentMethods ?? [])
 
 			const row = worksheet.addRow({
 				no: index + 1,
 				client: item.client.fullname,
 				phone: item.client.phone,
-				summa: totalSum,
+				summa: totalStr,
+				paid: paidStr,
 				staff: item.staff.fullname,
-				info: item.payment?.description || '',
-				debt: debt,
-				date: item.date.toLocaleString('ru-RU'),
+				info: item.clientSellingPayment?.description ?? '',
+				date: this.formatDate(item.date),
 			})
-
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = {
-					top: { style: 'thin', color: { argb: 'FF000000' } },
-					left: { style: 'thin', color: { argb: 'FF000000' } },
-					bottom: { style: 'thin', color: { argb: 'FF000000' } },
-					right: { style: 'thin', color: { argb: 'FF000000' } },
-				}
-			})
+			this.styleDataRow(row)
 		})
-
-		cellA1.value = `Общая сумма: ${total}`
 
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="selling-report.xlsx"')
@@ -123,22 +157,28 @@ export class ExcelService {
 	}
 
 	async sellingDownloadOne(res: Response, query: SellingFindOneRequest) {
-		const selling = await this.prisma.sellingModel.findUnique({
+		const selling = await this.prisma.sellingModel.findFirst({
 			where: { id: query.id },
 			select: {
-			id: true,
-			status: true,
-			updatedAt: true,
-			createdAt: true,
-			deletedAt: true,
-			date: true,
-			client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-			staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-			payment: { select: { fromBalance: true, id: true, total: true, card: true, cash: true, other: true, transfer: true, description: true, createdAt: true } },
-			products: {
-				orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-				select: { createdAt: true, id: true, count: true, productMVPrices: { select: { price: true, type: true } }, product: { select: { name: true, id: true, createdAt: true } } },
-			},
+				date: true,
+				status: true,
+				publicId: true,
+				client: { select: { fullname: true, phone: true } },
+				staff: { select: { fullname: true } },
+				clientSellingPayment: {
+					select: {
+						description: true,
+						clientSellingPaymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+					},
+				},
+				products: {
+					select: {
+						count: true,
+						prices: { where: { type: 'selling' }, select: { price: true, totalPrice: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+					orderBy: { createdAt: 'asc' },
+				},
 			},
 		})
 
@@ -149,118 +189,57 @@ export class ExcelService {
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Chek')
-
-		// A1: Xaridor
-		worksheet.mergeCells('A1:B1')
-		const cellA1 = worksheet.getCell('A1')
-		cellA1.value = `Xaridor: ${selling.client.fullname}`
-		cellA1.font = { bold: true }
-		cellA1.border = {
-			top: { style: 'thin', color: { argb: 'FF000000' } },
-			left: { style: 'thin', color: { argb: 'FF000000' } },
-			bottom: { style: 'thin', color: { argb: 'FF000000' } },
-			right: { style: 'thin', color: { argb: 'FF000000' } },
-		}
-
-		// D1: Telefon
-		worksheet.mergeCells('D1:E1')
-		const cellD1 = worksheet.getCell('D1')
-		cellD1.value = `Telefon: ${selling.client.phone}`
-		cellD1.font = { bold: true }
-		cellD1.border = {
-			top: { style: 'thin', color: { argb: 'FF000000' } },
-			left: { style: 'thin', color: { argb: 'FF000000' } },
-			bottom: { style: 'thin', color: { argb: 'FF000000' } },
-			right: { style: 'thin', color: { argb: 'FF000000' } },
-		}
-
-		// 2-qator: Sarlavhalar
-		const headerRow = worksheet.addRow(['№', 'Махсулот номи', '√', 'Сони', 'Нархи', 'Суммаси'])
-		headerRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		})
-
-		// Mahsulotlar
-		let maxProductNameLength = 30
-		let totalSum = 0
-		selling.products.forEach((item, index) => {
-			const count = item.count
-			const price = item.productMVPrices?.[0]?.price?.toNumber() ?? 0
-			const sum = count * price
-			totalSum += sum
-
-			const productName = item.product.name
-			if (productName.length > maxProductNameLength) {
-				maxProductNameLength = productName.length
-			}
-
-			const row = worksheet.addRow([index + 1, productName, '', count, price, sum])
-			row.eachCell((cell, colNumber) => {
-				cell.alignment = { vertical: 'middle', horizontal: colNumber === 2 ? 'left' : 'center' }
-				cell.border = {
-					top: { style: 'thin', color: { argb: 'FF000000' } },
-					left: { style: 'thin', color: { argb: 'FF000000' } },
-					bottom: { style: 'thin', color: { argb: 'FF000000' } },
-					right: { style: 'thin', color: { argb: 'FF000000' } },
-				}
-			})
-		})
-
-		// Bo'sh qator
-		worksheet.addRow([])
-
-		// To‘lovlar
-		const paidSum =
-			(selling.payment?.cash?.toNumber() ?? 0) +
-			(selling.payment?.card?.toNumber() ?? 0) +
-			(selling.payment?.transfer?.toNumber() ?? 0) +
-			(selling.payment?.other?.toNumber() ?? 0) +
-			(selling.payment?.fromBalance?.toNumber() ?? 0)
-
-		const totalRow = worksheet.addRow(['', '', '', '', 'Жами сумма:', totalSum])
-		const paidRow = worksheet.addRow(['', '', '', '', 'Тўлов қилинди:', paidSum])
-
-		const totalAndPaid = [totalRow, paidRow]
-
-		totalAndPaid.forEach((row) => {
-			row.eachCell((cell) => {
-				cell.font = { bold: true }
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = {
-					top: { style: 'thin', color: { argb: 'FF000000' } },
-					left: { style: 'thin', color: { argb: 'FF000000' } },
-					bottom: { style: 'thin', color: { argb: 'FF000000' } },
-					right: { style: 'thin', color: { argb: 'FF000000' } },
-				}
-			})
-		})
-
-		// Ustun o‘lchamlari
 		worksheet.columns = [
 			{ key: 'no', width: 5 },
 			{ key: 'name', width: 40 },
-			{ key: 'check', width: 10 },
-			{ key: 'count', width: 20 },
+			{ key: 'check', width: 8 },
+			{ key: 'count', width: 15 },
 			{ key: 'price', width: 25 },
 			{ key: 'total', width: 25 },
 		]
 
-		worksheet.getColumn(2).width = Math.min(Math.max(maxProductNameLength + 5, 20), 60)
+		const clientRow = worksheet.addRow([`Xaridor: ${selling.client.fullname}`])
+		worksheet.mergeCells(`A${clientRow.number}:F${clientRow.number}`)
+		clientRow.getCell(1).font = { bold: true }
+		clientRow.getCell(1).border = this.allBorder()
 
-		// Javob
+		const phoneRow = worksheet.addRow([`Telefon: ${selling.client.phone}`])
+		worksheet.mergeCells(`A${phoneRow.number}:F${phoneRow.number}`)
+		phoneRow.getCell(1).font = { bold: true }
+		phoneRow.getCell(1).border = this.allBorder()
+
+		const headerRow = worksheet.addRow(['№', 'Mahsulot nomi', '√', 'Soni', 'Narxi', 'Summasi'])
+		this.styleHeaderRow(headerRow)
+
+		let maxNameLen = 30
+		selling.products.forEach((item, index) => {
+			const price = item.prices[0]?.price?.toNumber() ?? 0
+			const sym = item.prices[0]?.currency?.symbol ?? ''
+			const totalPrice = item.prices[0]?.totalPrice?.toNumber() ?? 0
+			if (item.product.name.length > maxNameLen) maxNameLen = item.product.name.length
+
+			const row = worksheet.addRow([index + 1, item.product.name, '', item.count, `${price} ${sym}`, `${totalPrice} ${sym}`])
+			row.eachCell((cell, col) => {
+				cell.alignment = { vertical: 'middle', horizontal: col === 2 ? 'left' : 'center' }
+				cell.border = this.allBorder()
+			})
+		})
+
+		worksheet.addRow([])
+
+		const paidStr = this.formatPaymentMethods(selling.clientSellingPayment?.clientSellingPaymentMethods ?? [])
+		const paidRow = worksheet.addRow(['', '', '', '', 'Тўлов қилинди:', paidStr])
+		this.styleHeaderRow(paidRow)
+
+		worksheet.getColumn(2).width = Math.min(Math.max(maxNameLen + 5, 20), 60)
+
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-		res.setHeader('Content-Disposition', `attachment; filename="selling-${selling.id}.xlsx"`)
-
+		res.setHeader('Content-Disposition', `attachment; filename="selling-${selling.publicId ?? 'one'}.xlsx"`)
 		await workbook.xlsx.write(res)
 		res.end()
 	}
+
+	// ─── Arrival ──────────────────────────────────────────────────────────────
 
 	async arrivalDownloadMany(res: Response, query: ArrivalFindManyRequest) {
 		const startDate = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
@@ -271,200 +250,160 @@ export class ExcelService {
 				deletedAt: null,
 				supplierId: query.supplierId,
 				OR: [{ supplier: { fullname: { contains: query.search, mode: 'insensitive' } } }, { supplier: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				createdAt: {
-					...(startDate && { gte: startDate }),
-					...(endDate && { lte: endDate }),
-				},
+				createdAt: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
-			include: {
-				supplier: true,
-				staff: true,
-			products: {
-				select: {
-					count: true,
-					productMVPrices: { select: { price: true, type: true } },
+			select: {
+				date: true,
+				supplier: { select: { fullname: true } },
+				staff: { select: { fullname: true } },
+				supplierArrivalPayment: {
+					select: {
+						description: true,
+						supplierArrivalPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } },
+					},
 				},
-			},
-				payment: true,
+				products: {
+					select: { prices: { where: { type: 'cost' }, select: { totalPrice: true, currency: { select: { symbol: true } } } } },
+				},
 			},
 			orderBy: { createdAt: 'desc' },
 		})
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Приходы')
-
 		worksheet.columns = [
 			{ key: 'no', width: 5 },
 			{ key: 'supplier', width: 35 },
-			{ key: 'summa', width: 15 },
+			{ key: 'summa', width: 30 },
+			{ key: 'paid', width: 25 },
 			{ key: 'staff', width: 25 },
-			{ key: 'info', width: 40 },
-			{ key: 'date', width: 30 },
+			{ key: 'info', width: 35 },
+			{ key: 'date', width: 25 },
 		]
 
-		let total = 0
+		worksheet.insertRow(1, ['Приходы hisoboti'])
+		worksheet.mergeCells('A1:G1')
+		const titleCell = worksheet.getCell('A1')
+		titleCell.font = { bold: true, size: 14 }
+		titleCell.border = this.allBorder()
 
-		// 1-qator: Общая сумма
-		worksheet.insertRow(1, [`Общая сумма: 0`])
-		worksheet.mergeCells('A1:F1')
-		const cellA1 = worksheet.getCell('A1')
-		cellA1.font = { bold: true }
-		cellA1.border = {
-			top: { style: 'thin', color: { argb: 'FF000000' } },
-			left: { style: 'thin', color: { argb: 'FF000000' } },
-			bottom: { style: 'thin', color: { argb: 'FF000000' } },
-			right: { style: 'thin', color: { argb: 'FF000000' } },
-		}
-
-		// 2-qator: bo'sh
 		worksheet.insertRow(2, [])
 
-		// 3-qator: Header
-		const headers = ['№', 'Поставщик', 'Сумма', 'Кем оприходован', 'Информация', 'Дата прихода']
-		worksheet.insertRow(3, headers)
-		worksheet.getRow(3).eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		})
+		const headerRow = worksheet.insertRow(3, ['№', 'Поставщик', 'Сумма', 'Оплачено', 'Кем оприходован', 'Информация', 'Дата прихода'])
+		this.styleHeaderRow(headerRow)
 
-		// Ma'lumotlar
 		arrivalList.forEach((item, index) => {
-			const totalSum = item.products.reduce((sum, p) => sum + (p.productMVPrices?.find((pp) => pp.type === PriceTypeEnum.cost)?.price?.toNumber() ?? p.productMVPrices?.[0]?.price?.toNumber() ?? 0) * p.count, 0)
-			total += totalSum
+			const totalMap = new Map<string, Decimal>()
+			for (const p of item.products) {
+				for (const pr of p.prices) {
+					const sym = pr.currency?.symbol ?? '?'
+					totalMap.set(sym, (totalMap.get(sym) ?? new Decimal(0)).plus(pr.totalPrice))
+				}
+			}
+			const totalStr =
+				Array.from(totalMap.entries())
+					.map(([s, t]) => `${t.toFixed(2)} ${s}`)
+					.join(' + ') || '0'
+			const paidStr = this.formatPaymentMethods(item.supplierArrivalPayment?.supplierArrivalPaymentMethods ?? [])
 
 			const row = worksheet.addRow({
 				no: index + 1,
 				supplier: item.supplier.fullname,
-				summa: totalSum,
-				staff: item.staff.phone,
-				info: item.payment?.description || '',
-				date: item.createdAt.toLocaleString('ru-RU'),
+				summa: totalStr,
+				paid: paidStr,
+				staff: item.staff?.fullname ?? '',
+				info: item.supplierArrivalPayment?.description ?? '',
+				date: this.formatDate(item.date),
 			})
-
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = {
-					top: { style: 'thin', color: { argb: 'FF000000' } },
-					left: { style: 'thin', color: { argb: 'FF000000' } },
-					bottom: { style: 'thin', color: { argb: 'FF000000' } },
-					right: { style: 'thin', color: { argb: 'FF000000' } },
-				}
-			})
+			this.styleDataRow(row)
 		})
 
-		// Общая сумма ni yangilash
-		cellA1.value = `Общая сумма: ${total}`
-
-		// Excelga yozish
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="arrival-report.xlsx"')
-
 		await workbook.xlsx.write(res)
 		res.end()
 	}
 
 	async arrivalDownloadOne(res: Response, query: ArrivalFindOneRequest) {
-		const arrival = await this.prisma.arrivalModel.findUnique({
+		const arrival = await this.prisma.arrivalModel.findFirst({
 			where: { id: query.id, deletedAt: null },
-			include: {
-				supplier: true,
-				staff: true,
-			products: {
-				select: {
-					count: true,
-					productMVPrices: { select: { price: true, type: true } },
-					product: { select: { name: true } },
+			select: {
+				date: true,
+				supplier: { select: { fullname: true } },
+				staff: { select: { fullname: true } },
+				supplierArrivalPayment: {
+					select: { description: true, supplierArrivalPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
 				},
-			},
-				payment: true,
+				products: {
+					select: {
+						count: true,
+						prices: { where: { type: 'cost' }, select: { price: true, totalPrice: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+					orderBy: { createdAt: 'asc' },
+				},
 			},
 		})
 
 		if (!arrival) {
-			return res.status(404).json({ message: 'Arrival not found' })
+			res.status(404).send('Prikhod topilmadi')
+			return
 		}
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Приходы')
-
-		// Ustun o'lchamlari
 		worksheet.columns = [
 			{ key: 'no', width: 5 },
 			{ key: 'product', width: 35 },
 			{ key: 'quantity', width: 15 },
-			{ key: 'price', width: 15 },
-			{ key: 'cost', width: 15 },
+			{ key: 'price', width: 20 },
+			{ key: 'cost', width: 20 },
 		]
 
-		// 1-qator: Приход от
-		const arrivalDateRow = worksheet.addRow([`Приход от: ${arrival.createdAt.toLocaleString('ru-RU')}`])
-		worksheet.mergeCells(`A${arrivalDateRow.number}:E${arrivalDateRow.number}`)
-		arrivalDateRow.getCell(1).font = { bold: true }
-		arrivalDateRow.getCell(1).border = borderAll()
+		const dateRow = worksheet.addRow([`Приход от: ${this.formatDate(arrival.date)}`])
+		worksheet.mergeCells(`A${dateRow.number}:E${dateRow.number}`)
+		dateRow.getCell(1).font = { bold: true }
+		dateRow.getCell(1).border = this.allBorder()
 
-		// 2-qator: Поставщик
 		const supplierRow = worksheet.addRow([`Поставщик: ${arrival.supplier.fullname}`])
 		worksheet.mergeCells(`A${supplierRow.number}:E${supplierRow.number}`)
 		supplierRow.getCell(1).font = { bold: true }
-		supplierRow.getCell(1).border = borderAll()
+		supplierRow.getCell(1).border = this.allBorder()
 
-		// 3-qator: bo'sh
 		worksheet.addRow([])
 
-		// 4-qator: Header
-		const headerTitles = ['№', 'Товар', 'Количество', 'Цена', 'Стоимость']
-		const headerRow = worksheet.addRow(headerTitles)
-		headerRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
+		const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Цена', 'Стоимость'])
+		this.styleHeaderRow(headerRow)
+
+		let totalCostStr = '0'
+		const totalMap = new Map<string, Decimal>()
+
+		arrival.products.forEach((p, index) => {
+			const price = p.prices[0]?.price?.toNumber() ?? 0
+			const sym = p.prices[0]?.currency?.symbol ?? ''
+			const totalPrice = p.prices[0]?.totalPrice ?? new Decimal(0)
+			totalMap.set(sym, (totalMap.get(sym) ?? new Decimal(0)).plus(totalPrice))
+
+			const row = worksheet.addRow([index + 1, p.product.name, p.count, `${price} ${sym}`, `${totalPrice.toFixed(2)} ${sym}`])
+			this.styleDataRow(row)
 		})
 
-		// Mahsulotlar
-		arrival.products.forEach((product, index) => {
-			const cost = product.productMVPrices?.find((pp) => pp.type === PriceTypeEnum.cost)?.price?.toNumber() ?? product.productMVPrices?.[0]?.price?.toNumber() ?? 0
-			const row = worksheet.addRow([index + 1, product.product.name, product.count, cost, cost * product.count])
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
-		})
+		totalCostStr =
+			Array.from(totalMap.entries())
+				.map(([s, t]) => `${t.toFixed(2)} ${s}`)
+				.join(' + ') || '0'
 
-		// Bo'sh qator
 		worksheet.addRow([])
+		const totalRow = worksheet.addRow(['', 'Итого', '', '', totalCostStr])
+		this.styleHeaderRow(totalRow)
 
-		// Итого qatori
-		const totalCost = arrival.products.reduce((sum, p) => sum + (p.productMVPrices?.find((pp) => pp.type === PriceTypeEnum.cost)?.price?.toNumber() ?? p.productMVPrices?.[0]?.price?.toNumber() ?? 0) * p.count, 0)
-		const totalRow = worksheet.addRow(['', 'Итого', '', '', totalCost])
-		totalRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
-		})
-
-		// Excel javobi
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="arrival-report-one.xlsx"')
-
 		await workbook.xlsx.write(res)
 		res.end()
-
-		// Border helper funksiyasi
-		function borderAll(): Partial<ExcelJS.Borders> {
-			return {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		}
 	}
+
+	// ─── Returning ────────────────────────────────────────────────────────────
 
 	async returningDownloadMany(res: Response, query: ReturningFindManyRequest) {
 		const startDate = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
@@ -475,1419 +414,585 @@ export class ExcelService {
 				status: query.status,
 				clientId: query.clientId,
 				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				date: {
-					...(startDate && { gte: startDate }),
-					...(endDate && { lte: endDate }),
-				},
+				date: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
 			select: {
 				date: true,
 				client: { select: { fullname: true, phone: true } },
-				staff: { select: { phone: true } },
-				payment: { select: { cash: true, fromBalance: true, description: true } },
+				staff: { select: { fullname: true } },
+				clientReturningPayments: {
+					select: {
+						description: true,
+						clientReturningPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } },
+					},
+				},
 			},
 			orderBy: { date: 'desc' },
 		})
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Возвраты')
-
 		worksheet.columns = [
 			{ key: 'no', width: 5 },
 			{ key: 'client', width: 45 },
-			{ key: 'cash', width: 15 },
-			{ key: 'balance', width: 15 },
+			{ key: 'paid', width: 25 },
 			{ key: 'staff', width: 20 },
 			{ key: 'info', width: 25 },
 			{ key: 'date', width: 20 },
 		]
 
-		let total = new Decimal(0)
-
-		// 1-qator: Общая сумма (dynamic, keyin yangilanadi)
-		worksheet.insertRow(1, [`Общая сумма: 0`])
+		worksheet.insertRow(1, ['Возвраты hisoboti'])
 		worksheet.mergeCells('A1:F1')
-		const cellA1 = worksheet.getCell('A1')
-		cellA1.font = { bold: true }
-		cellA1.alignment = { vertical: 'middle', horizontal: 'left' }
-		cellA1.border = {
-			top: { style: 'thin', color: { argb: 'FF000000' } },
-			left: { style: 'thin', color: { argb: 'FF000000' } },
-			bottom: { style: 'thin', color: { argb: 'FF000000' } },
-			right: { style: 'thin', color: { argb: 'FF000000' } },
-		}
+		const titleCell = worksheet.getCell('A1')
+		titleCell.font = { bold: true }
+		titleCell.border = this.allBorder()
 
-		// 2-qator: bo‘sh qator
 		worksheet.insertRow(2, [])
 
-		// 3-qator: sarlavhalar
-		const headers = ['№', 'Клиент', 'Наличные', 'Из баланса', 'Кем отправован', 'Информация', 'Дата прихода']
-		worksheet.insertRow(3, headers)
+		const headerRow = worksheet.insertRow(3, ['№', 'Клиент', 'Оплачено', 'Кем отправован', 'Информация', 'Дата'])
+		this.styleHeaderRow(headerRow)
 
-		worksheet.getRow(3).eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		})
-
-		// Ma'lumotlarni to‘ldirish
 		returningList.forEach((item, index) => {
-			const sum = item.payment?.cash.plus(item.payment?.fromBalance ?? 0) ?? new Decimal(0)
-			total = total.plus(sum)
-
+			const paidStr = this.formatPaymentMethods(item.clientReturningPayments?.clientReturningPaymentMethods ?? [])
 			const row = worksheet.addRow({
 				no: index + 1,
 				client: `${item.client.fullname} - ${item.client.phone}`,
-				cash: item.payment.cash.toFixed(2),
-				balance: item.payment.fromBalance.toFixed(2),
-				staff: item.staff?.phone || '',
-				info: item.payment?.description || '',
-				date: item.date.toLocaleString('ru-RU'),
+				paid: paidStr,
+				staff: item.staff?.fullname ?? '',
+				info: item.clientReturningPayments?.description ?? '',
+				date: this.formatDate(item.date),
 			})
-
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = {
-					top: { style: 'thin', color: { argb: 'FF000000' } },
-					left: { style: 'thin', color: { argb: 'FF000000' } },
-					bottom: { style: 'thin', color: { argb: 'FF000000' } },
-					right: { style: 'thin', color: { argb: 'FF000000' } },
-				}
-			})
+			this.styleDataRow(row)
 		})
 
-		// Общая сумма yangilash
-		cellA1.value = `Общая сумма: ${total.toFixed(2)}`
-
-		// Excel response
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="returnings-report.xlsx"')
-
 		await workbook.xlsx.write(res)
 		res.end()
 	}
 
 	async returningDownloadOne(res: Response, query: ReturningFindOneRequest) {
-		const returning = await this.prisma.returningModel.findUnique({
+		const returning = await this.prisma.returningModel.findFirst({
 			where: { id: query.id },
 			select: {
 				date: true,
 				client: { select: { fullname: true } },
-			products: {
-				select: {
-					count: true,
-					productMVPrices: { select: { price: true, type: true } },
-					product: { select: { name: true } },
+				products: {
+					select: {
+						count: true,
+						prices: { where: { type: 'selling' }, select: { price: true, totalPrice: true, currency: { select: { symbol: true } } } },
+						product: { select: { name: true } },
+					},
+					orderBy: { createdAt: 'asc' },
 				},
-				orderBy: { createdAt: 'asc' },
-			},
 			},
 		})
 
 		if (!returning) {
-			return res.status(404).json({ message: 'Returning not found' })
+			res.status(404).send('Qaytarish topilmadi')
+			return
 		}
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Возврат')
-
-		// Ustun o‘lchamlari
 		worksheet.columns = [
 			{ key: 'no', width: 5 },
 			{ key: 'product', width: 40 },
 			{ key: 'quantity', width: 15 },
-			{ key: 'price', width: 12 },
-			{ key: 'cost', width: 15 },
+			{ key: 'price', width: 20 },
+			{ key: 'cost', width: 20 },
 		]
 
-		// 1-qator: Приход от: ...
-		const formattedDate = formatDate(returning.date)
-		const dateRow = worksheet.addRow([`Приход от: ${formattedDate}`])
+		const dateRow = worksheet.addRow([`Дата: ${this.formatDate(returning.date)}`])
 		worksheet.mergeCells(`A${dateRow.number}:E${dateRow.number}`)
-		const dateCell = dateRow.getCell(1)
-		dateCell.font = { bold: true }
-		dateCell.alignment = { vertical: 'middle', horizontal: 'left' }
-		dateCell.border = borderAll()
+		dateRow.getCell(1).font = { bold: true }
+		dateRow.getCell(1).border = this.allBorder()
 
-		// 2-qator: Клиент: ...
 		const clientRow = worksheet.addRow([`Клиент: ${returning.client.fullname}`])
 		worksheet.mergeCells(`A${clientRow.number}:E${clientRow.number}`)
-		const clientCell = clientRow.getCell(1)
-		clientCell.font = { bold: true }
-		clientCell.alignment = { vertical: 'middle', horizontal: 'left' }
-		clientCell.border = borderAll()
+		clientRow.getCell(1).font = { bold: true }
+		clientRow.getCell(1).border = this.allBorder()
 
-		// 3-qator: bo‘sh
 		worksheet.addRow([])
 
-		// 4-qator: Header
-		const headerTitles = ['№', 'Товар', 'Количество', 'Цена', 'Стоимость']
-		const headerRow = worksheet.addRow(headerTitles)
-		headerRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
-		})
+		const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Цена', 'Стоимость'])
+		this.styleHeaderRow(headerRow)
 
-		// Mahsulotlar
-		let total = 0
+		const totalMap = new Map<string, Decimal>()
 
 		returning.products.forEach((item, index) => {
-			const count = item.count
-			const price = item.productMVPrices?.[0]?.price?.toNumber() ?? 0
-			const cost = count * price
-			total += cost
+			const price = item.prices[0]?.price?.toNumber() ?? 0
+			const sym = item.prices[0]?.currency?.symbol ?? ''
+			const totalPrice = item.prices[0]?.totalPrice ?? new Decimal(0)
+			totalMap.set(sym, (totalMap.get(sym) ?? new Decimal(0)).plus(totalPrice))
 
-			const row = worksheet.addRow([index + 1, item.product.name, count, price, cost])
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
+			const row = worksheet.addRow([index + 1, item.product.name, item.count, `${price} ${sym}`, `${totalPrice.toFixed(2)} ${sym}`])
+			this.styleDataRow(row)
 		})
 
-		// Bo‘sh qator
 		worksheet.addRow([])
+		const totalStr =
+			Array.from(totalMap.entries())
+				.map(([s, t]) => `${t.toFixed(2)} ${s}`)
+				.join(' + ') || '0'
+		const totalRow = worksheet.addRow(['', 'Итого', '', '', totalStr])
+		this.styleHeaderRow(totalRow)
 
-		// Итого
-		const totalRow = worksheet.addRow(['', 'Итого', '', '', total])
-		totalRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
-		})
-
-		// Response
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="returning-report.xlsx"')
-
 		await workbook.xlsx.write(res)
 		res.end()
-
-		// Helpers
-		function formatDate(date: Date): string {
-			const dd = String(date.getDate()).padStart(2, '0')
-			const mm = String(date.getMonth() + 1).padStart(2, '0')
-			const yyyy = date.getFullYear()
-			const hh = String(date.getHours()).padStart(2, '0')
-			const min = String(date.getMinutes()).padStart(2, '0')
-			return `${dd}.${mm}.${yyyy} ${hh}:${min}`
-		}
-
-		function borderAll(): Partial<ExcelJS.Borders> {
-			return {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		}
 	}
+
+	// ─── Client Payment ────────────────────────────────────────────────────────
 
 	async clientPaymentDownloadMany(res: Response, query: ClientPaymentFindManyRequest) {
 		const startDate = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
 		const endDate = query.endDate ? new Date(new Date(query.endDate).setHours(23, 59, 59, 999)) : undefined
 
-		let paginationOptions = {}
-		if (query.pagination) {
-			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
-		}
-
-		const clientPayments = await this.prisma.paymentModel.findMany({
+		const clientPayments = await this.prisma.clientPaymentModel.findMany({
 			where: {
+				clientId: query.clientId,
 				staffId: query.staffId,
-				type: { in: [ServiceTypeEnum.client, ServiceTypeEnum.selling] },
-				OR: [{ user: { fullname: { contains: query.search, mode: 'insensitive' } } }, { user: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				createdAt: {
-					...(startDate && { gte: startDate }),
-					...(endDate && { lte: endDate }),
-				},
-				NOT: { AND: [{ card: 0 }, { cash: 0 }, { transfer: 0 }, { other: 0 }] },
+				deletedAt: null,
+				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
+				createdAt: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
 			select: {
-				user: { select: { fullname: true } },
+				client: { select: { fullname: true } },
+				staff: { select: { fullname: true } },
 				description: true,
-				cash: true,
-				card: true,
-				transfer: true,
-				other: true,
-				staff: { select: { phone: true } },
 				createdAt: true,
+				clientPaymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
 			},
-			...paginationOptions,
 			orderBy: { createdAt: 'desc' },
 		})
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Клиент оплаты')
-
-		// Ustunlar
 		worksheet.columns = [
 			{ header: '№', key: 'no', width: 5 },
 			{ header: 'Клиент', key: 'client', width: 30 },
 			{ header: 'Информация', key: 'info', width: 35 },
-			{ header: 'Оплата наличными', key: 'cash', width: 30 },
-			{ header: 'Оплата банковской', key: 'card', width: 30 },
-			{ header: 'Оплата перечислением', key: 'transfer', width: 30 },
-			{ header: 'Оплата другими способами', key: 'other', width: 38 },
-			{ header: 'Пользователь', key: 'staff', width: 30 },
-			{ header: 'Дата', key: 'date', width: 30 },
+			{ header: 'Сумма', key: 'amount', width: 35 },
+			{ header: 'Сотрудник', key: 'staff', width: 25 },
+			{ header: 'Дата', key: 'date', width: 25 },
 		]
 
-		// Header row styling
-		const headerRow = worksheet.getRow(1)
-		headerRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
-		})
+		this.styleHeaderRow(worksheet.getRow(1))
 
-		// Data rows
 		clientPayments.forEach((payment, index) => {
+			const amountStr = this.formatPaymentMethods(payment.clientPaymentMethods)
 			const row = worksheet.addRow({
 				no: index + 1,
-				client: payment.user.fullname,
-				info: payment.description || '',
-				cash: payment.cash.toNumber() || 0,
-				card: payment.card.toNumber() || 0,
-				transfer: payment.transfer.toNumber() || 0,
-				other: payment.other.toNumber() || 0,
-				staff: payment.staff.phone || '',
-				date: formatDate(payment.createdAt),
+				client: payment.client.fullname,
+				info: payment.description ?? '',
+				amount: amountStr,
+				staff: payment.staff?.fullname ?? '',
+				date: this.formatDate(payment.createdAt),
 			})
-
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
+			this.styleDataRow(row)
 		})
 
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="client-payments.xlsx"')
 		await workbook.xlsx.write(res)
 		res.end()
-
-		// Helperlar
-		function formatDate(date: Date): string {
-			const dd = String(date.getDate()).padStart(2, '0')
-			const mm = String(date.getMonth() + 1).padStart(2, '0')
-			const yyyy = date.getFullYear()
-			const hh = String(date.getHours()).padStart(2, '0')
-			const min = String(date.getMinutes()).padStart(2, '0')
-			return `${dd}.${mm}.${yyyy} ${hh}:${min}`
-		}
-
-		function borderAll(): Partial<ExcelJS.Borders> {
-			return {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		}
 	}
 
-	async supplierPaymentDownloadMany(res: Response, query: ClientPaymentFindManyRequest) {
+	// ─── Supplier Payment ──────────────────────────────────────────────────────
+
+	async supplierPaymentDownloadMany(res: Response, query: SupplierPaymentFindManyRequest) {
 		const startDate = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
 		const endDate = query.endDate ? new Date(new Date(query.endDate).setHours(23, 59, 59, 999)) : undefined
 
-		const clientPayments = await this.prisma.paymentModel.findMany({
+		const supplierPayments = await this.prisma.supplierPaymentModel.findMany({
 			where: {
+				supplierId: query.supplierId,
 				staffId: query.staffId,
-				type: { in: [ServiceTypeEnum.supplier] },
-				OR: [{ user: { fullname: { contains: query.search, mode: 'insensitive' } } }, { user: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				createdAt: {
-					...(startDate && { gte: startDate }),
-					...(endDate && { lte: endDate }),
-				},
-				NOT: { AND: [{ card: 0 }, { cash: 0 }, { transfer: 0 }, { other: 0 }] },
+				deletedAt: null,
+				OR: [{ supplier: { fullname: { contains: query.search, mode: 'insensitive' } } }, { supplier: { phone: { contains: query.search, mode: 'insensitive' } } }],
+				createdAt: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
 			select: {
-				user: { select: { fullname: true } },
+				supplier: { select: { fullname: true } },
+				staff: { select: { fullname: true } },
 				description: true,
-				cash: true,
-				card: true,
-				transfer: true,
-				other: true,
-				staff: { select: { phone: true } },
 				createdAt: true,
+				supplierPaymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
 			},
 			orderBy: { createdAt: 'desc' },
 		})
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Поставщик оплаты')
-
 		worksheet.columns = [
 			{ header: '№', key: 'no', width: 5 },
 			{ header: 'Поставщик', key: 'supplier', width: 30 },
-			{ header: 'Сумма', key: 'sum', width: 25 },
-			{ header: 'Кем оприходан', key: 'staff', width: 20 },
-			{ header: 'Информация', key: 'info', width: 30 },
-			{ header: 'Дата', key: 'date', width: 20 },
+			{ header: 'Информация', key: 'info', width: 35 },
+			{ header: 'Сумма', key: 'amount', width: 35 },
+			{ header: 'Сотрудник', key: 'staff', width: 25 },
+			{ header: 'Дата', key: 'date', width: 25 },
 		]
 
-		const headerRow = worksheet.getRow(1)
-		headerRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
-		})
+		this.styleHeaderRow(worksheet.getRow(1))
 
-		clientPayments.forEach((payment, index) => {
-			const totalSum = payment.cash.plus(payment.card).plus(payment.transfer).plus(payment.other)
-
+		supplierPayments.forEach((payment, index) => {
+			const amountStr = this.formatPaymentMethods(payment.supplierPaymentMethods)
 			const row = worksheet.addRow({
 				no: index + 1,
-				supplier: payment.user.fullname,
-				sum: totalSum.toFixed(2),
-				staff: payment.staff.phone || '',
-				info: payment.description || '',
-				date: formatDate(payment.createdAt),
+				supplier: payment.supplier.fullname,
+				info: payment.description ?? '',
+				amount: amountStr,
+				staff: payment.staff?.fullname ?? '',
+				date: this.formatDate(payment.createdAt),
 			})
-
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
+			this.styleDataRow(row)
 		})
 
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="supplier-payments.xlsx"')
 		await workbook.xlsx.write(res)
 		res.end()
+	}
 
-		function formatDate(date: Date): string {
-			const dd = String(date.getDate()).padStart(2, '0')
-			const mm = String(date.getMonth() + 1).padStart(2, '0')
-			const yyyy = date.getFullYear()
-			const hh = String(date.getHours()).padStart(2, '0')
-			const min = String(date.getMinutes()).padStart(2, '0')
-			return `${dd}.${mm}.${yyyy} ${hh}:${min}`
-		}
+	// ─── Client Download ───────────────────────────────────────────────────────
 
-		function borderAll(): Partial<ExcelJS.Borders> {
-			return {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
+	async clientDownloadMany(res: Response, query: ClientFindManyRequest) {
+		const clients = await this.prisma.clientModel.findMany({
+			where: {
+				deletedAt: null,
+				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
+			},
+			select: {
+				id: true,
+				fullname: true,
+				phone: true,
+				createdAt: true,
+				sellings: {
+					where: { status: SellingStatusEnum.accepted },
+					select: {
+						date: true,
+						products: { select: { prices: { where: { type: 'selling' }, select: { totalPrice: true, currencyId: true } } } },
+						clientSellingPayment: { select: { clientSellingPaymentMethods: { select: { amount: true, currencyId: true } } } },
+					},
+					orderBy: { date: 'desc' },
+				},
+				clientPayments: {
+					select: { clientPaymentMethods: { select: { amount: true, currencyId: true } } },
+				},
+			},
+			orderBy: { createdAt: 'desc' },
+		})
+
+		const workbook = new ExcelJS.Workbook()
+		const worksheet = workbook.addWorksheet('Клиенты')
+		worksheet.columns = [
+			{ header: '№', key: 'no', width: 5 },
+			{ header: 'ФИО', key: 'fullname', width: 35 },
+			{ header: 'Телефон', key: 'phone', width: 20 },
+			{ header: 'Долг', key: 'debt', width: 30 },
+			{ header: 'Последняя продажа', key: 'lastSale', width: 25 },
+			{ header: 'Зарегистрирован', key: 'createdAt', width: 25 },
+		]
+
+		this.styleHeaderRow(worksheet.getRow(1))
+
+		clients.forEach((c, index) => {
+			const debtMap = new Map<string, Decimal>()
+			for (const sel of c.sellings) {
+				for (const p of sel.products) {
+					for (const pr of p.prices) {
+						debtMap.set(pr.currencyId, (debtMap.get(pr.currencyId) ?? new Decimal(0)).plus(pr.totalPrice))
+					}
+				}
+				for (const m of sel.clientSellingPayment?.clientSellingPaymentMethods ?? []) {
+					debtMap.set(m.currencyId, (debtMap.get(m.currencyId) ?? new Decimal(0)).minus(m.amount))
+				}
 			}
-		}
+			for (const cp of c.clientPayments) {
+				for (const m of cp.clientPaymentMethods) {
+					debtMap.set(m.currencyId, (debtMap.get(m.currencyId) ?? new Decimal(0)).minus(m.amount))
+				}
+			}
+			const debtStr = Array.from(debtMap.values())
+				.reduce((a, b) => a.plus(b), new Decimal(0))
+				.toFixed(2)
+
+			const row = worksheet.addRow({
+				no: index + 1,
+				fullname: c.fullname,
+				phone: c.phone,
+				debt: debtStr,
+				lastSale: c.sellings[0] ? this.formatDate(c.sellings[0].date) : '',
+				createdAt: this.formatDate(c.createdAt),
+			})
+			this.styleDataRow(row)
+		})
+
+		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+		res.setHeader('Content-Disposition', 'attachment; filename="clients.xlsx"')
+		await workbook.xlsx.write(res)
+		res.end()
 	}
 
 	async clientDeedDownloadOne(res: Response, query: ClientFindOneRequest) {
 		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
 		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined
 
-		const client = await this.prisma.userModel.findFirst({
+		const client = await this.prisma.clientModel.findFirst({
 			where: { id: query.id },
 			select: {
-				id: true,
 				fullname: true,
 				phone: true,
-				actions: true,
-				balance: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				payments: {
-					where: { type: ServiceTypeEnum.client, createdAt: { gte: deedStartDate, lte: deedEndDate } },
-					select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-				},
 				sellings: {
 					where: { status: SellingStatusEnum.accepted, date: { gte: deedStartDate, lte: deedEndDate } },
 					select: {
 						date: true,
-				totals: { select: { total: true } },
-					payment: {
-						where: { createdAt: { gte: deedStartDate, lte: deedEndDate } },
-						select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
+						products: { select: { prices: { where: { type: 'selling' }, select: { totalPrice: true, currency: { select: { symbol: true } } } } } },
+						clientSellingPayment: {
+							select: { createdAt: true, description: true, clientSellingPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
+						},
 					},
+					orderBy: { date: 'asc' },
 				},
-				orderBy: { date: 'desc' },
-			},
-			returnings: {
-				where: { status: SellingStatusEnum.accepted, createdAt: { gte: deedStartDate, lte: deedEndDate } },
-				select: {
-					payment: {
-						where: { createdAt: { gte: deedStartDate, lte: deedEndDate } },
-						select: { fromBalance: true, createdAt: true, description: true },
-					},
+				clientPayments: {
+					where: { createdAt: { gte: deedStartDate, lte: deedEndDate }, deletedAt: null },
+					select: { createdAt: true, description: true, clientPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
 				},
 			},
-		},
-	})
-
-	if (!client) throw new BadRequestException(ERROR_MSG.CLIENT.NOT_FOUND.UZ)
-
-		const deeds: ClientDeed[] = []
-		let totalDebit: Decimal = new Decimal(0)
-		let totalCredit: Decimal = new Decimal(0)
-
-		client.payments.forEach((curr) => {
-			if (curr.description === `import qilingan boshlang'ich qiymat ${Number(curr.total).toFixed(2)}`) {
-				deeds.push({ type: 'debit', action: 'selling', value: curr.total, date: curr.createdAt, description: curr.description })
-				totalDebit = totalDebit.plus(curr.total)
-			} else {
-				deeds.push({ type: 'credit', action: 'payment', value: curr.total, date: curr.createdAt, description: curr.description })
-				totalCredit = totalCredit.plus(curr.total)
-			}
 		})
 
-	client.sellings.forEach((sel) => {
-		const productsSum = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
-		deeds.push({ type: 'debit', action: 'selling', value: productsSum, date: sel.date, description: '' })
-		totalDebit = totalDebit.plus(productsSum)
-
-		deeds.push({ type: 'credit', action: 'payment', value: sel.payment.total, date: sel.payment.createdAt, description: sel.payment.description })
-		totalCredit = totalCredit.plus(sel.payment.total)
-	})
-
-		client.returnings.forEach((returning) => {
-			deeds.push({
-				type: 'credit',
-				action: 'returning',
-				value: returning.payment.fromBalance,
-				date: returning.payment.createdAt,
-				description: returning.payment.description,
-			})
-			totalCredit = totalCredit.plus(returning.payment.fromBalance)
-		})
-
-		console.log('total credit and debit', totalCredit, totalDebit)
-
-		const filteredDeeds = deeds.filter((d) => !d.value.equals(0)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-		///=====================
-		const clientAllInfos = await this.prisma.userModel.findFirst({
-			where: { id: query.id },
-			select: {
-				id: true,
-				fullname: true,
-				phone: true,
-				balance: true,
-				actions: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				payments: {
-					where: { type: ServiceTypeEnum.client },
-					select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-				},
-			sellings: {
-				where: { status: SellingStatusEnum.accepted },
-				select: {
-					date: true,
-					totals: { select: { total: true } },
-					payment: {
-						select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-					},
-				},
-				orderBy: { date: 'desc' },
-			},
-			returnings: {
-				where: { status: SellingStatusEnum.accepted },
-				select: {
-					payment: {
-						select: { fromBalance: true, createdAt: true, description: true },
-					},
-				},
-			},
-		},
-	})
-
-	let totalDebit2: Decimal = new Decimal(0)
-	let totalCredit2: Decimal = new Decimal(0)
-
-	clientAllInfos.payments.forEach((curr) => {
-		if (curr.description === `import qilingan boshlang'ich qiymat ${Number(curr.total).toFixed(2)}`) {
-			totalDebit2 = totalDebit2.plus(curr.total)
-		} else {
-			totalCredit2 = totalCredit2.plus(curr.total)
+		if (!client) {
+			res.status(404).send('Mijoz topilmadi')
+			return
 		}
-	})
 
-	clientAllInfos.sellings.forEach((sel) => {
-		const productsSum = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
-		totalDebit2 = totalDebit2.plus(productsSum)
+		const deeds: { type: 'debit' | 'credit'; action: string; amount: string; date: Date; description: string }[] = []
 
-		totalCredit2 = totalCredit2.plus(sel.payment.total)
-	})
+		for (const sel of client.sellings) {
+			const totalMap = new Map<string, Decimal>()
+			for (const p of sel.products) {
+				for (const pr of p.prices) {
+					const sym = pr.currency?.symbol ?? '?'
+					totalMap.set(sym, (totalMap.get(sym) ?? new Decimal(0)).plus(pr.totalPrice))
+				}
+			}
+			const amtStr = Array.from(totalMap.entries())
+				.map(([s, t]) => `${t.toFixed(2)} ${s}`)
+				.join(' + ')
+			deeds.push({ type: 'debit', action: 'Sotuv', amount: amtStr, date: sel.date, description: '' })
 
-		clientAllInfos.returnings.forEach((returning) => {
-			totalCredit2 = totalCredit2.plus(returning.payment.fromBalance)
-		})
+			if (sel.clientSellingPayment) {
+				const paidStr = this.formatPaymentMethods(sel.clientSellingPayment.clientSellingPaymentMethods)
+				deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: sel.clientSellingPayment.createdAt, description: sel.clientSellingPayment.description ?? '' })
+			}
+		}
 
-		console.log('total credit2 and debit2', totalCredit2, totalDebit2, clientAllInfos.balance)
+		for (const cp of client.clientPayments) {
+			const paidStr = this.formatPaymentMethods(cp.clientPaymentMethods)
+			deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: cp.createdAt, description: cp.description ?? '' })
+		}
 
-		///=====================
+		deeds.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
 		const workbook = new ExcelJS.Workbook()
-		const worksheet = workbook.addWorksheet('Клиент')
+		const worksheet = workbook.addWorksheet('Дебитор')
+		worksheet.columns = [
+			{ key: 'no', width: 5 },
+			{ key: 'type', width: 15 },
+			{ key: 'action', width: 20 },
+			{ key: 'amount', width: 35 },
+			{ key: 'description', width: 35 },
+			{ key: 'date', width: 25 },
+		]
 
-		const row1 = worksheet.addRow([`Клиент: ${client.fullname}`, '', '', `Остаток: ${totalDebit2.minus(totalCredit2).toNumber()}`, '', ''])
-		worksheet.mergeCells(`A${row1.number}:C${row1.number}`)
-		worksheet.mergeCells(`D${row1.number}:F${row1.number}`)
-		styleRow(row1)
-
-		const row2 = worksheet.addRow([
-			`Акт сверки с ${this.formatDate(deedStartDate || filteredDeeds[0].date)} по ${this.formatDate(deedEndDate || filteredDeeds[filteredDeeds.length - 1].date)}`,
-		])
-		worksheet.mergeCells(`A${row2.number}:F${row2.number}`)
-		styleRow(row2)
+		const titleRow = worksheet.addRow([`${client.fullname} (${client.phone}) - Дебитор ведомость`])
+		worksheet.mergeCells(`A${titleRow.number}:F${titleRow.number}`)
+		titleRow.getCell(1).font = { bold: true, size: 13 }
+		titleRow.getCell(1).border = this.allBorder()
 
 		worksheet.addRow([])
 
-		const headerRow = worksheet.addRow(['№', 'Время', 'Операция', 'Дебит', 'Кредит', 'Описание'])
-		headerRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
-		})
+		const headerRow = worksheet.addRow(['№', 'Тип', 'Действие', 'Сумма', 'Примечание', 'Дата'])
+		this.styleHeaderRow(headerRow)
 
-		filteredDeeds.forEach((deed, index) => {
-			const row = worksheet.addRow([
-				index + 1,
-				this.formatDate(deed.date),
-				deed.action,
-				deed.type === 'debit' ? deed.value.toFixed(2) : '',
-				deed.type === 'credit' ? deed.value.toFixed(2) : '',
-				deed.description,
-			])
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-				if (deed.type === 'debit') {
-					cell.fill = this.fillLightGreen()
-				}
-
-				if (deed.type === 'credit') {
-					cell.fill = this.fillLightRed()
-				}
+		deeds.forEach((d, i) => {
+			const row = worksheet.addRow([i + 1, d.type === 'debit' ? 'Дебит' : 'Кредит', d.action, d.amount, d.description, this.formatDate(d.date)])
+			row.eachCell((cell, col) => {
+				cell.alignment = { vertical: 'middle', horizontal: col === 4 ? 'left' : 'center' }
+				cell.border = this.allBorder()
+				if (d.type === 'debit') cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF0CC' } }
+				else cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9F0D3' } }
 			})
 		})
-
-		const totalRow = worksheet.addRow(['', '', 'Итого', totalDebit.toFixed(2), totalCredit.toFixed(2)])
-		styleRow(totalRow)
-
-		const remainder = totalDebit.minus(totalCredit)
-		const lastRow = worksheet.addRow(['', '', 'Конечный остаток', '', '', remainder.toFixed(2)])
-		styleRow(lastRow)
-
-		worksheet.columns = [{ width: 5 }, { width: 30 }, { width: 30 }, { width: 25 }, { width: 25 }, { width: 40 }]
 
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-		res.setHeader('Content-Disposition', 'attachment; filename="client-deeds.xlsx"')
-
+		res.setHeader('Content-Disposition', 'attachment; filename="client-deed.xlsx"')
 		await workbook.xlsx.write(res)
 		res.end()
-
-		function styleRow(row: ExcelJS.Row) {
-			row.eachCell((cell) => {
-				cell.font = { bold: true }
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
-		}
-
-		function borderAll(): Partial<ExcelJS.Borders> {
-			return {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		}
 	}
 
 	async clientDeedWithProductDownloadOne(res: Response, query: ClientFindOneRequest) {
-		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
-		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined
-
-		const client = await this.prisma.userModel.findFirst({
-			where: { id: query.id },
-			select: {
-				fullname: true,
-				payments: {
-					where: { type: ServiceTypeEnum.client, createdAt: { gte: deedStartDate, lte: deedEndDate } },
-					select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-				},
-				sellings: {
-					where: { status: SellingStatusEnum.accepted, date: { gte: deedStartDate, lte: deedEndDate } },
-					select: {
-						date: true,
-						products: { select: { product: { select: { name: true } }, count: true, productMVPrices: { select: { price: true, type: true } }, createdAt: true } },
-						payment: {
-							where: { createdAt: { gte: deedStartDate, lte: deedEndDate } },
-							select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-						},
-					},
-				},
-				returnings: {
-					where: { status: SellingStatusEnum.accepted, createdAt: { gte: deedStartDate, lte: deedEndDate } },
-					select: {
-						payment: {
-							where: { createdAt: { gte: deedStartDate, lte: deedEndDate } },
-							select: { fromBalance: true, createdAt: true, description: true },
-						},
-					},
-				},
-			},
-		})
-
-		if (!client) throw new BadRequestException(ERROR_MSG.CLIENT.NOT_FOUND.UZ)
-
-		const deeds: (ClientDeed & { quantity: number; price: Decimal; cost: Decimal; name?: string })[] = []
-		let totalDebit = new Decimal(0)
-		let totalCredit = new Decimal(0)
-
-		client.payments.forEach((curr) => {
-			if (curr.description === `import qilingan boshlang'ich qiymat ${Number(curr.total).toFixed(2)}`) {
-				deeds.push({
-					type: 'debit',
-					action: 'selling',
-					value: curr.total,
-					date: curr.createdAt,
-					description: curr.description,
-					cost: curr.total,
-					price: curr.total,
-					quantity: 1,
-				})
-				totalDebit = totalDebit.plus(curr.total)
-			} else {
-				deeds.push({
-					type: 'credit',
-					action: 'payment',
-					value: curr.total,
-					date: curr.createdAt,
-					description: curr.description,
-					cost: curr.total,
-					price: curr.total,
-					quantity: 1,
-				})
-				totalCredit = totalCredit.plus(curr.total)
-			}
-		})
-
-		client.sellings.forEach((sel) => {
-			sel.products.forEach((p) => {
-				const unitPrice = new Decimal(p.productMVPrices?.[0]?.price?.toNumber() ?? 0)
-				const price = unitPrice.mul(p.count)
-				deeds.push({
-					type: 'debit',
-					action: 'selling',
-					value: price,
-					date: p.createdAt,
-					description: '',
-					cost: unitPrice,
-					price,
-					quantity: p.count,
-					name: p.product.name,
-				})
-				totalDebit = totalDebit.plus(price)
-			})
-
-			deeds.push({
-				type: 'credit',
-				action: 'payment',
-				value: sel.payment.total,
-				date: sel.payment.createdAt,
-				description: sel.payment.description,
-				cost: sel.payment.total,
-				price: sel.payment.total,
-				quantity: 1,
-			})
-			totalCredit = totalCredit.plus(sel.payment.total)
-		})
-
-		client.returnings.forEach((r) => {
-			const bal = r.payment.fromBalance
-			deeds.push({
-				type: 'credit',
-				action: 'returning',
-				value: bal,
-				date: r.payment.createdAt,
-				description: r.payment.description,
-				cost: bal,
-				price: bal,
-				quantity: 1,
-			})
-			totalCredit = totalCredit.plus(bal)
-		})
-
-		const filtered = deeds.filter((d) => !d.value.equals(0)).sort((a, b) => a.date.getTime() - b.date.getTime())
-		const rows = filtered.map((deed, i) => [i + 1, deed.name || '', deed.quantity, deed.cost.toFixed(2), deed.price.toFixed(2), deed.action, this.formatDate(deed.date)])
-
-		///=====================
-		const clientAllInfos = await this.prisma.userModel.findFirst({
-			where: { id: query.id },
-			select: {
-				id: true,
-				fullname: true,
-				phone: true,
-				actions: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				payments: {
-					where: { type: ServiceTypeEnum.client },
-					select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-				},
-				sellings: {
-					where: { status: SellingStatusEnum.accepted },
-					select: {
-						date: true,
-					totals: { select: { total: true } },
-					payment: {
-						select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-					},
-				},
-				orderBy: { date: 'desc' },
-			},
-			returnings: {
-				where: { status: SellingStatusEnum.accepted },
-				select: {
-					payment: {
-						select: { fromBalance: true, createdAt: true, description: true },
-					},
-				},
-			},
-		},
-	})
-
-	let totalDebit2: Decimal = new Decimal(0)
-	let totalCredit2: Decimal = new Decimal(0)
-
-	clientAllInfos.payments.forEach((curr) => {
-		totalCredit2 = totalCredit2.plus(curr.total)
-	})
-
-	clientAllInfos.sellings.forEach((sel) => {
-		const productsSum = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
-		totalDebit2 = totalDebit2.plus(productsSum)
-
-		totalCredit2 = totalCredit2.plus(sel.payment.total)
-	})
-
-		clientAllInfos.returnings.forEach((returning) => {
-			totalCredit2 = totalCredit2.plus(returning.payment.fromBalance)
-		})
-		///=====================
-
-		const wb = new ExcelJS.Workbook()
-		const ws = wb.addWorksheet('Клиент')
-
-		const row1 = ws.addRow([`Клиент: ${client.fullname}`, '', '', `Остаток: ${totalDebit2.minus(totalCredit2).toFixed(2)}`, '', '', ''])
-		ws.mergeCells(`A${row1.number}:C${row1.number}`)
-		ws.mergeCells(`D${row1.number}:G${row1.number}`)
-		styleRow(row1)
-
-		const row2 = ws.addRow([`Акт сверки с ${this.formatDate(deedStartDate || filtered[0]?.date)} по ${this.formatDate(deedEndDate || filtered[filtered.length - 1]?.date)}`])
-		ws.mergeCells(`A${row2.number}:G${row2.number}`)
-		styleRow(row2)
-
-		ws.addRow([])
-
-		const header = ws.addRow(['№', 'Товар', 'Количество', 'Стоимость', 'Цена', 'Операция', 'Время'])
-		header.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
-		})
-
-		rows.forEach((data) => {
-			const row = ws.addRow(data)
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
-		})
-
-		const totalRow = ws.addRow(['', '', '', '', '', 'Итого', ''])
-		ws.mergeCells(`A${totalRow.number}:G${totalRow.number}`)
-		styleRow(totalRow)
-
-		const debitRow = ws.addRow(['', 'Продажи', '', '', totalDebit.toFixed(2), '', ''])
-		styleRow(debitRow)
-
-		const creditRow = ws.addRow(['', 'Оплата', '', '', totalCredit.toFixed(2), '', ''])
-		styleRow(creditRow)
-
-		ws.columns = [{ width: 5 }, { width: 30 }, { width: 15 }, { width: 15 }, { width: 20 }, { width: 20 }, { width: 30 }]
-
-		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-		res.setHeader('Content-Disposition', 'attachment; filename="client-deeds-with-product.xlsx"')
-
-		await wb.xlsx.write(res)
-		res.end()
-
-		function styleRow(row: ExcelJS.Row) {
-			row.eachCell((cell) => {
-				cell.font = { bold: true }
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
-		}
-
-		function borderAll(): Partial<ExcelJS.Borders> {
-			return {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		}
+		return this.clientDeedDownloadOne(res, query)
 	}
 
-	async supplierDeedDownloadOne(res: Response, query: ClientFindOneRequest) {
-		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
-		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined
+	// ─── Supplier Download ─────────────────────────────────────────────────────
 
-		const supplier = await this.prisma.userModel.findFirst({
-			where: { id: query.id },
-			select: {
-				id: true,
-				fullname: true,
-				phone: true,
-				actions: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				payments: {
-					where: { type: ServiceTypeEnum.supplier, createdAt: { gte: deedStartDate, lte: deedEndDate } },
-					select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-				},
-				arrivals: {
-				where: { date: { gte: deedStartDate, lte: deedEndDate } },
-				select: {
-					date: true,
-					totals: { select: { totalCost: true, totalPrice: true } },
-					payment: {
-						where: { createdAt: { gte: deedStartDate, lte: deedEndDate } },
-						select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-					},
-				},
-				orderBy: { date: 'desc' },
-			},
-			},
-		})
-
-		if (!supplier) throw new BadRequestException(ERROR_MSG.SUPPLIER.NOT_FOUND.UZ)
-
-		const deeds: ClientDeed[] = []
-		let totalDebit = new Decimal(0)
-		let totalCredit = new Decimal(0)
-
-		supplier.payments.forEach((curr) => {
-			if (curr.description === `import qilingan boshlang'ich qiymat ${Number(curr.total).toFixed(2)}`) {
-				deeds.push({ type: 'debit', action: 'arrival', value: curr.total, date: curr.createdAt, description: curr.description })
-				totalDebit = totalDebit.plus(curr.total)
-			} else {
-				deeds.push({ type: 'credit', action: 'payment', value: curr.total, date: curr.createdAt, description: curr.description })
-				totalCredit = totalCredit.plus(curr.total)
-			}
-		})
-
-	supplier.arrivals.forEach((arr) => {
-		const productsSum = arr.totals?.reduce((a, t) => a.plus(t.totalCost), new Decimal(0)) ?? new Decimal(0)
-		deeds.push({ type: 'debit', action: 'arrival', value: productsSum, date: arr.date, description: '' })
-		totalDebit = totalDebit.plus(productsSum)
-
-		deeds.push({ type: 'credit', action: 'payment', value: arr.payment.total, date: arr.payment.createdAt, description: arr.payment.description })
-		totalCredit = totalCredit.plus(arr.payment.total)
-	})
-
-		const filteredDeeds = deeds.filter((d) => !d.value.equals(0)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-		///=====================
-		const supplierDeedInfos = await this.prisma.userModel.findFirst({
-			where: { id: query.id },
-			select: {
-				id: true,
-				fullname: true,
-				phone: true,
-				actions: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				payments: {
-					where: { type: ServiceTypeEnum.supplier },
-					select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-				},
-			arrivals: {
-				select: {
-					date: true,
-					totals: { select: { totalCost: true, totalPrice: true } },
-					payment: {
-						select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-					},
-				},
-				orderBy: { date: 'desc' },
-			},
-		},
-	})
-
-	let totalDebit2: Decimal = new Decimal(0)
-	let totalCredit2: Decimal = new Decimal(0)
-	supplierDeedInfos.payments.forEach((curr) => {
-		totalCredit2 = totalCredit2.plus(curr.total)
-	})
-
-	supplierDeedInfos.arrivals.forEach((arr) => {
-		const productsSum = arr.totals?.reduce((a, t) => a.plus(t.totalCost), new Decimal(0)) ?? new Decimal(0)
-		totalDebit2 = totalDebit2.plus(productsSum)
-
-		totalCredit2 = totalCredit2.plus(arr.payment.total)
-	})
-		///=====================
-
-		const workbook = new ExcelJS.Workbook()
-		const worksheet = workbook.addWorksheet('Поставшик')
-
-		const row1 = worksheet.addRow([`Поставшик: ${supplier.fullname}`, '', '', `Остаток: ${totalDebit2.minus(totalCredit2).toFixed(2)}`, '', ''])
-		worksheet.mergeCells(`A${row1.number}:C${row1.number}`)
-		worksheet.mergeCells(`D${row1.number}:F${row1.number}`)
-		styleRow(row1)
-
-		const row2 = worksheet.addRow([
-			`Акт сверки с ${this.formatDate(deedStartDate || filteredDeeds[0].date)} по ${this.formatDate(deedEndDate || filteredDeeds[filteredDeeds.length - 1].date)}`,
-		])
-		worksheet.mergeCells(`A${row2.number}:F${row2.number}`)
-		styleRow(row2)
-
-		worksheet.addRow([])
-
-		const headerRow = worksheet.addRow(['№', 'Время', 'Операция', 'Дебит', 'Кредит', 'Описание'])
-		headerRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = borderAll()
-		})
-
-		filteredDeeds.forEach((deed, index) => {
-			const row = worksheet.addRow([
-				index + 1,
-				this.formatDate(deed.date),
-				deed.action,
-				deed.type === 'debit' ? deed.value.toFixed(2) : '',
-				deed.type === 'credit' ? deed.value.toFixed(2) : '',
-				deed.description,
-			])
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
-		})
-
-		const totalRow = worksheet.addRow(['', '', 'Итого', totalDebit.toFixed(2), totalCredit.toFixed(2), ''])
-		styleRow(totalRow)
-
-		const remainderRow = worksheet.addRow(['', '', 'Конечный остаток', '', totalDebit.minus(totalCredit).toFixed(2), ''])
-		styleRow(remainderRow)
-
-		worksheet.columns = [{ width: 5 }, { width: 30 }, { width: 30 }, { width: 25 }, { width: 25 }, { width: 40 }]
-
-		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-		res.setHeader('Content-Disposition', 'attachment; filename="supplier-deeds.xlsx"')
-
-		await workbook.xlsx.write(res)
-		res.end()
-
-		function styleRow(row: ExcelJS.Row) {
-			row.eachCell((cell) => {
-				cell.font = { bold: true }
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = borderAll()
-			})
-		}
-
-		function borderAll(): Partial<ExcelJS.Borders> {
-			return {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		}
-	}
-
-	async supplierDeedWithProductDownloadOne(res: Response, query: ClientFindOneRequest) {
-		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
-		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined
-
-		const supplier = await this.prisma.userModel.findFirst({
-			where: { id: query.id },
-			select: {
-				id: true,
-				fullname: true,
-				phone: true,
-				payments: {
-					where: {
-						type: ServiceTypeEnum.supplier,
-						createdAt: { gte: deedStartDate, lte: deedEndDate },
-					},
-					select: {
-						total: true,
-						card: true,
-						cash: true,
-						other: true,
-						transfer: true,
-						createdAt: true,
-						description: true,
-					},
-				},
-				arrivals: {
-				where: { date: { gte: deedStartDate, lte: deedEndDate } },
-				select: {
-					date: true,
-					products: {
-						select: {
-							product: { select: { name: true } },
-							count: true,
-							createdAt: true,
-							productMVPrices: { select: { price: true, totalPrice: true, type: true } },
-						},
-					},
-					payment: {
-						where: { createdAt: { gte: deedStartDate, lte: deedEndDate } },
-						select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-					},
-				},
-				orderBy: { date: 'desc' },
-			},
-			},
-		})
-
-		if (!supplier) throw new BadRequestException(ERROR_MSG.SUPPLIER.NOT_FOUND.UZ)
-
-		const deeds: (Omit<ClientDeed, 'value'> & { quantity: number; price: Decimal; cost: Decimal; name?: string })[] = []
-		let totalDebit = new Decimal(0)
-		let totalCredit = new Decimal(0)
-
-		supplier.payments.forEach((curr) => {
-			if (curr.description === `import qilingan boshlang'ich qiymat ${Number(curr.total).toFixed(2)}`) {
-				deeds.push({
-					type: 'debit',
-					action: 'arrival',
-					// value: curr.total,
-					date: curr.createdAt,
-					description: curr.description,
-					cost: curr.total,
-					price: curr.total,
-					quantity: 1,
-				})
-				totalDebit = totalDebit.plus(curr.total)
-			} else {
-				deeds.push({
-					type: 'credit',
-					action: 'payment',
-					// value: curr.total,
-					date: curr.createdAt,
-					description: curr.description,
-					cost: curr.total,
-					price: curr.total,
-					quantity: 1,
-				})
-				totalCredit = totalCredit.plus(curr.total)
-			}
-		})
-
-	supplier.arrivals.forEach((arr) => {
-		const sum = arr.products.reduce((acc, p) => {
-			const unitCost = new Decimal(p.productMVPrices?.find((pp) => pp.type === PriceTypeEnum.cost)?.price?.toNumber() ?? p.productMVPrices?.[0]?.price?.toNumber() ?? 0)
-			const unitTotalCost = new Decimal(p.productMVPrices?.find((pp) => pp.type === PriceTypeEnum.cost)?.totalPrice?.toNumber() ?? 0)
-			deeds.push({
-				type: 'debit',
-				action: 'arrival',
-				// value: arr.totalCost,
-				date: p.createdAt,
-				description: '',
-				name: p.product.name,
-				price: unitCost,
-				cost: unitTotalCost,
-				quantity: p.count,
-			})
-
-			return acc.plus(unitTotalCost)
-		}, new Decimal(0))
-
-			totalDebit = totalDebit.plus(sum)
-
-			if (!arr.payment.total.isZero()) {
-				deeds.push({
-					type: 'credit',
-					action: 'payment',
-					// value: arr.payment.total,
-					date: arr.payment.createdAt,
-					description: arr.payment.description,
-					price: arr.payment.total,
-					cost: arr.payment.total,
-					quantity: 1,
-				})
-				totalCredit = totalCredit.plus(arr.payment.total)
-			}
-		})
-
-		const filteredDeeds = deeds /* .filter((d) => !d.value.isZero()) */
-			.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-		///=====================
-		const supplierDeedInfos = await this.prisma.userModel.findFirst({
-			where: { id: query.id },
-			select: {
-				id: true,
-				fullname: true,
-				phone: true,
-				balance: true,
-				actions: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				payments: {
-					where: { type: ServiceTypeEnum.supplier },
-					select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-				},
-			arrivals: {
-				select: {
-					date: true,
-					totals: { select: { totalCost: true, totalPrice: true } },
-					payment: {
-						select: { total: true, card: true, cash: true, other: true, transfer: true, createdAt: true, description: true },
-					},
-				},
-				orderBy: { date: 'desc' },
-			},
-		},
-	})
-
-	const arrivalPayment = supplier.arrivals.reduce((acc, arr) => {
-		const totalCost = arr.products?.reduce((pAcc, p) => {
-			const costPriceMV = p.productMVPrices?.find((pp) => pp.type === PriceTypeEnum.cost)
-			return pAcc.plus(costPriceMV?.totalPrice ?? 0)
-		}, new Decimal(0)) ?? new Decimal(0)
-		return acc.plus(totalCost).minus(arr.payment?.total || 0)
-	}, new Decimal(0))
-
-		// let totalDebit2: Decimal = new Decimal(0)
-		// let totalCredit2: Decimal = new Decimal(0)
-		// supplierDeedInfos.payments.forEach((curr) => {
-		// 	totalCredit2 = totalCredit2.plus(curr.total)
-		// })
-
-		// supplierDeedInfos.arrivals.forEach((arr) => {
-		// 	const productsSum = arr.products.reduce((a, p) => a.plus(p.totalCost), new Decimal(0))
-		// 	totalDebit2 = totalDebit2.plus(productsSum)
-
-		// 	totalCredit2 = totalCredit2.plus(arr.payment.total)
-		// })
-		///=====================
-
-		const workbook = new ExcelJS.Workbook()
-		const worksheet = workbook.addWorksheet('Поставшик')
-
-		worksheet.columns = [
-			{ key: 'no', width: 5 },
-			{ key: 'name', width: 25 },
-			{ key: 'quantity', width: 15 },
-			{ key: 'price', width: 15 },
-			{ key: 'cost', width: 15 },
-			{ key: 'action', width: 15 },
-			{ key: 'date', width: 20 },
-		]
-
-		// === 1-2 qator ===
-		const row1 = worksheet.addRow([`Клиент: ${supplier.fullname}`, '', '', `Остаток: ${supplierDeedInfos.balance.plus(arrivalPayment).toNumber()}`, '', '', ''])
-		worksheet.mergeCells('A1:C1')
-		worksheet.mergeCells('D1:G1')
-
-		const fromDate = this.formatDate(deedStartDate || filteredDeeds[0]?.date)
-		const toDate = this.formatDate(deedEndDate || filteredDeeds[filteredDeeds.length - 1]?.date)
-
-		const row2 = worksheet.addRow([`Акт сверки с ${fromDate} по ${toDate}`])
-		worksheet.mergeCells('A2:G2')
-		;[row1, row2].forEach((row) =>
-			row.eachCell((cell) => {
-				cell.font = { bold: true }
-				cell.alignment = { horizontal: 'center', vertical: 'middle' }
-				cell.border = {
-					top: { style: 'thin' },
-					left: { style: 'thin' },
-					bottom: { style: 'thin' },
-					right: { style: 'thin' },
-				}
-			}),
-		)
-
-		worksheet.addRow([])
-
-		// === Header row ===
-		const headerRow = worksheet.addRow(['№', 'Товар', 'Количество', 'Цена', 'Стоимость', 'Операция', 'Время'])
-		headerRow.font = { bold: true }
-		headerRow.eachCell((cell) => {
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = {
-				top: { style: 'thin' },
-				left: { style: 'thin' },
-				bottom: { style: 'thin' },
-				right: { style: 'thin' },
-			}
-		})
-
-		// === Data rows ===
-		filteredDeeds.forEach((deed, index) => {
-			const row = worksheet.addRow([index + 1, deed.name || '', deed.quantity, deed.price.toNumber(), deed.cost.toNumber(), deed.action, this.formatDate(deed.date)])
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = {
-					top: { style: 'thin' },
-					left: { style: 'thin' },
-					bottom: { style: 'thin' },
-					right: { style: 'thin' },
-				}
-			})
-		})
-
-		// === Totals ===
-		const totalDebitRow = worksheet.addRow(['', 'Итого приходов:', '', '', totalDebit.toNumber(), '', ''])
-		const totalCreditRow = worksheet.addRow(['', 'Итого выплат:', '', '', totalCredit.toNumber(), '', ''])
-
-		;[totalDebitRow, totalCreditRow].forEach((row) =>
-			row.eachCell((cell) => {
-				cell.font = { bold: true }
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = {
-					top: { style: 'thin' },
-					left: { style: 'thin' },
-					bottom: { style: 'thin' },
-					right: { style: 'thin' },
-				}
-			}),
-		)
-
-		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-		res.setHeader('Content-Disposition', 'attachment; filename="supplier-deeds-with-product.xlsx"')
-		await workbook.xlsx.write(res)
-		res.end()
-	}
-
-	async clientDownloadMany(res: Response, query: ClientFindManyRequest) {
-		const clients = await this.prisma.userModel.findMany({
+	async supplierDownloadMany(res: Response, query: SupplierFindManyRequest) {
+		const suppliers = await this.prisma.supplierModel.findMany({
 			where: {
-				fullname: query.fullname,
-				type: UserTypeEnum.client,
+				deletedAt: null,
 				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
 			},
 			select: {
+				id: true,
 				fullname: true,
 				phone: true,
-				balance: true,
-				payments: {
-					where: { type: ServiceTypeEnum.client, deletedAt: null },
-					select: { fromBalance: true },
-				},
-				returnings: {
+				createdAt: true,
+				arrivals: {
 					select: {
-						payment: { select: { fromBalance: true } },
+						date: true,
+						products: { select: { prices: { where: { type: 'cost' }, select: { totalPrice: true, currencyId: true } } } },
+						supplierArrivalPayment: { select: { supplierArrivalPaymentMethods: { select: { amount: true, currencyId: true } } } },
 					},
+					orderBy: { date: 'desc' },
 				},
-				sellings: {
-				where: { status: SellingStatusEnum.accepted },
-				select: {
-					date: true,
-					totals: { select: { total: true } },
-					payment: { select: { total: true } },
-				},
-				orderBy: { date: 'desc' },
+				supplierPayments: { select: { supplierPaymentMethods: { select: { amount: true, currencyId: true } } } },
 			},
-		},
-	})
-
-	const mappedClients = clients.map((c) => {
-		// Sotuvlardan qarz
-		const sellingDebt = c.sellings.reduce((acc, sel) => {
-			const selTotal = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
-			return acc.plus(selTotal).minus(sel.payment.total)
-		}, new Decimal(0))
-
-			// Qaytarishlardan balance kamayishi
-			const returningBalance = c.returnings.reduce((acc, r) => {
-				return acc.plus(r.payment.fromBalance)
-			}, new Decimal(0))
-
-			const finalBalance = new Decimal(c.balance).minus(returningBalance)
-
-			return {
-				fullname: c.fullname,
-				phone: c.phone,
-				debt: sellingDebt.plus(finalBalance),
-				lastSellingDate: c.sellings?.[0]?.date ?? null,
-			}
-		})
-
-		// const filteredClients = mappedClients.filter((s) => {
-		// 	if (query.debtType && query.debtValue !== undefined) {
-		// 		const value = new Decimal(query.debtValue)
-		// 		switch (query.debtType) {
-		// 			case DebtTypeEnum.gt:
-		// 				return s.debt.gt(value)
-		// 			case DebtTypeEnum.lt:
-		// 				return s.debt.lt(value)
-		// 			case DebtTypeEnum.eq:
-		// 				return s.debt.eq(value)
-		// 		}
-		// 	}
-		// 	return true
-		// })
-
-		const sortedClients = mappedClients.sort((a, b) => {
-			// b - a → descending
-			return b.debt.comparedTo(a.debt)
 		})
 
 		const workbook = new ExcelJS.Workbook()
-		const worksheet = workbook.addWorksheet('Клиенты с долгом')
-
+		const worksheet = workbook.addWorksheet('Поставщики')
 		worksheet.columns = [
 			{ header: '№', key: 'no', width: 5 },
-			{ header: 'клиент', key: 'fullname', width: 40 },
-			{ header: 'телефон', key: 'phone', width: 20 },
-			{ header: 'долг', key: 'debt', width: 20 },
-			{ header: 'последняя дата продажи', key: 'lastSellingDate', width: 50 },
+			{ header: 'ФИО', key: 'fullname', width: 35 },
+			{ header: 'Телефон', key: 'phone', width: 20 },
+			{ header: 'Долг', key: 'debt', width: 30 },
+			{ header: 'Последний приход', key: 'lastArrival', width: 25 },
 		]
 
-		worksheet.getRow(1).eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.fill = {
-				type: 'pattern',
-				pattern: 'solid',
-				fgColor: { argb: 'FFB6D7A8' },
-			}
-			cell.border = this.allBorder()
-		})
+		this.styleHeaderRow(worksheet.getRow(1))
 
-		sortedClients.forEach((client, index) => {
+		suppliers.forEach((s, index) => {
+			const debtMap = new Map<string, Decimal>()
+			for (const arr of s.arrivals) {
+				for (const p of arr.products) {
+					for (const pr of p.prices) {
+						debtMap.set(pr.currencyId, (debtMap.get(pr.currencyId) ?? new Decimal(0)).plus(pr.totalPrice))
+					}
+				}
+				for (const m of arr.supplierArrivalPayment?.supplierArrivalPaymentMethods ?? []) {
+					debtMap.set(m.currencyId, (debtMap.get(m.currencyId) ?? new Decimal(0)).minus(m.amount))
+				}
+			}
+			for (const sp of s.supplierPayments) {
+				for (const m of sp.supplierPaymentMethods) {
+					debtMap.set(m.currencyId, (debtMap.get(m.currencyId) ?? new Decimal(0)).minus(m.amount))
+				}
+			}
+			const debtStr = Array.from(debtMap.values())
+				.reduce((a, b) => a.plus(b), new Decimal(0))
+				.toFixed(2)
+
 			const row = worksheet.addRow({
 				no: index + 1,
-				fullname: client.fullname,
-				phone: client.phone,
-				debt: client.debt.toFixed(2),
-				lastSellingDate: client.lastSellingDate
-					? new Date(client.lastSellingDate).toLocaleString('ru-RU', {
-							year: 'numeric',
-							month: '2-digit',
-							day: '2-digit',
-							hour: '2-digit',
-							minute: '2-digit',
-						})
-					: '',
+				fullname: s.fullname,
+				phone: s.phone,
+				debt: debtStr,
+				lastArrival: s.arrivals[0] ? this.formatDate(s.arrivals[0].date) : '',
 			})
+			this.styleDataRow(row)
+		})
 
+		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+		res.setHeader('Content-Disposition', 'attachment; filename="suppliers.xlsx"')
+		await workbook.xlsx.write(res)
+		res.end()
+	}
+
+	async supplierDeedDownloadOne(res: Response, query: SupplierFindOneRequest & { deedStartDate?: Date; deedEndDate?: Date }) {
+		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
+		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined
+
+		const supplier = await this.prisma.supplierModel.findFirst({
+			where: { id: query.id },
+			select: {
+				fullname: true,
+				phone: true,
+				arrivals: {
+					where: { date: { gte: deedStartDate, lte: deedEndDate } },
+					select: {
+						date: true,
+						products: { select: { prices: { where: { type: 'cost' }, select: { totalPrice: true, currency: { select: { symbol: true } } } } } },
+						supplierArrivalPayment: {
+							select: { createdAt: true, description: true, supplierArrivalPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
+						},
+					},
+					orderBy: { date: 'asc' },
+				},
+				supplierPayments: {
+					where: { createdAt: { gte: deedStartDate, lte: deedEndDate }, deletedAt: null },
+					select: { createdAt: true, description: true, supplierPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
+				},
+			},
+		})
+
+		if (!supplier) {
+			res.status(404).send('Yetkazib beruvchi topilmadi')
+			return
+		}
+
+		const deeds: { type: 'debit' | 'credit'; action: string; amount: string; date: Date; description: string }[] = []
+
+		for (const arr of supplier.arrivals) {
+			const totalMap = new Map<string, Decimal>()
+			for (const p of arr.products) {
+				for (const pr of p.prices) {
+					const sym = pr.currency?.symbol ?? '?'
+					totalMap.set(sym, (totalMap.get(sym) ?? new Decimal(0)).plus(pr.totalPrice))
+				}
+			}
+			const amtStr = Array.from(totalMap.entries())
+				.map(([s, t]) => `${t.toFixed(2)} ${s}`)
+				.join(' + ')
+			deeds.push({ type: 'debit', action: 'Kelish', amount: amtStr, date: arr.date, description: '' })
+
+			if (arr.supplierArrivalPayment) {
+				const paidStr = this.formatPaymentMethods(arr.supplierArrivalPayment.supplierArrivalPaymentMethods)
+				deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: arr.supplierArrivalPayment.createdAt, description: arr.supplierArrivalPayment.description ?? '' })
+			}
+		}
+
+		for (const sp of supplier.supplierPayments) {
+			const paidStr = this.formatPaymentMethods(sp.supplierPaymentMethods)
+			deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: sp.createdAt, description: sp.description ?? '' })
+		}
+
+		deeds.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+		const workbook = new ExcelJS.Workbook()
+		const worksheet = workbook.addWorksheet('Поставщик')
+		worksheet.columns = [
+			{ key: 'no', width: 5 },
+			{ key: 'type', width: 15 },
+			{ key: 'action', width: 20 },
+			{ key: 'amount', width: 35 },
+			{ key: 'description', width: 35 },
+			{ key: 'date', width: 25 },
+		]
+
+		const titleRow = worksheet.addRow([`${supplier.fullname} (${supplier.phone}) - Ведомость`])
+		worksheet.mergeCells(`A${titleRow.number}:F${titleRow.number}`)
+		titleRow.getCell(1).font = { bold: true, size: 13 }
+		titleRow.getCell(1).border = this.allBorder()
+
+		worksheet.addRow([])
+		const headerRow = worksheet.addRow(['№', 'Тип', 'Действие', 'Сумма', 'Примечание', 'Дата'])
+		this.styleHeaderRow(headerRow)
+
+		deeds.forEach((d, i) => {
+			const row = worksheet.addRow([i + 1, d.type === 'debit' ? 'Дебит' : 'Кредит', d.action, d.amount, d.description, this.formatDate(d.date)])
 			row.eachCell((cell) => {
 				cell.alignment = { vertical: 'middle', horizontal: 'center' }
 				cell.border = this.allBorder()
@@ -1895,331 +1000,124 @@ export class ExcelService {
 		})
 
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-		res.setHeader('Content-Disposition', 'attachment; filename="client-debt-report.xlsx"')
-
+		res.setHeader('Content-Disposition', 'attachment; filename="supplier-deed.xlsx"')
 		await workbook.xlsx.write(res)
 		res.end()
 	}
 
+	async supplierDeedWithProductDownloadOne(res: Response, query: SupplierFindOneRequest & { deedStartDate?: Date; deedEndDate?: Date }) {
+		return this.supplierDeedDownloadOne(res, query)
+	}
+
+	// ─── Product Download ──────────────────────────────────────────────────────
+
 	async productDownloadMany(res: Response, query: ProductFindManyRequest) {
-		let paginationOptions = {}
-		if (query.pagination) {
-			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
-		}
-
-		let nameFilter: any = {}
-		if (query.search) {
-			const searchWords = query.search?.split(/\s+/).filter(Boolean) ?? []
-
-			nameFilter = {
-				[searchWords.length > 1 ? 'AND' : 'OR']: searchWords.map((word) => ({
-					name: {
-						contains: word,
-						mode: 'insensitive',
-					},
-				})),
-			}
-		}
+		const nameFilter = query.search ? { OR: [{ name: { contains: query.search, mode: 'insensitive' as const } }] } : {}
 
 		const products = await this.prisma.productModel.findMany({
-			where: {
-				...nameFilter,
-			},
+			where: { ...nameFilter },
 			select: {
 				id: true,
-				count: true,
-				createdAt: true,
 				name: true,
+				count: true,
 				minAmount: true,
-				productPrices: {
+				createdAt: true,
+				prices: {
 					where: { type: { in: ['cost', 'selling'] } },
-					select: { type: true, price: true, totalPrice: true },
-				},
-				productMVs: {
-					where: { type: ServiceTypeEnum.selling },
-					orderBy: { selling: { date: 'desc' } },
-					take: 1,
-					select: { selling: { select: { date: true } } },
+					select: { type: true, price: true, totalPrice: true, currency: { select: { symbol: true } } },
 				},
 			},
-			...paginationOptions,
+			orderBy: { createdAt: 'desc' },
 		})
 
 		const workbook = new ExcelJS.Workbook()
-		const worksheet = workbook.addWorksheet('Клиенты с долгом')
-
+		const worksheet = workbook.addWorksheet('Товары')
 		worksheet.columns = [
 			{ header: '№', key: 'no', width: 5 },
-			{ header: 'name', key: 'name', width: 40 },
-			{ header: 'cost', key: 'cost', width: 20 },
-			{ header: 'price', key: 'price', width: 20 },
-			{ header: 'count', key: 'count', width: 20 },
-			{ header: 'min amount', key: 'minAmount', width: 20 },
-			{ header: 'created at', key: 'createdAt', width: 30 },
+			{ header: 'Наименование', key: 'name', width: 40 },
+			{ header: 'Себестоимость', key: 'cost', width: 25 },
+			{ header: 'Цена продажи', key: 'price', width: 25 },
+			{ header: 'Количество', key: 'count', width: 15 },
+			{ header: 'Мин. остаток', key: 'minAmount', width: 15 },
+			{ header: 'Дата', key: 'createdAt', width: 25 },
 		]
 
 		worksheet.getRow(1).eachCell((cell) => {
 			cell.font = { bold: true }
 			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.fill = {
-				type: 'pattern',
-				pattern: 'solid',
-				fgColor: { argb: 'FFB6D7A8' },
-			}
+			cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB6D7A8' } }
 			cell.border = this.allBorder()
 		})
 
-		products.forEach((product, index) => {
-			const costPrice = product.productPrices.find((p) => p.type === 'cost')?.price
-			const sellingPrice = product.productPrices.find((p) => p.type === 'selling')?.price
+		products.forEach((p, index) => {
+			const costPrice = p.prices.find((pp) => pp.type === 'cost')
+			const sellingPrice = p.prices.find((pp) => pp.type === 'selling')
+			const costStr = costPrice ? `${costPrice.price.toFixed(2)} ${costPrice.currency?.symbol ?? ''}` : '0'
+			const sellingStr = sellingPrice ? `${sellingPrice.price.toFixed(2)} ${sellingPrice.currency?.symbol ?? ''}` : '0'
 
 			const row = worksheet.addRow({
 				no: index + 1,
-				name: product.name,
-				count: product.count,
-				minAmount: product.minAmount,
-				cost: costPrice ? costPrice.toFixed(2) : '0',
-				price: sellingPrice ? sellingPrice.toFixed(2) : '0',
-				createdAt: product.createdAt
-					? new Date(product.createdAt).toLocaleString('ru-RU', {
-							year: 'numeric',
-							month: '2-digit',
-							day: '2-digit',
-							hour: '2-digit',
-							minute: '2-digit',
-						})
-					: '',
+				name: p.name,
+				cost: costStr,
+				price: sellingStr,
+				count: p.count,
+				minAmount: p.minAmount ?? 0,
+				createdAt: this.formatDate(p.createdAt),
 			})
-
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = this.allBorder()
-			})
+			this.styleDataRow(row)
 		})
 
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="products.xlsx"')
-
 		await workbook.xlsx.write(res)
 		res.end()
 	}
 
-	async supplierDownloadMany(res: Response, query: ClientFindManyRequest) {
-		const suppliers = await this.prisma.userModel.findMany({
-			where: {
-				type: UserTypeEnum.supplier,
-				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
-			},
-			select: {
-				id: true,
-				fullname: true,
-				phone: true,
-				balance: true,
-				arrivals: {
-				select: {
-					date: true,
-					totals: { select: { totalCost: true, totalPrice: true } },
-					payment: { select: { total: true, card: true, cash: true, other: true, transfer: true } },
-				},
-				orderBy: { date: 'desc' },
-			},
-				payments: {
-					where: { type: ServiceTypeEnum.supplier },
-					select: { total: true, card: true, cash: true, other: true, transfer: true },
-				},
-				actions: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-			},
-		})
-
-		const mappedSuppliers = suppliers.map((s) => {
-			const arrivalPayment = s.arrivals.reduce((acc, arr) => {
-				const totalCost = arr.totals?.reduce((a, t) => a.plus(t.totalCost), new Decimal(0)) ?? new Decimal(0)
-				return acc.plus(totalCost).minus(arr.payment?.total || 0)
-			}, new Decimal(0))
-			return {
-				...s,
-				debt: s.balance.plus(arrivalPayment),
-				lastArrivalDate: s.arrivals?.length ? s.arrivals[0].date : null,
-			}
-		})
-
-		const filteredSuppliers = mappedSuppliers.filter((s) => {
-			if (query.debtType && query.debtValue !== undefined) {
-				const value = new Decimal(query.debtValue)
-				switch (query.debtType) {
-					case DebtTypeEnum.gt:
-						return s.debt.gt(value)
-					case DebtTypeEnum.lt:
-						return s.debt.lt(value)
-					case DebtTypeEnum.eq:
-						return s.debt.eq(value)
-					default:
-						return true
-				}
-			}
-			return true
-		})
-
-		const workbook = new ExcelJS.Workbook()
-		const worksheet = workbook.addWorksheet('Клиенты с долгом')
-
-		worksheet.columns = [
-			{ header: '№', key: 'no', width: 5 },
-			{ header: 'клиент', key: 'fullname', width: 40 },
-			{ header: 'телефон', key: 'phone', width: 20 },
-			{ header: 'долг', key: 'debt', width: 20 },
-			{ header: 'Время', key: 'lastSellingDate', width: 30 },
-		]
-
-		worksheet.getRow(1).eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.fill = {
-				type: 'pattern',
-				pattern: 'solid',
-				fgColor: { argb: 'FFB6D7A8' },
-			}
-			cell.border = this.allBorder()
-		})
-
-		filteredSuppliers.forEach((client, index) => {
-			const row = worksheet.addRow({
-				no: index + 1,
-				fullname: client.fullname,
-				phone: client.phone,
-				debt: client.debt.toFixed(2),
-				lastSellingDate: client.lastArrivalDate
-					? new Date(client.lastArrivalDate).toLocaleString('ru-RU', {
-							year: 'numeric',
-							month: '2-digit',
-							day: '2-digit',
-							hour: '2-digit',
-							minute: '2-digit',
-						})
-					: '',
-			})
-
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = this.allBorder()
-			})
-		})
-
-		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-		res.setHeader('Content-Disposition', 'attachment; filename="supplier-debt-report.xlsx"')
-
-		await workbook.xlsx.write(res)
-		res.end()
-	}
+	// ─── Staff Payment Download ────────────────────────────────────────────────
 
 	async staffPaymentDownloadMany(res: Response, query: StaffPaymentFindManyRequest) {
-		const staffPayments = await this.prisma.paymentModel.findMany({
+		const startDate = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
+		const endDate = query.endDate ? new Date(new Date(query.endDate).setHours(23, 59, 59, 999)) : undefined
+
+		const staffPayments = await this.prisma.staffPaymentModel.findMany({
 			where: {
-				staffId: query.staffId,
-				type: ServiceTypeEnum.staff,
-				createdAt: {
-					gte: query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined,
-					lte: query.endDate ? new Date(new Date(query.endDate).setHours(23, 59, 59, 999)) : undefined,
-				},
+				employeeId: query.staffId,
+				deletedAt: null,
+				createdAt: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
 			select: {
-				id: true,
-				user: { select: { id: true, fullname: true, phone: true } },
-				staff: { select: { id: true, fullname: true, phone: true } },
-				sum: true,
+				employee: { select: { fullname: true, phone: true } },
+				staff: { select: { fullname: true } },
 				description: true,
-				updatedAt: true,
 				createdAt: true,
-				deletedAt: true,
+				employeePaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } },
 			},
+			orderBy: { createdAt: 'desc' },
 		})
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Оплаты сотрудника')
-
-		// Ustun eni
 		worksheet.columns = [
 			{ key: 'no', width: 5 },
 			{ key: 'fullname', width: 30 },
 			{ key: 'phone', width: 20 },
-			{ key: 'amount', width: 20 },
+			{ key: 'amount', width: 30 },
 			{ key: 'description', width: 30 },
 			{ key: 'createdAt', width: 25 },
 		]
 
-		// Header rus tilida
 		const headerRow = worksheet.addRow(['№', 'ФИО', 'Телефон', 'Сумма оплаты', 'Примечание', 'Дата оплаты'])
+		this.styleHeaderRow(headerRow)
 
-		headerRow.eachCell((cell) => {
-			cell.font = { bold: true }
-			cell.alignment = { vertical: 'middle', horizontal: 'center' }
-			cell.border = {
-				top: { style: 'thin', color: { argb: 'FF000000' } },
-				left: { style: 'thin', color: { argb: 'FF000000' } },
-				bottom: { style: 'thin', color: { argb: 'FF000000' } },
-				right: { style: 'thin', color: { argb: 'FF000000' } },
-			}
-		})
-
-		// Ma'lumotlar
 		staffPayments.forEach((item, index) => {
-			const row = worksheet.addRow([index + 1, item.user.fullname, item.user.phone, item.sum.toNumber(), item.description || '', item.createdAt.toLocaleString('ru-RU')])
-
-			row.eachCell((cell) => {
-				cell.alignment = { vertical: 'middle', horizontal: 'center' }
-				cell.border = {
-					top: { style: 'thin', color: { argb: 'FF000000' } },
-					left: { style: 'thin', color: { argb: 'FF000000' } },
-					bottom: { style: 'thin', color: { argb: 'FF000000' } },
-					right: { style: 'thin', color: { argb: 'FF000000' } },
-				}
-			})
+			const amountStr = this.formatPaymentMethods(item.employeePaymentMethods)
+			const row = worksheet.addRow([index + 1, item.employee.fullname, item.employee.phone, amountStr, item.description ?? '', this.formatDate(item.createdAt)])
+			this.styleDataRow(row)
 		})
 
-		// Javobga yozish
 		res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		res.setHeader('Content-Disposition', 'attachment; filename="staff-payments.xlsx"')
-
 		await workbook.xlsx.write(res)
 		res.end()
-	}
-
-	private formatDate(date: Date): string {
-		const dd = String(date.getDate()).padStart(2, '0')
-		const mm = String(date.getMonth() + 1).padStart(2, '0') // 0-based
-		const yyyy = date.getFullYear()
-
-		const hh = String(date.getHours()).padStart(2, '0')
-		const min = String(date.getMinutes()).padStart(2, '0')
-
-		return `${dd}.${mm}.${yyyy} ${hh}:${min}`
-	}
-
-	allBorder(): Partial<ExcelJS.Borders> {
-		return {
-			top: { style: 'thin', color: { argb: 'FF000000' } },
-			left: { style: 'thin', color: { argb: 'FF000000' } },
-			bottom: { style: 'thin', color: { argb: 'FF000000' } },
-			right: { style: 'thin', color: { argb: 'FF000000' } },
-		}
-	}
-
-	fillLightGreen(): ExcelJS.Fill {
-		return {
-			type: 'pattern',
-			pattern: 'solid',
-			fgColor: { argb: 'FFDFF0D8' }, // och yashil
-		}
-	}
-
-	fillLightRed(): ExcelJS.Fill {
-		return {
-			type: 'pattern',
-			pattern: 'solid',
-			fgColor: { argb: 'FFF2DEDE' }, // och qizil
-		}
 	}
 }

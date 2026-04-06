@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../shared/prisma'
 import {
 	ReturningCreateOneRequest,
@@ -9,22 +9,57 @@ import {
 	ReturningGetOneRequest,
 	ReturningUpdateOneRequest,
 } from './interfaces'
-import { ReturningController } from './returning.controller'
-import { PriceTypeEnum, SellingStatusEnum, ServiceTypeEnum } from '@prisma/client'
+import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
-const TOTALS_SELECT = {
+const RETURNING_PRODUCT_MV_SELECT = {
 	id: true,
-	currencyId: true,
-	total: true,
-	currency: { select: { id: true, symbol: true, name: true } },
+	count: true,
+	createdAt: true,
+	prices: { select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true } } } },
+	product: { select: { id: true, name: true } },
+}
+const RETURNING_PAYMENT_SELECT = {
+	id: true,
+	description: true,
+	createdAt: true,
+	clientReturningPaymentMethods: { select: { type: true, currencyId: true, amount: true } },
+}
+const RETURNING_SELECT = {
+	id: true as const,
+	publicId: true as const,
+	date: true as const,
+	status: true as const,
+	createdAt: true as const,
+	updatedAt: true as const,
+	deletedAt: true as const,
+	client: { select: { id: true, fullname: true, phone: true } },
+	staff: { select: { id: true, fullname: true, phone: true } },
+	clientReturningPayments: { select: RETURNING_PAYMENT_SELECT },
+	products: {
+		orderBy: [{ createdAt: 'desc' as const }],
+		select: RETURNING_PRODUCT_MV_SELECT,
+	},
 }
 
 @Injectable()
-export class ReturningRepository implements OnModuleInit {
+export class ReturningRepository {
 	private readonly prisma: PrismaService
 	constructor(prisma: PrismaService) {
 		this.prisma = prisma
+	}
+
+	private async syncProductPrices(productId: string, newCount: number) {
+		const prices = await this.prisma.productPriceModel.findMany({
+			where: { productId },
+			select: { id: true, price: true },
+		})
+		for (const p of prices) {
+			await this.prisma.productPriceModel.update({
+				where: { id: p.id },
+				data: { totalPrice: new Decimal(newCount).mul(p.price) },
+			})
+		}
 	}
 
 	async findMany(query: ReturningFindManyRequest) {
@@ -33,80 +68,54 @@ export class ReturningRepository implements OnModuleInit {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		const returnings = await this.prisma.returningModel.findMany({
+		return this.prisma.returningModel.findMany({
 			where: {
 				status: query.status,
+				staffId: query.staffId,
 				clientId: query.clientId,
 				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
 				date: { gte: query.startDate, lte: query.endDate },
 			},
-			select: {
-				id: true,
-				status: true,
-				totals: { select: TOTALS_SELECT },
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				date: true,
-				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				payment: { select: { id: true, cash: true, fromBalance: true, total: true } },
-				products: {
-					orderBy: [{ createdAt: 'desc' }],
-					select: {
-						id: true,
-						count: true,
-						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
-						product: { select: { name: true } },
-					},
-				},
-			},
+			orderBy: [{ date: 'desc' }],
+			select: RETURNING_SELECT,
 			...paginationOptions,
 		})
-
-		return returnings
-	}
-
-	async findOne(query: ReturningFindOneRequest) {
-		const returning = await this.prisma.returningModel.findFirst({
-			where: { id: query.id },
-			select: {
-				id: true,
-				status: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				date: true,
-				totals: { select: TOTALS_SELECT },
-				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				payment: { select: { total: true, id: true, cash: true, fromBalance: true } },
-				products: {
-					orderBy: [{ createdAt: 'desc' }],
-					select: {
-						id: true,
-						count: true,
-						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
-						product: { select: { name: true } },
-					},
-				},
-			},
-		})
-
-		return returning
 	}
 
 	async countFindMany(query: ReturningFindManyRequest) {
-		const returningsCount = await this.prisma.returningModel.count({
+		return this.prisma.returningModel.count({
 			where: {
 				status: query.status,
+				staffId: query.staffId,
 				clientId: query.clientId,
 				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
 				date: { gte: query.startDate, lte: query.endDate },
 			},
 		})
+	}
 
-		return returningsCount
+	async findOne(query: ReturningFindOneRequest) {
+		return this.prisma.returningModel.findFirst({ where: { id: query.id }, select: RETURNING_SELECT })
+	}
+
+	async getOne(query: ReturningGetOneRequest) {
+		return this.prisma.returningModel.findFirst({
+			where: { id: query.id, status: query.status, staffId: query.staffId, clientId: query.clientId },
+			select: {
+				id: true,
+				status: true,
+				staffId: true,
+				clientId: true,
+				clientReturningPayments: { select: { id: true } },
+				products: {
+					select: {
+						id: true,
+						count: true,
+						product: { select: { id: true, count: true } },
+					},
+				},
+			},
+		})
 	}
 
 	async getMany(query: ReturningGetManyRequest) {
@@ -114,91 +123,49 @@ export class ReturningRepository implements OnModuleInit {
 		if (query.pagination) {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
-
-		const returnings = await this.prisma.returningModel.findMany({
-			where: {
-				id: { in: query.ids },
-				clientId: query.clientId,
-				status: query.status,
-			},
+		return this.prisma.returningModel.findMany({
+			where: { id: { in: query.ids }, status: query.status, clientId: query.clientId },
+			select: RETURNING_SELECT,
 			...paginationOptions,
 		})
-
-		return returnings
-	}
-
-	async getOne(query: ReturningGetOneRequest) {
-		const returning = await this.prisma.returningModel.findFirst({
-			where: { id: query.id, clientId: query.clientId, staffId: query.staffId, status: query.status },
-			select: { id: true, payment: true, staffId: true, status: true },
-		})
-
-		return returning
 	}
 
 	async countGetMany(query: ReturningGetManyRequest) {
-		const returningsCount = await this.prisma.returningModel.count({
-			where: {
-				id: { in: query.ids },
-				clientId: query.clientId,
-				status: query.status,
-			},
-		})
-
-		return returningsCount
+		return this.prisma.returningModel.count({ where: { id: { in: query.ids }, status: query.status } })
 	}
 
 	async createOne(body: ReturningCreateOneRequest) {
-		const today = new Date()
-		const dayClose = await this.prisma.dayCloseLog.findFirst({ where: { closedDate: today } })
-
-		if (dayClose) {
-			const tomorrow = new Date(today)
-			tomorrow.setDate(today.getDate() + 1)
-			tomorrow.setHours(0, 0, 0, 0)
-			body.date = tomorrow
-		}
-
-		// Pre-fetch exchange rates
-		const currencyIds = [...new Set((body.products ?? []).map((p) => p.currencyId))]
-		const currencies = await this.prisma.currencyModel.findMany({
-			where: { id: { in: currencyIds } },
-			select: { id: true, exchangeRate: true },
-		})
-		const currencyExchangeMap = Object.fromEntries(currencies.map((c) => [c.id, c.exchangeRate]))
-
 		const returning = await this.prisma.returningModel.create({
 			data: {
-				status: body.status,
 				clientId: body.clientId,
-				date: new Date(body.date),
-				createdAt: dayClose ? body.date : undefined,
 				staffId: body.staffId,
-				payment: {
-					create: {
-						total: body.payment.total,
-						cash: body.payment?.cash,
-						fromBalance: body.payment?.fromBalance,
-						userId: body.clientId,
-						staffId: body.staffId,
-						type: ServiceTypeEnum.returning,
-						createdAt: dayClose ? body.date : undefined,
+				status: body.status,
+				date: body.date ? new Date(body.date) : undefined,
+				...(body.payment?.paymentMethods?.length && {
+					clientReturningPayments: {
+						create: {
+							clientId: body.clientId,
+							staffId: body.staffId,
+							description: body.payment.description,
+							clientReturningPaymentMethods: {
+								createMany: {
+									data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })),
+								},
+							},
+						},
 					},
-				},
+				}),
 				products: {
 					create: (body.products ?? []).map((p) => ({
 						productId: p.productId,
-						type: ServiceTypeEnum.returning,
 						count: p.count,
 						staffId: body.staffId,
-						createdAt: dayClose ? body.date : undefined,
-						productMVPrices: {
+						prices: {
 							create: {
 								type: PriceTypeEnum.selling,
 								price: p.price,
 								totalPrice: new Decimal(p.price).mul(p.count),
 								currencyId: p.currencyId,
-								exchangeRate: currencyExchangeMap[p.currencyId] ?? 0,
 							},
 						},
 					})),
@@ -207,175 +174,95 @@ export class ReturningRepository implements OnModuleInit {
 			select: {
 				id: true,
 				status: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				date: true,
-				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				payment: { select: { id: true, cash: true, fromBalance: true } },
-				products: {
-					select: {
-						id: true,
-						count: true,
-						productMVPrices: { select: { totalPrice: true, currencyId: true } },
-						product: { select: { id: true, name: true } },
-					},
-				},
+				products: { select: { count: true, product: { select: { id: true, count: true } } } },
 			},
 		})
 
-		// Upsert ReturningTotalModel per currency
-		for (const product of returning.products) {
-			for (const mvPrice of product.productMVPrices) {
-				await this.prisma.returningTotalModel.upsert({
-					where: { returningId_currencyId: { returningId: returning.id, currencyId: mvPrice.currencyId } },
-					update: { total: { increment: mvPrice.totalPrice } },
-					create: { returningId: returning.id, currencyId: mvPrice.currencyId, total: mvPrice.totalPrice },
+		if (returning.status === SellingStatusEnum.accepted) {
+			for (const product of returning.products) {
+				const newCount = product.product.count + product.count
+				await this.prisma.productModel.update({ where: { id: product.product.id }, data: { count: { increment: product.count } } })
+				await this.syncProductPrices(product.product.id, newCount)
+			}
+		}
+
+		return this.prisma.returningModel.findFirst({ where: { id: returning.id }, select: RETURNING_SELECT })
+	}
+
+	async updateOne(query: ReturningGetOneRequest, body: ReturningUpdateOneRequest) {
+		const existing = await this.getOne(query)
+
+		if (existing.status !== SellingStatusEnum.accepted && body.status === SellingStatusEnum.accepted) {
+			body.date = new Date()
+		}
+
+		await this.prisma.returningModel.update({
+			where: { id: query.id },
+			data: {
+				clientId: body.clientId,
+				staffId: body.staffId,
+				status: body.status,
+				date: body.date ? new Date(body.date) : undefined,
+				deletedAt: body.deletedAt,
+			},
+		})
+
+		if (body.payment?.paymentMethods) {
+			const existingPayment = existing.clientReturningPayments
+			if (existingPayment) {
+				await this.prisma.clientReturningPaymentMethodModel.deleteMany({ where: { clientReturningPaymentId: existingPayment.id } })
+				if (body.payment.paymentMethods.length) {
+					await this.prisma.clientReturningPaymentMethodModel.createMany({
+						data: body.payment.paymentMethods.map((m) => ({
+							type: m.type,
+							currencyId: m.currencyId,
+							amount: m.amount,
+							clientReturningPaymentId: existingPayment.id,
+						})),
+					})
+				}
+				if (body.payment.description !== undefined) {
+					await this.prisma.clientReturningPaymentModel.update({ where: { id: existingPayment.id }, data: { description: body.payment.description } })
+				}
+			} else if (body.payment.paymentMethods.length) {
+				await this.prisma.clientReturningPaymentModel.create({
+					data: {
+						returningId: query.id,
+						clientId: existing.clientId,
+						staffId: existing.staffId,
+						description: body.payment.description,
+						clientReturningPaymentMethods: {
+							createMany: { data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) },
+						},
+					},
 				})
 			}
 		}
 
-		// Increment product counts if accepted
-		if (body.status === SellingStatusEnum.accepted && (body.products?.length ?? 0) > 0) {
-			const existingProducts = await this.prisma.productModel.findMany({
-				where: { id: { in: body.products.map((p) => p.productId) } },
-				select: { id: true },
-			})
-
-			const existingProductIds = new Set(existingProducts.map((p) => p.id))
-
-			await Promise.all(
-				body.products
-					.filter((p) => existingProductIds.has(p.productId))
-					.map((product) =>
-						this.prisma.productModel.update({
-							where: { id: product.productId },
-							data: { count: { increment: product.count } },
-						}),
-					),
-			)
-		}
-
-		// Return with totals
-		return this.prisma.returningModel.findFirst({
-			where: { id: returning.id },
-			select: {
-				id: true,
-				status: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				date: true,
-				totals: { select: TOTALS_SELECT },
-				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				payment: { select: { id: true, cash: true, fromBalance: true } },
-				products: {
-					select: {
-						id: true,
-						count: true,
-						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true, currency: { select: { symbol: true } } } },
-						product: { select: { name: true } },
-					},
-				},
-			},
-		})
-	}
-
-	async updateOne(query: ReturningGetOneRequest, body: ReturningUpdateOneRequest) {
-		const existReturning = await this.findOne(query)
-
-		const returning = await this.prisma.returningModel.update({
-			where: { id: query.id },
-			data: {
-				date: body.date ? new Date(body.date) : undefined,
-				status: body.status,
-				clientId: body.clientId,
-				deletedAt: body.deletedAt,
-				payment: {
-					update: {
-						total: body.payment.total,
-						cash: body.payment?.cash,
-						fromBalance: body.payment?.fromBalance,
-						createdAt: existReturning.payment.total ? undefined : new Date(),
-					},
-				},
-			},
-			select: {
-				id: true,
-				status: true,
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-				date: true,
-				totals: { select: TOTALS_SELECT },
-				client: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				staff: { select: { fullname: true, phone: true, id: true, createdAt: true } },
-				payment: { select: { id: true, cash: true, fromBalance: true } },
-				products: {
-					select: {
-						id: true,
-						count: true,
-						productMVPrices: { select: { price: true, totalPrice: true, type: true, currencyId: true } },
-						product: { select: { id: true, name: true } },
-					},
-				},
-			},
-		})
-
-		await this.prisma.returningModel.update({
-			where: { id: returning.id },
-			data: { payment: { update: { total: returning.payment.cash.plus(returning.payment.fromBalance) } } },
-		})
-
-		if (body.status === SellingStatusEnum.accepted && existReturning.status !== SellingStatusEnum.accepted) {
-			if (returning.products) {
-				for (const product of returning.products) {
-					const pr = await this.prisma.productModel.findFirst({ where: { id: product.product.id } })
-					if (pr) {
-						await this.prisma.productModel.update({
-							where: { id: product.product.id },
-							data: { count: { increment: product.count } },
-						})
-					}
-				}
+		if (body.status === SellingStatusEnum.accepted && existing.status !== SellingStatusEnum.accepted) {
+			for (const product of existing.products) {
+				const newCount = product.product.count + product.count
+				await this.prisma.productModel.update({ where: { id: product.product.id }, data: { count: { increment: product.count } } })
+				await this.syncProductPrices(product.product.id, newCount)
 			}
 		}
-
-		return returning
 	}
 
 	async deleteOne(query: ReturningDeleteOneRequest) {
 		const returning = await this.prisma.returningModel.delete({
 			where: { id: query.id },
-			select: { products: { select: { product: true, count: true } }, status: true },
+			select: { products: { select: { count: true, product: { select: { id: true, count: true } } } }, status: true },
 		})
 
 		if (returning.status === SellingStatusEnum.accepted) {
 			for (const product of returning.products) {
+				const newCount = product.product.count - product.count
 				await this.prisma.productModel.update({ where: { id: product.product.id }, data: { count: { decrement: product.count } } })
+				await this.syncProductPrices(product.product.id, newCount)
 			}
 		}
 
 		return returning
 	}
 
-	async findManyReturningProductMv(ids: string[]) {
-		const productmvs = await this.prisma.productMVModel.findMany({
-			where: { id: { in: ids }, type: ServiceTypeEnum.returning },
-			select: {
-				id: true,
-				count: true,
-				productMVPrices: { select: { price: true, type: true, currencyId: true } },
-				product: true,
-			},
-		})
-
-		return productmvs
-	}
-
-	async onModuleInit() {
-		await this.prisma.createActionMethods(ReturningController)
-	}
 }

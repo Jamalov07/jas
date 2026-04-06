@@ -6,7 +6,7 @@ import { StaffPaymentRepository } from './staff-payment.repository'
 import { StaffModule } from '../staff'
 
 @Module({
-	imports: [PrismaModule, StaffModule, ExcelModule],
+	imports: [PrismaModule, ExcelModule, StaffModule],
 	controllers: [StaffPaymentController],
 	providers: [StaffPaymentService, StaffPaymentRepository],
 	exports: [StaffPaymentService, StaffPaymentRepository],

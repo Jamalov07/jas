@@ -108,4 +108,13 @@ export class StaffService {
 		}
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
 	}
+
+	async updateCurrency(staffId: string, currencyId: string) {
+		const staff = await this.staffRepository.getOne({ id: staffId })
+		if (!staff) {
+			throw new BadRequestException(ERROR_MSG.STAFF.NOT_FOUND.UZ)
+		}
+		await this.staffRepository.updateCurrency(staffId, currencyId)
+		return createResponse({ data: null, success: { messages: ['update currency success'] } })
+	}
 }

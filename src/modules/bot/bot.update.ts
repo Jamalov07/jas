@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 import { BotService } from './bot.service'
 import { Ctx, Hears, On, Start, Update } from 'nestjs-telegraf'
 import { Context } from 'telegraf'
-import { Message } from 'telegraf/typings/core/types/typegram'
 import { BotLanguageEnum } from '@prisma/client'
 
 @Update()

@@ -9,8 +9,8 @@ import {
 	ClientFindManyRequest,
 	ClientFindOneRequest,
 	ClientDeleteOneRequest,
+	ClientDebtByCurrency,
 	ClientDeed,
-	ClientCalc,
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 import { ExcelService } from '../shared'
@@ -19,49 +19,78 @@ import { Response } from 'express'
 @Injectable()
 export class ClientService {
 	private readonly clientRepository: ClientRepository
-	private readonly excelService: ExcelService
 
-	constructor(clientRepository: ClientRepository, excelService: ExcelService) {
+	constructor(
+		clientRepository: ClientRepository,
+		private readonly excelService: ExcelService,
+	) {
 		this.clientRepository = clientRepository
-		this.excelService = excelService
+	}
+
+	private calcDebtByCurrency(
+		sellings: Array<{
+			products: Array<{ prices: Array<{ totalPrice: Decimal; currencyId: string }> }>
+			clientSellingPayment?: { clientSellingPaymentMethods: Array<{ amount: Decimal; currencyId: string }> } | null
+		}>,
+		clientPayments: Array<{ clientPaymentMethods: Array<{ amount: Decimal; currencyId: string }> }>,
+	): Map<string, Decimal> {
+		const debtMap = new Map<string, Decimal>()
+
+		for (const sel of sellings) {
+			for (const product of sel.products) {
+				for (const price of product.prices) {
+					const curr = debtMap.get(price.currencyId) ?? new Decimal(0)
+					debtMap.set(price.currencyId, curr.plus(price.totalPrice))
+				}
+			}
+			if (sel.clientSellingPayment) {
+				for (const method of sel.clientSellingPayment.clientSellingPaymentMethods) {
+					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
+					debtMap.set(method.currencyId, curr.minus(method.amount))
+				}
+			}
+		}
+
+		for (const payment of clientPayments) {
+			for (const method of payment.clientPaymentMethods) {
+				const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
+				debtMap.set(method.currencyId, curr.minus(method.amount))
+			}
+		}
+
+		return debtMap
 	}
 
 	async findMany(query: ClientFindManyRequest) {
 		const clients = await this.clientRepository.findMany({ ...query, pagination: false })
-		// const clientsCount = await this.clientRepository.countFindMany(query)
 
 		const mappedClients = clients.map((c) => {
-			const sellingDebt = c.sellings.reduce((acc, sel) => {
-				const selTotal = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
-				return acc.plus(selTotal).minus(sel.payment.total)
-			}, new Decimal(0))
-
-			c.returnings.map((returning) => {
-				c.balance = c.balance.minus(returning.payment.fromBalance)
-			})
+			const debtMap = this.calcDebtByCurrency(c.sellings, c.clientPayments)
+			const debtByCurrency: ClientDebtByCurrency[] = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+			const totalDebt = Array.from(debtMap.values()).reduce((a, b) => a.plus(b), new Decimal(0))
 
 			return {
 				id: c.id,
 				fullname: c.fullname,
-				telegram: c.telegram,
-				actions: c.actions,
-				createdAt: c.createdAt,
 				phone: c.phone,
-				debt: sellingDebt.plus(c.balance),
+				telegram: c.telegram,
+				createdAt: c.createdAt,
+				debtByCurrency,
+				_totalDebt: totalDebt,
 				lastSellingDate: c.sellings?.length ? c.sellings[0].date : null,
 			}
 		})
 
-		const filteredClients = mappedClients.filter((s) => {
+		const filteredClients = mappedClients.filter((c) => {
 			if (query.debtType && query.debtValue !== undefined) {
 				const value = new Decimal(query.debtValue)
 				switch (query.debtType) {
 					case DebtTypeEnum.gt:
-						return s.debt.gt(value)
+						return c._totalDebt.gt(value)
 					case DebtTypeEnum.lt:
-						return s.debt.lt(value)
+						return c._totalDebt.lt(value)
 					case DebtTypeEnum.eq:
-						return s.debt.eq(value)
+						return c._totalDebt.eq(value)
 					default:
 						return true
 				}
@@ -75,7 +104,9 @@ export class ClientService {
 			return db - da
 		})
 
-		const paginatedClients = query.pagination ? sortedClients.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize) : sortedClients
+		const paginatedClients = query.pagination
+			? sortedClients.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize).map(({ _totalDebt, ...rest }) => rest)
+			: sortedClients.map(({ _totalDebt, ...rest }) => rest)
 
 		const result = query.pagination
 			? {
@@ -84,42 +115,9 @@ export class ClientService {
 					pageSize: paginatedClients.length,
 					data: paginatedClients,
 				}
-			: { data: mappedClients }
+			: { data: paginatedClients }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
-	}
-
-	async findManyForReport(query: ClientFindManyRequest) {
-		const clients = await this.clientRepository.findManyClientForReport(query)
-		const clientStats = await this.clientRepository.findManyStatsForReport2(query)
-		const clientsCount = await this.clientRepository.countFindMany(query)
-
-		const mappedClients = clients.map((c) => {
-			const calc: ClientCalc = clientStats[c.id]
-
-			return {
-				id: c.id,
-				fullname: c.fullname,
-				createdAt: c.createdAt,
-				phone: c.phone,
-				calc: calc,
-			}
-		})
-
-		const result = query.pagination
-			? {
-					totalCount: clientsCount,
-					pagesCount: Math.ceil(clientsCount / query.pageSize),
-					pageSize: mappedClients.length,
-					data: mappedClients,
-				}
-			: { data: mappedClients }
-
-		return createResponse({ data: result, success: { messages: ['find many success'] } })
-	}
-
-	async excelDownloadMany(res: Response, query: ClientFindManyRequest) {
-		return this.excelService.clientDownloadMany(res, query)
 	}
 
 	async findOne(query: ClientFindOneRequest) {
@@ -131,61 +129,95 @@ export class ClientService {
 		if (!client) {
 			throw new BadRequestException(ERROR_MSG.CLIENT.NOT_FOUND.UZ)
 		}
-		const deeds: ClientDeed[] = []
-		let totalDebit: Decimal = new Decimal(0)
-		let totalCredit: Decimal = new Decimal(0)
 
-		let payment = client.payments.reduce((acc, curr) => {
-			if ((!deedStartDate || curr.createdAt >= deedStartDate) && (!deedEndDate || curr.createdAt <= deedEndDate)) {
-				if (curr.description === `import qilingan boshlang'ich qiymat ${Number(curr.total).toFixed(2)}`) {
-					deeds.push({ type: 'debit', action: 'selling', value: curr.total, date: curr.createdAt, description: curr.description })
-					totalDebit = totalDebit.plus(curr.total)
-				} else {
-					deeds.push({ type: 'credit', action: 'payment', value: curr.total, date: curr.createdAt, description: curr.description })
-					totalCredit = totalCredit.plus(curr.total)
+		const deeds: ClientDeed[] = []
+		const totalDebitMap = new Map<string, Decimal>()
+		const totalCreditMap = new Map<string, Decimal>()
+
+		const addToMap = (map: Map<string, Decimal>, currencyId: string, amount: Decimal) => {
+			const curr = map.get(currencyId) ?? new Decimal(0)
+			map.set(currencyId, curr.plus(amount))
+		}
+
+		for (const sel of client.sellings) {
+			for (const product of sel.products) {
+				for (const price of product.prices) {
+					if ((!deedStartDate || sel.date >= deedStartDate) && (!deedEndDate || sel.date <= deedEndDate)) {
+						deeds.push({ type: 'debit', action: 'selling', value: price.totalPrice, date: sel.date, description: '', currencyId: price.currencyId })
+						addToMap(totalDebitMap, price.currencyId, price.totalPrice)
+					}
 				}
 			}
 
-			return acc.plus(curr.total)
-		}, new Decimal(0))
-
-		const sellingDebt = client.sellings.reduce((acc, sel) => {
-			const selTotal = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
-			if ((!deedStartDate || sel.date >= deedStartDate) && (!deedEndDate || sel.date <= deedEndDate)) {
-				deeds.push({ type: 'debit', action: 'selling', value: selTotal, date: sel.date, description: '' })
-				totalDebit = totalDebit.plus(selTotal)
+			if (sel.clientSellingPayment) {
+				for (const method of sel.clientSellingPayment.clientSellingPaymentMethods) {
+					const payDate = sel.clientSellingPayment.createdAt
+					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
+						deeds.push({
+							type: 'credit',
+							action: 'payment',
+							value: method.amount,
+							date: payDate,
+							description: sel.clientSellingPayment.description ?? '',
+							currencyId: method.currencyId,
+						})
+						addToMap(totalCreditMap, method.currencyId, method.amount)
+					}
+				}
 			}
+		}
 
-			if ((!deedStartDate || sel.payment.createdAt >= deedStartDate) && (!deedEndDate || sel.payment.createdAt <= deedEndDate)) {
-				deeds.push({ type: 'credit', action: 'payment', value: sel.payment.total, date: sel.payment.createdAt, description: sel.payment.description })
-				totalCredit = totalCredit.plus(sel.payment.total)
+		for (const returning of client.returnings) {
+			if (returning.clientReturningPayments) {
+				for (const method of returning.clientReturningPayments.clientReturningPaymentMethods) {
+					const payDate = returning.clientReturningPayments.createdAt
+					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
+						deeds.push({
+							type: 'credit',
+							action: 'returning',
+							value: method.amount,
+							date: payDate,
+							description: returning.clientReturningPayments.description ?? '',
+							currencyId: method.currencyId,
+						})
+						addToMap(totalCreditMap, method.currencyId, method.amount)
+					}
+				}
 			}
+		}
 
-			return acc.plus(selTotal).minus(sel.payment.total)
-		}, new Decimal(0))
-
-		let returningTotalSum = new Decimal(0)
-		client.returnings.map((returning) => {
-			if ((!deedStartDate || returning.payment.createdAt >= deedStartDate) && (!deedEndDate || returning.payment.createdAt <= deedEndDate)) {
-				deeds.push({ type: 'credit', action: 'returning', value: returning.payment.fromBalance, date: returning.payment.createdAt, description: returning.payment.description })
-				totalCredit = totalCredit.plus(returning.payment.fromBalance)
-				payment = payment.minus(returning.payment.fromBalance)
-				returningTotalSum = returningTotalSum.minus(returning.payment.fromBalance)
+		for (const payment of client.clientPayments) {
+			for (const method of payment.clientPaymentMethods) {
+				if ((!deedStartDate || payment.createdAt >= deedStartDate) && (!deedEndDate || payment.createdAt <= deedEndDate)) {
+					deeds.push({
+						type: 'credit',
+						action: 'payment',
+						value: method.amount,
+						date: payment.createdAt,
+						description: payment.description ?? '',
+						currencyId: method.currencyId,
+					})
+					addToMap(totalCreditMap, method.currencyId, method.amount)
+				}
 			}
-		})
+		}
 
 		const filteredDeeds = deeds.filter((d) => !d.value.equals(0)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
-		const sellingDebt2 = client.sellings.reduce((acc, sel) => {
-			const selTotal = sel.totals?.reduce((a, t) => a.plus(t.total), new Decimal(0)) ?? new Decimal(0)
-			return acc.plus(selTotal).minus(sel.payment.total)
-		}, new Decimal(0))
+		const allCurrencies = new Set([...totalDebitMap.keys(), ...totalCreditMap.keys()])
+		const debtByCurrencyMap = new Map<string, Decimal>()
+		for (const currId of allCurrencies) {
+			const debit = totalDebitMap.get(currId) ?? new Decimal(0)
+			const credit = totalCreditMap.get(currId) ?? new Decimal(0)
+			debtByCurrencyMap.set(currId, debit.minus(credit))
+		}
 
-		client.returnings.map((returning) => {
-			client.balance = client.balance.minus(returning.payment.fromBalance)
-		})
+		const totalCreditByCurrency = Array.from(totalCreditMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+		const totalDebitByCurrency = Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+		const debtByCurrency = Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
-		console.log(totalDebit, totalCredit, totalDebit.minus(totalCredit), sellingDebt2, client.balance)
+		const fullDebtMap = this.calcDebtByCurrency(client.sellings, client.clientPayments)
+		const fullDebt = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
 		return createResponse({
 			data: {
@@ -195,27 +227,18 @@ export class ClientService {
 				createdAt: client.createdAt,
 				updatedAt: client.updatedAt,
 				deletedAt: client.deletedAt,
-				actionIds: client.actions.map((a) => a.id),
-				debt: sellingDebt2.plus(client.balance),
+				debtByCurrency: fullDebt,
 				deedInfo: {
-					totalDebit: totalDebit,
-					totalCredit: totalCredit,
-					debt: totalDebit.minus(totalCredit),
+					totalDebitByCurrency,
+					totalCreditByCurrency,
+					debtByCurrency,
 					deeds: filteredDeeds,
 				},
 				telegram: client.telegram,
-				lastArrivalDate: client.sellings?.length ? client.sellings[0].date : null,
+				lastSellingDate: client.sellings?.length ? client.sellings[0].date : null,
 			},
 			success: { messages: ['find one success'] },
 		})
-	}
-
-	async excelDownloadOne(res: Response, query: ClientFindOneRequest) {
-		return this.excelService.clientDeedDownloadOne(res, query)
-	}
-
-	async excelWithProductDownloadOne(res: Response, query: ClientFindOneRequest) {
-		return this.excelService.clientDeedWithProductDownloadOne(res, query)
 	}
 
 	async getMany(query: ClientGetManyRequest) {
@@ -277,5 +300,21 @@ export class ClientService {
 			await this.clientRepository.updateOne(query, { deletedAt: new Date() })
 		}
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
+	}
+
+	async findManyForReport(query: ClientFindManyRequest) {
+		return this.findMany(query)
+	}
+
+	async excelDownloadMany(res: Response, query: ClientFindManyRequest) {
+		return await this.excelService.clientDownloadMany(res, query)
+	}
+
+	async excelDownloadOne(res: Response, query: ClientFindOneRequest) {
+		return await this.excelService.clientDeedDownloadOne(res, query)
+	}
+
+	async excelWithProductDownloadOne(res: Response, query: ClientFindOneRequest) {
+		return await this.excelService.clientDeedWithProductDownloadOne(res, query)
 	}
 }

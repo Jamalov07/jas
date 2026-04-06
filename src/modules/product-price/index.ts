@@ -1,6 +1,0 @@
-export * from './product-price.controller'
-export * from './product-price.module'
-export * from './product-price.repository'
-export * from './product-price.service'
-export * from './dtos'
-export * from './interfaces'

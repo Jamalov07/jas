@@ -1,4 +1,3 @@
-import { Decimal } from '@prisma/client/runtime/library'
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ReturningRepository } from './returning.repository'
 import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG } from '@common'
@@ -11,17 +10,15 @@ import {
 	ReturningFindOneRequest,
 	ReturningDeleteOneRequest,
 } from './interfaces'
-import { ClientService } from '../client'
 import { SellingStatusEnum } from '@prisma/client'
+import { CommonService } from '../common'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
-import { CommonService } from '../common'
 
 @Injectable()
 export class ReturningService {
 	constructor(
 		private readonly returningRepository: ReturningRepository,
-		private readonly clientService: ClientService,
 		private readonly commonService: CommonService,
 		private readonly excelService: ExcelService,
 	) {}
@@ -30,29 +27,16 @@ export class ReturningService {
 		const returnings = await this.returningRepository.findMany(query)
 		const returningsCount = await this.returningRepository.countFindMany(query)
 
-		const mappedReturnings = returnings.map((returning) => {
-			return {
-				...returning,
-				payment: returning.payment.total.toNumber() ? returning.payment : null,
-				totalPayment: returning.payment.total,
-				totals: returning.totals,
-			}
-		})
+		const mappedReturnings = returnings.map((returning) => ({
+			...returning,
+			payment: returning.clientReturningPayments,
+		}))
 
 		const result = query.pagination
-			? {
-					totalCount: returningsCount,
-					pagesCount: Math.ceil(returningsCount / query.pageSize),
-					pageSize: mappedReturnings.length,
-					data: mappedReturnings,
-				}
+			? { totalCount: returningsCount, pagesCount: Math.ceil(returningsCount / query.pageSize), pageSize: mappedReturnings.length, data: mappedReturnings }
 			: { data: mappedReturnings }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
-	}
-
-	async excelDownloadMany(res: Response, query: ReturningFindManyRequest) {
-		return this.excelService.returningDownloadMany(res, query)
 	}
 
 	async findOne(query: ReturningFindOneRequest) {
@@ -62,24 +46,14 @@ export class ReturningService {
 			throw new BadRequestException(ERROR_MSG.RETURNING.NOT_FOUND.UZ)
 		}
 
-		return createResponse({ data: { ...returning, totals: returning.totals, totalPayment: returning.payment.total }, success: { messages: ['find one success'] } })
-	}
-
-	async excelDownloadOne(res: Response, query: ReturningFindOneRequest) {
-		return this.excelService.returningDownloadOne(res, query)
+		return createResponse({ data: { ...returning, payment: returning.clientReturningPayments }, success: { messages: ['find one success'] } })
 	}
 
 	async getMany(query: ReturningGetManyRequest) {
 		const returnings = await this.returningRepository.getMany(query)
 		const returningsCount = await this.returningRepository.countGetMany(query)
 
-		const result = query.pagination
-			? {
-					pagesCount: Math.ceil(returningsCount / query.pageSize),
-					pageSize: returnings.length,
-					data: returnings,
-				}
-			: { data: returnings }
+		const result = query.pagination ? { pagesCount: Math.ceil(returningsCount / query.pageSize), pageSize: returnings.length, data: returnings } : { data: returnings }
 
 		return createResponse({ data: result, success: { messages: ['get many success'] } })
 	}
@@ -95,29 +69,8 @@ export class ReturningService {
 	}
 
 	async createOne(request: CRequest, body: ReturningCreateOneRequest) {
-		await this.clientService.findOne({ id: body.clientId })
-
-		let total = new Decimal(0)
-		if (body.payment) {
-			if (Object.values(body.payment).some((value) => value !== 0)) {
-				body.status = SellingStatusEnum.accepted
-				if (body.date) {
-					const inputDate = new Date(body.date)
-					const now = new Date()
-
-					const isToday = inputDate.getFullYear() === now.getFullYear() && inputDate.getMonth() === now.getMonth() && inputDate.getDate() === now.getDate()
-
-					if (isToday) {
-						body.date = now
-					} else {
-						body.date = new Date(inputDate.setHours(0, 0, 0, 0))
-					}
-				} else {
-					body.date = new Date()
-				}
-
-				total = new Decimal(body.payment?.cash ?? 0).plus(body.payment?.fromBalance ?? 0)
-			}
+		if (body.payment?.paymentMethods?.length) {
+			body.status = SellingStatusEnum.accepted
 		}
 
 		if (body.status === SellingStatusEnum.accepted) {
@@ -130,49 +83,31 @@ export class ReturningService {
 			} else {
 				body.date = new Date()
 			}
+		} else if (body.date) {
+			const inputDate = new Date(body.date)
+			const now = new Date()
+			const isToday = inputDate.getFullYear() === now.getFullYear() && inputDate.getMonth() === now.getMonth() && inputDate.getDate() === now.getDate()
+			body.date = isToday ? now : new Date(inputDate.setHours(0, 0, 0, 0))
 		}
 
-		body = {
-			...body,
-			staffId: request.user.id,
-			payment: { ...body.payment, total: total },
-		}
-
+		body.staffId = request.user.id
 		const returning = await this.returningRepository.createOne(body)
-
 		return createResponse({ data: returning, success: { messages: ['create one success'] } })
 	}
 
 	async updateOne(query: ReturningGetOneRequest, body: ReturningUpdateOneRequest) {
-		const returning = await this.getOne(query)
+		const existing = await this.getOne(query)
 
-		if (returning.data.status === SellingStatusEnum.accepted) {
+		if (existing.data.status === SellingStatusEnum.accepted) {
 			body.productIdsToRemove = []
 			body.products = []
 		}
 
-		const hasValidPayment = body.payment && ['fromBalance', 'cash'].some((key) => !!body.payment?.[key] && +body.payment[key] !== 0)
-
-		if (body.status !== SellingStatusEnum.accepted) {
-			if (body.payment) {
-				if (Object.values(body.payment).some((value) => value !== 0)) {
-					body.status = SellingStatusEnum.accepted
-					body.date = new Date()
-					body.payment.total = new Decimal(body.payment.cash || 0).plus(body.payment.fromBalance || 0)
-				}
-			}
-		}
-		if (body.status === SellingStatusEnum.accepted) {
+		if (body.status === SellingStatusEnum.accepted && existing.data.status !== SellingStatusEnum.accepted) {
 			body.date = new Date()
 		}
 
-		body = {
-			...body,
-			staffId: returning.data.staffId,
-			payment: hasValidPayment ? body.payment : returning.data.payment,
-		}
 		await this.returningRepository.updateOne(query, body)
-
 		return createResponse({ data: null, success: { messages: ['update one success'] } })
 	}
 
@@ -182,5 +117,13 @@ export class ReturningService {
 			await this.returningRepository.deleteOne(query)
 		}
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
+	}
+
+	async excelDownloadMany(res: Response, query: ReturningFindManyRequest) {
+		return this.excelService.returningDownloadMany(res, query)
+	}
+
+	async excelDownloadOne(res: Response, query: ReturningFindOneRequest) {
+		return this.excelService.returningDownloadOne(res, query)
 	}
 }

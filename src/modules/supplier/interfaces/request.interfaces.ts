@@ -17,6 +17,6 @@ export declare interface SupplierGetOneRequest extends SupplierOptional, Pick<Re
 
 export declare interface SupplierCreateOneRequest extends Pick<SupplierRequired, 'fullname' | 'phone'> {}
 
-export declare interface SupplierUpdateOneRequest extends Pick<SupplierOptional, 'fullname' | 'phone' | 'deletedAt' | 'balance'> {}
+export declare interface SupplierUpdateOneRequest extends Pick<SupplierOptional, 'fullname' | 'phone' | 'deletedAt'> {}
 
 export declare interface SupplierDeleteOneRequest extends Pick<SupplierOptional, 'id'>, Pick<RequestOtherFields, 'method'> {}

@@ -9,8 +9,6 @@ import {
 	PermissionGetOneRequest,
 	PermissionUpdateOneRequest,
 } from './interfaces'
-import { PermissionController } from './permission.controller'
-
 @Injectable()
 export class PermissionRepository {
 	private readonly prisma: PrismaService
@@ -114,7 +112,4 @@ export class PermissionRepository {
 		return permission
 	}
 
-	async onModuleInit() {
-		await this.prisma.createActionMethods(PermissionController)
-	}
 }

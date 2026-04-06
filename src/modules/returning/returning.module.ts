@@ -3,12 +3,10 @@ import { ExcelModule, PrismaModule } from '../shared'
 import { ReturningController } from './returning.controller'
 import { ReturningService } from './returning.service'
 import { ReturningRepository } from './returning.repository'
-import { ClientModule } from '../client'
-import { ProductModule } from '../product'
 import { CommonModule } from '../common'
 
 @Module({
-	imports: [PrismaModule, ClientModule, ProductModule, ExcelModule, CommonModule],
+	imports: [PrismaModule, CommonModule, ExcelModule],
 	controllers: [ReturningController],
 	providers: [ReturningService, ReturningRepository],
 	exports: [ReturningService, ReturningRepository],

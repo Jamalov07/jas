@@ -5,33 +5,45 @@ import {
 	ReturningFindManyRequest,
 	ReturningFindOneRequest,
 	ReturningPayment,
+	ReturningPaymentMethod,
 	ReturningProduct,
 	ReturningUpdateOneRequest,
 } from '../interfaces'
 import { IsDecimalIntOrBigInt, PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { ReturningOptionalDto, ReturningRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
+import { PaymentMethodEnum } from '@prisma/client'
 
-export class ReturningFindManyRequestDto
-	extends IntersectionType(PickType(ReturningOptionalDto, ['clientId', 'staffId']), PaginationRequestDto, PickType(RequestOtherFieldsDto, ['search', 'startDate', 'endDate']))
-	implements ReturningFindManyRequest {}
+export class ReturningPaymentMethodDto implements ReturningPaymentMethod {
+	@ApiProperty({ enum: PaymentMethodEnum })
+	@IsNotEmpty()
+	@IsEnum(PaymentMethodEnum)
+	type: PaymentMethodEnum
 
-export class ReturningFindOneRequestDto extends IntersectionType(PickType(ReturningRequiredDto, ['id'])) implements ReturningFindOneRequest {}
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	amount: Decimal
+}
 
 export class ReturningPaymentDto implements ReturningPayment {
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	cash: Decimal
+	@ApiPropertyOptional({ type: ReturningPaymentMethodDto, isArray: true })
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => ReturningPaymentMethodDto)
+	paymentMethods?: ReturningPaymentMethod[]
 
-	@ApiProperty({ type: Number })
-	@IsNotEmpty()
-	@IsDecimalIntOrBigInt()
-	fromBalance: Decimal
-
-	total?: Decimal
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	description?: string
 }
 
 export class ReturningProductDto implements ReturningProduct {
@@ -55,6 +67,12 @@ export class ReturningProductDto implements ReturningProduct {
 	@IsUUID('4')
 	currencyId: string
 }
+
+export class ReturningFindManyRequestDto
+	extends IntersectionType(PickType(ReturningOptionalDto, ['clientId', 'staffId']), PaginationRequestDto, PickType(RequestOtherFieldsDto, ['search', 'startDate', 'endDate']))
+	implements ReturningFindManyRequest {}
+
+export class ReturningFindOneRequestDto extends IntersectionType(PickType(ReturningRequiredDto, ['id'])) implements ReturningFindOneRequest {}
 
 export class ReturningCreateOneRequestDto extends IntersectionType(PickType(ReturningRequiredDto, ['clientId', 'date'])) implements ReturningCreateOneRequest {
 	@ApiPropertyOptional({ type: ReturningPaymentDto })

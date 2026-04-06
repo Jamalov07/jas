@@ -7,7 +7,7 @@ import { ClientModule } from '../client'
 import { BotModule } from '../bot'
 
 @Module({
-	imports: [PrismaModule, forwardRef(() => ClientModule), ExcelModule, BotModule],
+	imports: [PrismaModule, ExcelModule, forwardRef(() => ClientModule), BotModule],
 	controllers: [ClientPaymentController],
 	providers: [ClientPaymentService, ClientPaymentRepository],
 	exports: [ClientPaymentService, ClientPaymentRepository],
