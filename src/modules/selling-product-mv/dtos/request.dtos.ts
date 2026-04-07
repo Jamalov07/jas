@@ -42,7 +42,9 @@ export class SellingProductMVCreateOneRequestDto {
 	count: number
 
 	@ApiProperty()
-	price: any
+	@IsNumber()
+	@Type(() => Number)
+	price: number
 
 	@ApiProperty()
 	@IsUUID()

@@ -101,7 +101,7 @@ export class SellingProductMVRepository {
 				sellingId: body.sellingId,
 				productId: body.productId,
 				staffId: body.staffId,
-				prices: { create: { type: PriceTypeEnum.selling, price: body.price, totalPrice, currencyId: body.currencyId } },
+				prices: { create: { type: PriceTypeEnum.selling, price: new Decimal(body.price), totalPrice, currencyId: body.currencyId } },
 			},
 			select: { id: true, count: true, productId: true, sellingId: true },
 		})
@@ -131,7 +131,7 @@ export class SellingProductMVRepository {
 		if (oldPrice) {
 			await this.prisma.sellingProductMVPriceModel.update({
 				where: { id: oldPrice.id },
-				data: { price: newPrice, totalPrice: newTotalPrice, currencyId: body.currencyId ?? oldPrice.currency?.id },
+				data: { price: new Decimal(newPrice), totalPrice: newTotalPrice, currencyId: body.currencyId ?? oldPrice.currency?.id },
 			})
 		}
 

@@ -15,14 +15,14 @@ export declare interface SellingProductMVCreateOneRequest {
 	sellingId: string
 	productId: string
 	count: number
-	price: Decimal
+	price: number
 	currencyId: string
 	staffId?: string
 }
 
 export declare interface SellingProductMVUpdateOneRequest {
 	count?: number
-	price?: Decimal
+	price?: number
 	currencyId?: string
 	productId?: string
 	sellingId?: string

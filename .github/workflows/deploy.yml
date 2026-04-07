@@ -1,20 +1,20 @@
-name: Deploy to jas
+# name: Deploy to jas
 
-on:
-  push:
-    branches:
-      - main
+# on:
+#   push:
+#     branches:
+#       - main
 
-jobs:
-  deploy:
-    runs-on: self-hosted
+# jobs:
+#   deploy:
+#     runs-on: self-hosted
 
-    steps:
-      - name: Deploy to jas
-        run: |
-          cd /home/runner/jas
-          git pull origin main
-          pnpm install
-          npx prisma db push
-          pnpm run build:swc
-          pm2 restart jas
+#     steps:
+#       - name: Deploy to jas
+#         run: |
+#           cd /home/runner/jas
+#           git pull origin main
+#           pnpm install
+#           npx prisma db push
+#           pnpm run build:swc
+#           pm2 restart jas

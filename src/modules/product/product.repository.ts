@@ -18,6 +18,7 @@ const PRICE_SELECT = {
 	price: true,
 	totalPrice: true,
 	currencyId: true,
+	currency: true,
 	exchangeRate: true,
 } as const
 
@@ -53,7 +54,9 @@ export class ProductRepository {
 				description: true,
 				name: true,
 				minAmount: true,
-				prices: { select: PRICE_SELECT },
+				prices: {
+					select: { id: true, type: true, price: true, totalPrice: true, currency: true, exchangeRate: true },
+				},
 				sellingMVs: {
 					orderBy: { selling: { date: 'desc' } },
 					take: 1,
@@ -219,5 +222,4 @@ export class ProductRepository {
 
 		return product
 	}
-
 }
