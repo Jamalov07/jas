@@ -111,5 +111,4 @@ export class PermissionRepository {
 
 		return permission
 	}
-
 }

@@ -23,7 +23,7 @@ const RETURNING_PAYMENT_SELECT = {
 	id: true,
 	description: true,
 	createdAt: true,
-	clientReturningPaymentMethods: { select: { type: true, currencyId: true, amount: true } },
+	methods: { select: { type: true, currencyId: true, amount: true } },
 }
 const RETURNING_SELECT = {
 	id: true as const,
@@ -35,7 +35,7 @@ const RETURNING_SELECT = {
 	deletedAt: true as const,
 	client: { select: { id: true, fullname: true, phone: true } },
 	staff: { select: { id: true, fullname: true, phone: true } },
-	clientReturningPayments: { select: RETURNING_PAYMENT_SELECT },
+	payment: { select: RETURNING_PAYMENT_SELECT },
 	products: {
 		orderBy: [{ createdAt: 'desc' as const }],
 		select: RETURNING_PRODUCT_MV_SELECT,
@@ -106,7 +106,7 @@ export class ReturningRepository {
 				status: true,
 				staffId: true,
 				clientId: true,
-				clientReturningPayments: { select: { id: true } },
+				payment: { select: { id: true } },
 				products: {
 					select: {
 						id: true,
@@ -142,12 +142,12 @@ export class ReturningRepository {
 				status: body.status,
 				date: body.date ? new Date(body.date) : undefined,
 				...(body.payment?.paymentMethods?.length && {
-					clientReturningPayments: {
+					payment: {
 						create: {
 							clientId: body.clientId,
 							staffId: body.staffId,
 							description: body.payment.description,
-							clientReturningPaymentMethods: {
+							methods: {
 								createMany: {
 									data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })),
 								},
@@ -208,16 +208,16 @@ export class ReturningRepository {
 		})
 
 		if (body.payment?.paymentMethods) {
-			const existingPayment = existing.clientReturningPayments
+			const existingPayment = existing.payment
 			if (existingPayment) {
-				await this.prisma.clientReturningPaymentMethodModel.deleteMany({ where: { clientReturningPaymentId: existingPayment.id } })
+				await this.prisma.clientReturningPaymentMethodModel.deleteMany({ where: { paymentId: existingPayment.id } })
 				if (body.payment.paymentMethods.length) {
 					await this.prisma.clientReturningPaymentMethodModel.createMany({
 						data: body.payment.paymentMethods.map((m) => ({
 							type: m.type,
 							currencyId: m.currencyId,
 							amount: m.amount,
-							clientReturningPaymentId: existingPayment.id,
+							paymentId: existingPayment.id,
 						})),
 					})
 				}
@@ -231,7 +231,7 @@ export class ReturningRepository {
 						clientId: existing.clientId,
 						staffId: existing.staffId,
 						description: body.payment.description,
-						clientReturningPaymentMethods: {
+						methods: {
 							createMany: { data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) },
 						},
 					},
@@ -264,5 +264,4 @@ export class ReturningRepository {
 
 		return returning
 	}
-
 }

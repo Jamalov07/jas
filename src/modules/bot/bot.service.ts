@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 import { Injectable } from '@nestjs/common'
 import { PdfService, PrismaService } from '../shared'
 import { Context, Markup, Telegraf } from 'telegraf'
@@ -270,7 +271,7 @@ export class BotService {
 	// ─── Client standalone payment notifications ──────────────────────────────
 
 	async sendClientPaymentToChannel(
-		payment: { description?: string | null; createdAt: Date; clientPaymentMethods: PaymentMethod[]; client: { fullname: string; phone: string } },
+		payment: { description?: string | null; createdAt: Date; methods: PaymentMethod[]; client: { fullname: string; phone: string } },
 		isModified: boolean,
 		debtByCurrency: DebtEntry[],
 	) {
@@ -281,7 +282,7 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: isModified ? '♻️ Обновлено (оплата клиента)\n\n' : '💳 Оплата клиента\n\n',
 			person: payment.client,
-			methods: payment.clientPaymentMethods,
+			methods: payment.methods,
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency,
@@ -291,7 +292,7 @@ export class BotService {
 	}
 
 	async sendDeletedClientPaymentToChannel(
-		payment: { description?: string | null; createdAt: Date; clientPaymentMethods: PaymentMethod[]; client: { fullname: string; phone: string } },
+		payment: { description?: string | null; createdAt: Date; methods: PaymentMethod[]; client: { fullname: string; phone: string } },
 		debtByCurrency: DebtEntry[],
 	) {
 		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
@@ -301,7 +302,7 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: '🗑️ Удалено (оплата клиента)\n\n',
 			person: payment.client,
-			methods: payment.clientPaymentMethods,
+			methods: payment.methods,
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency,
@@ -313,7 +314,7 @@ export class BotService {
 	// ─── Supplier payment notifications ───────────────────────────────────────
 
 	async sendSupplierPaymentToChannel(
-		payment: { description?: string | null; createdAt: Date; supplierPaymentMethods: PaymentMethod[]; supplier: { fullname: string; phone: string } },
+		payment: { description?: string | null; createdAt: Date; methods: PaymentMethod[]; supplier: { fullname: string; phone: string } },
 		isModified: boolean,
 		debtByCurrency: DebtEntry[],
 	) {
@@ -324,7 +325,7 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: isModified ? '♻️ Обновлено (оплата поставщику)\n\n' : '💳 Оплата поставщику\n\n',
 			person: payment.supplier,
-			methods: payment.supplierPaymentMethods,
+			methods: payment.methods,
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency,
@@ -334,7 +335,7 @@ export class BotService {
 	}
 
 	async sendDeletedSupplierPaymentToChannel(
-		payment: { description?: string | null; createdAt: Date; supplierPaymentMethods: PaymentMethod[]; supplier: { fullname: string; phone: string } },
+		payment: { description?: string | null; createdAt: Date; methods: PaymentMethod[]; supplier: { fullname: string; phone: string } },
 		debtByCurrency: DebtEntry[],
 	) {
 		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
@@ -344,7 +345,7 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: '🗑️ Удалено (оплата поставщику)\n\n',
 			person: payment.supplier,
-			methods: payment.supplierPaymentMethods,
+			methods: payment.methods,
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency,

@@ -44,14 +44,14 @@ export class PdfService {
 								{ text: 'Цена', bold: true },
 								{ text: 'Сумма', bold: true },
 							],
-				...(selling.products ?? [])
-						.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
-						.map((item, index) => {
-							const price = item.prices?.[0]?.price?.toNumber() ?? 0
-							const totalPrice = item.prices?.[0]?.totalPrice?.toNumber() ?? price * item.count
-							const sym = item.prices?.[0]?.currency?.symbol ?? ''
-							return [index + 1, item.product.name, item.count, `${price} ${sym}`, `${totalPrice} ${sym}`]
-						}),
+							...(selling.products ?? [])
+								.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
+								.map((item, index) => {
+									const price = item.prices?.[0]?.price?.toNumber() ?? 0
+									const totalPrice = item.prices?.[0]?.totalPrice?.toNumber() ?? price * item.count
+									const sym = item.prices?.[0]?.currency?.symbol ?? ''
+									return [index + 1, item.product.name, item.count, `${price} ${sym}`, `${totalPrice} ${sym}`]
+								}),
 						],
 					},
 					layout: {
@@ -124,20 +124,20 @@ export class PdfService {
 								{ text: 'Цена', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 								{ text: 'Сумма', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 							],
-				...(selling.products ?? [])
-						.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
-						.map((item, index) => {
-							const price = item.prices?.[0]?.price?.toNumber() ?? 0
-							const totalPrice = item.prices?.[0]?.totalPrice?.toNumber() ?? price * item.count
-							const sym = item.prices?.[0]?.currency?.symbol ?? ''
-							return [
-								{ text: index + 1, fontSize: 12, alignment: 'center' },
-								{ text: item.product.name, fontSize: 12, alignment: 'left' },
-								{ text: item.count.toString(), fontSize: 12, alignment: 'center' },
-								{ text: `${price} ${sym}`, fontSize: 12, alignment: 'right' },
-								{ text: `${totalPrice} ${sym}`, fontSize: 12, alignment: 'right' },
-							]
-						}),
+							...(selling.products ?? [])
+								.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
+								.map((item, index) => {
+									const price = item.prices?.[0]?.price?.toNumber() ?? 0
+									const totalPrice = item.prices?.[0]?.totalPrice?.toNumber() ?? price * item.count
+									const sym = item.prices?.[0]?.currency?.symbol ?? ''
+									return [
+										{ text: index + 1, fontSize: 12, alignment: 'center' },
+										{ text: item.product.name, fontSize: 12, alignment: 'left' },
+										{ text: item.count.toString(), fontSize: 12, alignment: 'center' },
+										{ text: `${price} ${sym}`, fontSize: 12, alignment: 'right' },
+										{ text: `${totalPrice} ${sym}`, fontSize: 12, alignment: 'right' },
+									]
+								}),
 						],
 					},
 					layout: {

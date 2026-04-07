@@ -11,7 +11,7 @@ import { ClientFindManyRequest, ClientFindOneRequest } from '../../client'
 import { StaffPaymentFindManyRequest } from '../../staff-payment'
 import { ProductFindManyRequest } from '../../product'
 import { SupplierFindManyRequest } from '../../supplier'
-import { SellingStatusEnum } from '@prisma/client'
+import { PaymentMethodEnum, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { SupplierFindOneRequest } from '../../supplier'
 
@@ -37,10 +37,11 @@ export class ExcelService {
 		}
 	}
 
-	private formatPaymentMethods(methods: { amount: Decimal; currency?: { symbol: string } | null }[]): string {
-		if (!methods || methods.length === 0) return '0'
+	private formatPaymentMethods(methods: { amount: Decimal; currency?: { symbol: string } | null; type?: string }[]): string {
+		const filtered = methods?.filter((m) => m.type !== PaymentMethodEnum.fromCash && m.type !== PaymentMethodEnum.fromBalance) ?? []
+		if (filtered.length === 0) return '0'
 		const map = new Map<string, Decimal>()
-		for (const m of methods) {
+		for (const m of filtered) {
 			const sym = m.currency?.symbol ?? '?'
 			map.set(sym, (map.get(sym) ?? new Decimal(0)).plus(m.amount))
 		}
@@ -83,10 +84,10 @@ export class ExcelService {
 				date: true,
 				client: { select: { fullname: true, phone: true } },
 				staff: { select: { fullname: true } },
-				clientSellingPayment: {
+				payment: {
 					select: {
 						description: true,
-						clientSellingPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } },
+						methods: { select: { type: true, amount: true, currency: { select: { symbol: true } } } },
 					},
 				},
 				products: {
@@ -135,7 +136,7 @@ export class ExcelService {
 				Array.from(totalMap.entries())
 					.map(([s, t]) => `${t.toFixed(2)} ${s}`)
 					.join(' + ') || '0'
-			const paidStr = this.formatPaymentMethods(item.clientSellingPayment?.clientSellingPaymentMethods ?? [])
+			const paidStr = this.formatPaymentMethods(item.payment?.methods ?? [])
 
 			const row = worksheet.addRow({
 				no: index + 1,
@@ -144,7 +145,7 @@ export class ExcelService {
 				summa: totalStr,
 				paid: paidStr,
 				staff: item.staff.fullname,
-				info: item.clientSellingPayment?.description ?? '',
+				info: item.payment?.description ?? '',
 				date: this.formatDate(item.date),
 			})
 			this.styleDataRow(row)
@@ -165,10 +166,10 @@ export class ExcelService {
 				publicId: true,
 				client: { select: { fullname: true, phone: true } },
 				staff: { select: { fullname: true } },
-				clientSellingPayment: {
+				payment: {
 					select: {
 						description: true,
-						clientSellingPaymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+						methods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
 					},
 				},
 				products: {
@@ -227,7 +228,7 @@ export class ExcelService {
 
 		worksheet.addRow([])
 
-		const paidStr = this.formatPaymentMethods(selling.clientSellingPayment?.clientSellingPaymentMethods ?? [])
+		const paidStr = this.formatPaymentMethods(selling.payment?.methods ?? [])
 		const paidRow = worksheet.addRow(['', '', '', '', 'Тўлов қилинди:', paidStr])
 		this.styleHeaderRow(paidRow)
 
@@ -256,10 +257,10 @@ export class ExcelService {
 				date: true,
 				supplier: { select: { fullname: true } },
 				staff: { select: { fullname: true } },
-				supplierArrivalPayment: {
+				payment: {
 					select: {
 						description: true,
-						supplierArrivalPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } },
+						methods: { select: { type: true, amount: true, currency: { select: { symbol: true } } } },
 					},
 				},
 				products: {
@@ -304,7 +305,7 @@ export class ExcelService {
 				Array.from(totalMap.entries())
 					.map(([s, t]) => `${t.toFixed(2)} ${s}`)
 					.join(' + ') || '0'
-			const paidStr = this.formatPaymentMethods(item.supplierArrivalPayment?.supplierArrivalPaymentMethods ?? [])
+			const paidStr = this.formatPaymentMethods(item.payment?.methods ?? [])
 
 			const row = worksheet.addRow({
 				no: index + 1,
@@ -312,7 +313,7 @@ export class ExcelService {
 				summa: totalStr,
 				paid: paidStr,
 				staff: item.staff?.fullname ?? '',
-				info: item.supplierArrivalPayment?.description ?? '',
+				info: item.payment?.description ?? '',
 				date: this.formatDate(item.date),
 			})
 			this.styleDataRow(row)
@@ -331,8 +332,8 @@ export class ExcelService {
 				date: true,
 				supplier: { select: { fullname: true } },
 				staff: { select: { fullname: true } },
-				supplierArrivalPayment: {
-					select: { description: true, supplierArrivalPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
+				payment: {
+					select: { description: true, methods: { select: { type: true, amount: true, currency: { select: { symbol: true } } } } },
 				},
 				products: {
 					select: {
@@ -420,10 +421,10 @@ export class ExcelService {
 				date: true,
 				client: { select: { fullname: true, phone: true } },
 				staff: { select: { fullname: true } },
-				clientReturningPayments: {
+				payment: {
 					select: {
 						description: true,
-						clientReturningPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } },
+						methods: { select: { type: true, amount: true, currency: { select: { symbol: true } } } },
 					},
 				},
 			},
@@ -453,13 +454,13 @@ export class ExcelService {
 		this.styleHeaderRow(headerRow)
 
 		returningList.forEach((item, index) => {
-			const paidStr = this.formatPaymentMethods(item.clientReturningPayments?.clientReturningPaymentMethods ?? [])
+			const paidStr = this.formatPaymentMethods(item.payment?.methods ?? [])
 			const row = worksheet.addRow({
 				no: index + 1,
 				client: `${item.client.fullname} - ${item.client.phone}`,
 				paid: paidStr,
 				staff: item.staff?.fullname ?? '',
-				info: item.clientReturningPayments?.description ?? '',
+				info: item.payment?.description ?? '',
 				date: this.formatDate(item.date),
 			})
 			this.styleDataRow(row)
@@ -563,7 +564,7 @@ export class ExcelService {
 				staff: { select: { fullname: true } },
 				description: true,
 				createdAt: true,
-				clientPaymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+				methods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
 			},
 			orderBy: { createdAt: 'desc' },
 		})
@@ -582,7 +583,7 @@ export class ExcelService {
 		this.styleHeaderRow(worksheet.getRow(1))
 
 		clientPayments.forEach((payment, index) => {
-			const amountStr = this.formatPaymentMethods(payment.clientPaymentMethods)
+			const amountStr = this.formatPaymentMethods(payment.methods)
 			const row = worksheet.addRow({
 				no: index + 1,
 				client: payment.client.fullname,
@@ -619,7 +620,7 @@ export class ExcelService {
 				staff: { select: { fullname: true } },
 				description: true,
 				createdAt: true,
-				supplierPaymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+				methods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
 			},
 			orderBy: { createdAt: 'desc' },
 		})
@@ -638,7 +639,7 @@ export class ExcelService {
 		this.styleHeaderRow(worksheet.getRow(1))
 
 		supplierPayments.forEach((payment, index) => {
-			const amountStr = this.formatPaymentMethods(payment.supplierPaymentMethods)
+			const amountStr = this.formatPaymentMethods(payment.methods)
 			const row = worksheet.addRow({
 				no: index + 1,
 				supplier: payment.supplier.fullname,
@@ -674,12 +675,12 @@ export class ExcelService {
 					select: {
 						date: true,
 						products: { select: { prices: { where: { type: 'selling' }, select: { totalPrice: true, currencyId: true } } } },
-						clientSellingPayment: { select: { clientSellingPaymentMethods: { select: { amount: true, currencyId: true } } } },
+						payment: { select: { methods: { select: { type: true, amount: true, currencyId: true } } } },
 					},
 					orderBy: { date: 'desc' },
 				},
-				clientPayments: {
-					select: { clientPaymentMethods: { select: { amount: true, currencyId: true } } },
+				payments: {
+					select: { methods: { select: { type: true, amount: true, currencyId: true } } },
 				},
 			},
 			orderBy: { createdAt: 'desc' },
@@ -706,12 +707,14 @@ export class ExcelService {
 						debtMap.set(pr.currencyId, (debtMap.get(pr.currencyId) ?? new Decimal(0)).plus(pr.totalPrice))
 					}
 				}
-				for (const m of sel.clientSellingPayment?.clientSellingPaymentMethods ?? []) {
+				for (const m of sel.payment?.methods ?? []) {
+					if (m.type === PaymentMethodEnum.fromCash || m.type === PaymentMethodEnum.fromBalance) continue
 					debtMap.set(m.currencyId, (debtMap.get(m.currencyId) ?? new Decimal(0)).minus(m.amount))
 				}
 			}
-			for (const cp of c.clientPayments) {
-				for (const m of cp.clientPaymentMethods) {
+			for (const cp of c.payments) {
+				for (const m of cp.methods) {
+					if (m.type === PaymentMethodEnum.fromCash || m.type === PaymentMethodEnum.fromBalance) continue
 					debtMap.set(m.currencyId, (debtMap.get(m.currencyId) ?? new Decimal(0)).minus(m.amount))
 				}
 			}
@@ -750,15 +753,15 @@ export class ExcelService {
 					select: {
 						date: true,
 						products: { select: { prices: { where: { type: 'selling' }, select: { totalPrice: true, currency: { select: { symbol: true } } } } } },
-						clientSellingPayment: {
-							select: { createdAt: true, description: true, clientSellingPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
+						payment: {
+							select: { createdAt: true, description: true, methods: { select: { type: true, amount: true, currency: { select: { symbol: true } } } } },
 						},
 					},
 					orderBy: { date: 'asc' },
 				},
-				clientPayments: {
+				payments: {
 					where: { createdAt: { gte: deedStartDate, lte: deedEndDate }, deletedAt: null },
-					select: { createdAt: true, description: true, clientPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
+					select: { createdAt: true, description: true, methods: { select: { type: true, amount: true, currency: { select: { symbol: true } } } } },
 				},
 			},
 		})
@@ -783,15 +786,21 @@ export class ExcelService {
 				.join(' + ')
 			deeds.push({ type: 'debit', action: 'Sotuv', amount: amtStr, date: sel.date, description: '' })
 
-			if (sel.clientSellingPayment) {
-				const paidStr = this.formatPaymentMethods(sel.clientSellingPayment.clientSellingPaymentMethods)
-				deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: sel.clientSellingPayment.createdAt, description: sel.clientSellingPayment.description ?? '' })
+			if (sel.payment) {
+				const activeMethods = sel.payment.methods.filter((m) => m.type !== PaymentMethodEnum.fromCash && m.type !== PaymentMethodEnum.fromBalance)
+				if (activeMethods.length) {
+					const paidStr = this.formatPaymentMethods(activeMethods)
+					deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: sel.payment.createdAt, description: sel.payment.description ?? '' })
+				}
 			}
 		}
 
-		for (const cp of client.clientPayments) {
-			const paidStr = this.formatPaymentMethods(cp.clientPaymentMethods)
-			deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: cp.createdAt, description: cp.description ?? '' })
+		for (const cp of client.payments) {
+			const activeMethods = cp.methods.filter((m) => m.type !== PaymentMethodEnum.fromCash && m.type !== PaymentMethodEnum.fromBalance)
+			if (activeMethods.length) {
+				const paidStr = this.formatPaymentMethods(activeMethods)
+				deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: cp.createdAt, description: cp.description ?? '' })
+			}
 		}
 
 		deeds.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -854,11 +863,11 @@ export class ExcelService {
 					select: {
 						date: true,
 						products: { select: { prices: { where: { type: 'cost' }, select: { totalPrice: true, currencyId: true } } } },
-						supplierArrivalPayment: { select: { supplierArrivalPaymentMethods: { select: { amount: true, currencyId: true } } } },
+						payment: { select: { methods: { select: { type: true, amount: true, currencyId: true } } } },
 					},
 					orderBy: { date: 'desc' },
 				},
-				supplierPayments: { select: { supplierPaymentMethods: { select: { amount: true, currencyId: true } } } },
+				payments: { select: { methods: { select: { type: true, amount: true, currencyId: true } } } },
 			},
 		})
 
@@ -882,12 +891,14 @@ export class ExcelService {
 						debtMap.set(pr.currencyId, (debtMap.get(pr.currencyId) ?? new Decimal(0)).plus(pr.totalPrice))
 					}
 				}
-				for (const m of arr.supplierArrivalPayment?.supplierArrivalPaymentMethods ?? []) {
+				for (const m of arr.payment?.methods ?? []) {
+					if (m.type === PaymentMethodEnum.fromCash || m.type === PaymentMethodEnum.fromBalance) continue
 					debtMap.set(m.currencyId, (debtMap.get(m.currencyId) ?? new Decimal(0)).minus(m.amount))
 				}
 			}
-			for (const sp of s.supplierPayments) {
-				for (const m of sp.supplierPaymentMethods) {
+			for (const sp of s.payments) {
+				for (const m of sp.methods) {
+					if (m.type === PaymentMethodEnum.fromCash || m.type === PaymentMethodEnum.fromBalance) continue
 					debtMap.set(m.currencyId, (debtMap.get(m.currencyId) ?? new Decimal(0)).minus(m.amount))
 				}
 			}
@@ -925,15 +936,15 @@ export class ExcelService {
 					select: {
 						date: true,
 						products: { select: { prices: { where: { type: 'cost' }, select: { totalPrice: true, currency: { select: { symbol: true } } } } } },
-						supplierArrivalPayment: {
-							select: { createdAt: true, description: true, supplierArrivalPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
+						payment: {
+							select: { createdAt: true, description: true, methods: { select: { type: true, amount: true, currency: { select: { symbol: true } } } } },
 						},
 					},
 					orderBy: { date: 'asc' },
 				},
-				supplierPayments: {
+				payments: {
 					where: { createdAt: { gte: deedStartDate, lte: deedEndDate }, deletedAt: null },
-					select: { createdAt: true, description: true, supplierPaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } } },
+					select: { createdAt: true, description: true, methods: { select: { type: true, amount: true, currency: { select: { symbol: true } } } } },
 				},
 			},
 		})
@@ -958,15 +969,21 @@ export class ExcelService {
 				.join(' + ')
 			deeds.push({ type: 'debit', action: 'Kelish', amount: amtStr, date: arr.date, description: '' })
 
-			if (arr.supplierArrivalPayment) {
-				const paidStr = this.formatPaymentMethods(arr.supplierArrivalPayment.supplierArrivalPaymentMethods)
-				deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: arr.supplierArrivalPayment.createdAt, description: arr.supplierArrivalPayment.description ?? '' })
+			if (arr.payment) {
+				const activeMethods = arr.payment.methods.filter((m) => m.type !== PaymentMethodEnum.fromCash && m.type !== PaymentMethodEnum.fromBalance)
+				if (activeMethods.length) {
+					const paidStr = this.formatPaymentMethods(activeMethods)
+					deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: arr.payment.createdAt, description: arr.payment.description ?? '' })
+				}
 			}
 		}
 
-		for (const sp of supplier.supplierPayments) {
-			const paidStr = this.formatPaymentMethods(sp.supplierPaymentMethods)
-			deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: sp.createdAt, description: sp.description ?? '' })
+		for (const sp of supplier.payments) {
+			const activeMethods = sp.methods.filter((m) => m.type !== PaymentMethodEnum.fromCash && m.type !== PaymentMethodEnum.fromBalance)
+			if (activeMethods.length) {
+				const paidStr = this.formatPaymentMethods(activeMethods)
+				deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: sp.createdAt, description: sp.description ?? '' })
+			}
 		}
 
 		deeds.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -1090,7 +1107,7 @@ export class ExcelService {
 				staff: { select: { fullname: true } },
 				description: true,
 				createdAt: true,
-				employeePaymentMethods: { select: { amount: true, currency: { select: { symbol: true } } } },
+				methods: { select: { amount: true, currency: { select: { symbol: true } } } },
 			},
 			orderBy: { createdAt: 'desc' },
 		})
@@ -1110,7 +1127,7 @@ export class ExcelService {
 		this.styleHeaderRow(headerRow)
 
 		staffPayments.forEach((item, index) => {
-			const amountStr = this.formatPaymentMethods(item.employeePaymentMethods)
+			const amountStr = this.formatPaymentMethods(item.methods)
 			const row = worksheet.addRow([index + 1, item.employee.fullname, item.employee.phone, amountStr, item.description ?? '', this.formatDate(item.createdAt)])
 			this.styleDataRow(row)
 		})

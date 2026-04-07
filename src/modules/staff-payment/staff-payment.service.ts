@@ -30,7 +30,7 @@ export class StaffPaymentService {
 
 		const calcMap = new Map<string, Decimal>()
 		for (const payment of payments) {
-			for (const method of payment.employeePaymentMethods) {
+			for (const method of payment.methods) {
 				const curr = calcMap.get(method.currencyId) ?? new Decimal(0)
 				calcMap.set(method.currencyId, curr.plus(method.amount))
 			}

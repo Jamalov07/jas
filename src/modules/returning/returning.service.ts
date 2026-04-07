@@ -29,7 +29,7 @@ export class ReturningService {
 
 		const mappedReturnings = returnings.map((returning) => ({
 			...returning,
-			payment: returning.clientReturningPayments,
+			payment: returning.payment,
 		}))
 
 		const result = query.pagination
@@ -46,7 +46,7 @@ export class ReturningService {
 			throw new BadRequestException(ERROR_MSG.RETURNING.NOT_FOUND.UZ)
 		}
 
-		return createResponse({ data: { ...returning, payment: returning.clientReturningPayments }, success: { messages: ['find one success'] } })
+		return createResponse({ data: { ...returning, payment: returning.payment }, success: { messages: ['find one success'] } })
 	}
 
 	async getMany(query: ReturningGetManyRequest) {

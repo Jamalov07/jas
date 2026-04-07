@@ -184,5 +184,4 @@ export class StaffRepository {
 			data: { currencyId },
 		})
 	}
-
 }

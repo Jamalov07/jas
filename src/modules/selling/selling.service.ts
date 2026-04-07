@@ -46,19 +46,36 @@ export class SellingService {
 	}
 
 	private buildPaymentData(
-		csp: { id: string; description?: string | null; createdAt: Date; clientSellingPaymentMethods: { type: string; currencyId: string; amount: Decimal }[] } | null | undefined,
+		csp: { id: string; description?: string | null; createdAt: Date; methods: { type: string; currencyId: string; amount: Decimal }[] } | null | undefined,
 	): SellingPaymentData | undefined {
 		if (!csp) return undefined
 		return {
 			id: csp.id,
 			description: csp.description,
-			paymentMethods: csp.clientSellingPaymentMethods as any,
+			paymentMethods: csp.methods as any,
 			createdAt: csp.createdAt,
 		}
 	}
 
-	private calcPaymentTotal(csp: { clientSellingPaymentMethods: { amount: Decimal }[] } | null | undefined): Decimal {
-		return csp?.clientSellingPaymentMethods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+	private calcPaymentTotal(csp: { methods: { amount: Decimal }[] } | null | undefined): Decimal {
+		return csp?.methods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+	}
+
+	private calcDebtByCurrency(totalPrices: { currencyId: string; total: Decimal; currency?: { symbol: string } }[], payment: SellingPaymentData | undefined) {
+		const debtMap = new Map<string, { amount: Decimal; symbol?: string }>()
+
+		for (const tp of totalPrices) {
+			debtMap.set(tp.currencyId, { amount: tp.total, symbol: tp.currency?.symbol })
+		}
+
+		for (const method of (payment?.paymentMethods as any[]) ?? []) {
+			if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
+			const existing = debtMap.get(method.currencyId)
+			const symbol = existing?.symbol ?? method.currency?.symbol
+			debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
+		}
+
+		return Array.from(debtMap.entries()).map(([currencyId, { amount, symbol }]) => ({ currencyId, amount, currency: { symbol: symbol ?? '' } }))
 	}
 
 	async findMany(query: SellingFindManyRequest) {
@@ -67,15 +84,16 @@ export class SellingService {
 
 		const calcMap = new Map<string, Decimal>()
 		const mappedSellings = sellings.map((selling) => {
-			for (const method of selling.clientSellingPayment?.clientSellingPaymentMethods ?? []) {
+			for (const method of selling.payment?.methods ?? []) {
 				const key = `${method.type}_${method.currencyId}`
 				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(method.amount))
 			}
 
 			const totalPrices = this.calcTotalPricesFromProducts(selling.products)
-			const payment = this.buildPaymentData(selling.clientSellingPayment)
+			const payment = this.buildPaymentData(selling.payment)
+			const debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
 
-			return { ...selling, payment, totalPrices }
+			return { ...selling, payment, totalPrices, debtByCurrency }
 		})
 
 		const calc: SellingCalcEntry[] = Array.from(calcMap.entries()).map(([key, total]) => {
@@ -98,10 +116,11 @@ export class SellingService {
 		}
 
 		const totalPrices = this.calcTotalPricesFromProducts(selling.products)
-		const payment = this.buildPaymentData(selling.clientSellingPayment)
+		const payment = this.buildPaymentData(selling.payment)
+		const debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
 
 		return createResponse({
-			data: { ...selling, payment, totalPrices },
+			data: { ...selling, payment, totalPrices, debtByCurrency },
 			success: { messages: ['find one success'] },
 		})
 	}
@@ -155,7 +174,7 @@ export class SellingService {
 			try {
 				const clientResult = await this.clientService.findOne({ id: body.clientId })
 				const totalPrices = this.calcTotalPricesFromProducts(selling.products)
-				const payment = this.buildPaymentData(selling.clientSellingPayment)
+				const payment = this.buildPaymentData(selling.payment)
 
 				const sellingInfo = {
 					...selling,
@@ -179,7 +198,8 @@ export class SellingService {
 			}
 		}
 
-		return createResponse({ data: selling, success: { messages: ['create one success'] } })
+		const data = { ...selling, payment: this.buildPaymentData(selling.payment) }
+		return createResponse({ data, success: { messages: ['create one success'] } })
 	}
 
 	async updateOne(request: CRequest, query: SellingGetOneRequest, body: SellingUpdateOneRequest) {
@@ -200,7 +220,7 @@ export class SellingService {
 			try {
 				const clientResult = await this.clientService.findOne({ id: existingSelling.client.id })
 				const totalPrices = this.calcTotalPricesFromProducts(updatedSelling.products)
-				const payment = this.buildPaymentData(updatedSelling.clientSellingPayment)
+				const payment = this.buildPaymentData(updatedSelling.payment)
 				const isFirstAccept = !wasAccepted && isAcceptedNow
 
 				const sellingInfo = {
@@ -218,8 +238,8 @@ export class SellingService {
 
 				await this.botService.sendSellingToChannel(sellingInfo).catch((e) => console.log('bot channel error:', e))
 
-				const prevPaymentTotal = this.calcPaymentTotal(existingSelling.clientSellingPayment)
-				const newPaymentTotal = this.calcPaymentTotal(updatedSelling.clientSellingPayment)
+				const prevPaymentTotal = this.calcPaymentTotal(existingSelling.payment)
+				const newPaymentTotal = this.calcPaymentTotal(updatedSelling.payment)
 				const paymentChanged = !prevPaymentTotal.equals(newPaymentTotal)
 				const hadPaymentBefore = !prevPaymentTotal.isZero()
 				const isModified = hadPaymentBefore && paymentChanged
@@ -259,7 +279,7 @@ export class SellingService {
 		if (wasAccepted && clientResult) {
 			try {
 				const totalPrices = this.calcTotalPricesFromProducts(selling.products)
-				const payment = this.buildPaymentData(selling.clientSellingPayment)
+				const payment = this.buildPaymentData(selling.payment)
 
 				const sellingInfo = {
 					...selling,

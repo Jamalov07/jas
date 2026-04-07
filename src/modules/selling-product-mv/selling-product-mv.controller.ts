@@ -17,20 +17,20 @@ import { AuthOptions, CheckPermissionGuard, CRequest } from '../../common'
 @Controller('selling-product-mv')
 @UseGuards(CheckPermissionGuard)
 export class SellingProductMVController {
-	constructor(private readonly sellingProductMVService: SellingProductMVService) {}
+	constructor(private readonly productMVService: SellingProductMVService) {}
 
 	@Get('many')
 	@ApiOkResponse({ type: SellingProductMVFindManyResponseDto })
 	@ApiOperation({ summary: 'get many selling product movements' })
 	async findMany(@Query() query: SellingProductMVFindManyRequestDto): Promise<SellingProductMVFindManyResponseDto> {
-		return this.sellingProductMVService.findMany(query)
+		return this.productMVService.findMany(query)
 	}
 
 	@Get('one')
 	@ApiOkResponse({ type: SellingProductMVFindOneResponseDto })
 	@ApiOperation({ summary: 'get one selling product movement' })
 	async findOne(@Query() query: SellingProductMVFindOneRequestDto): Promise<SellingProductMVFindOneResponseDto> {
-		return this.sellingProductMVService.findOne(query)
+		return this.productMVService.findOne(query)
 	}
 
 	@Post('one')
@@ -38,7 +38,7 @@ export class SellingProductMVController {
 	@ApiOkResponse({ type: SellingProductMVModifyResponseDto })
 	@ApiOperation({ summary: 'create one selling product movement' })
 	async createOne(@Req() request: CRequest, @Body() body: SellingProductMVCreateOneRequestDto): Promise<SellingProductMVModifyResponseDto> {
-		return this.sellingProductMVService.createOne(request, body)
+		return this.productMVService.createOne(request, body)
 	}
 
 	@Patch('one')
@@ -50,13 +50,13 @@ export class SellingProductMVController {
 		@Query() query: SellingProductMVFindOneRequestDto,
 		@Body() body: SellingProductMVUpdateOneRequestDto,
 	): Promise<SellingProductMVModifyResponseDto> {
-		return this.sellingProductMVService.updateOne(request, query, body)
+		return this.productMVService.updateOne(request, query, body)
 	}
 
 	@Delete('one')
 	@ApiOkResponse({ type: SellingProductMVModifyResponseDto })
 	@ApiOperation({ summary: 'delete one selling product movement' })
 	async deleteOne(@Query() query: SellingProductMVDeleteOneRequestDto): Promise<SellingProductMVModifyResponseDto> {
-		return this.sellingProductMVService.deleteOne(query)
+		return this.productMVService.deleteOne(query)
 	}
 }

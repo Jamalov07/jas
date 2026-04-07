@@ -76,7 +76,7 @@ export class SellingProductMVRepository {
 						createdAt: true,
 						client: { select: { id: true, fullname: true, phone: true } },
 						staff: { select: { id: true, fullname: true, phone: true } },
-						clientSellingPayment: { select: { id: true, description: true, clientSellingPaymentMethods: { select: { type: true, currencyId: true, amount: true } } } },
+						payment: { select: { id: true, description: true, methods: { select: { type: true, currencyId: true, amount: true } } } },
 						products: {
 							select: {
 								id: true,

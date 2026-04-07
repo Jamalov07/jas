@@ -42,21 +42,21 @@ export class SupplierRepository {
 								},
 							},
 						},
-						supplierArrivalPayment: {
+						payment: {
 							select: {
-								supplierArrivalPaymentMethods: {
-									select: { amount: true, currencyId: true },
+								methods: {
+									select: { type: true, amount: true, currencyId: true },
 								},
 							},
 						},
 					},
 					orderBy: { date: 'desc' },
 				},
-				supplierPayments: {
+				payments: {
 					where: { deletedAt: null },
 					select: {
-						supplierPaymentMethods: {
-							select: { amount: true, currencyId: true },
+						methods: {
+							select: { type: true, amount: true, currencyId: true },
 						},
 					},
 				},
@@ -88,11 +88,11 @@ export class SupplierRepository {
 								},
 							},
 						},
-						supplierArrivalPayment: {
+						payment: {
 							select: {
 								createdAt: true,
 								description: true,
-								supplierArrivalPaymentMethods: {
+								methods: {
 									select: { amount: true, currencyId: true, type: true },
 								},
 							},
@@ -100,12 +100,12 @@ export class SupplierRepository {
 					},
 					orderBy: { date: 'desc' },
 				},
-				supplierPayments: {
+				payments: {
 					where: { deletedAt: null },
 					select: {
 						createdAt: true,
 						description: true,
-						supplierPaymentMethods: {
+						methods: {
 							select: { amount: true, currencyId: true, type: true },
 						},
 					},
@@ -199,5 +199,4 @@ export class SupplierRepository {
 
 		return supplier
 	}
-
 }

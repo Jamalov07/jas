@@ -47,21 +47,21 @@ export class ClientRepository {
 								},
 							},
 						},
-						clientSellingPayment: {
+						payment: {
 							select: {
-								clientSellingPaymentMethods: {
-									select: { amount: true, currencyId: true },
+								methods: {
+									select: { type: true, amount: true, currencyId: true },
 								},
 							},
 						},
 					},
 					orderBy: { date: 'desc' },
 				},
-				clientPayments: {
+				payments: {
 					where: { deletedAt: null },
 					select: {
-						clientPaymentMethods: {
-							select: { amount: true, currencyId: true },
+						methods: {
+							select: { type: true, amount: true, currencyId: true },
 						},
 					},
 				},
@@ -95,11 +95,11 @@ export class ClientRepository {
 								},
 							},
 						},
-						clientSellingPayment: {
+						payment: {
 							select: {
 								createdAt: true,
 								description: true,
-								clientSellingPaymentMethods: {
+								methods: {
 									select: { amount: true, currencyId: true, type: true },
 								},
 							},
@@ -111,23 +111,23 @@ export class ClientRepository {
 					where: { status: SellingStatusEnum.accepted },
 					select: {
 						date: true,
-						clientReturningPayments: {
+						payment: {
 							select: {
 								createdAt: true,
 								description: true,
-								clientReturningPaymentMethods: {
+								methods: {
 									select: { amount: true, currencyId: true, type: true },
 								},
 							},
 						},
 					},
 				},
-				clientPayments: {
+				payments: {
 					where: { deletedAt: null },
 					select: {
 						createdAt: true,
 						description: true,
-						clientPaymentMethods: {
+						methods: {
 							select: { amount: true, currencyId: true, type: true },
 						},
 					},
@@ -222,5 +222,4 @@ export class ClientRepository {
 
 		return client
 	}
-
 }

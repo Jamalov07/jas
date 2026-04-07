@@ -12,7 +12,10 @@ import {
 	ClientDebtByCurrency,
 	ClientDeed,
 } from './interfaces'
+import { PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
+
+const isExcludedFromDebt = (type: string) => type === PaymentMethodEnum.fromCash || type === PaymentMethodEnum.fromBalance
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 
@@ -30,9 +33,9 @@ export class ClientService {
 	private calcDebtByCurrency(
 		sellings: Array<{
 			products: Array<{ prices: Array<{ totalPrice: Decimal; currencyId: string }> }>
-			clientSellingPayment?: { clientSellingPaymentMethods: Array<{ amount: Decimal; currencyId: string }> } | null
+			payment?: { methods: Array<{ type: string; amount: Decimal; currencyId: string }> } | null
 		}>,
-		clientPayments: Array<{ clientPaymentMethods: Array<{ amount: Decimal; currencyId: string }> }>,
+		payments: Array<{ methods: Array<{ type: string; amount: Decimal; currencyId: string }> }>,
 	): Map<string, Decimal> {
 		const debtMap = new Map<string, Decimal>()
 
@@ -43,16 +46,18 @@ export class ClientService {
 					debtMap.set(price.currencyId, curr.plus(price.totalPrice))
 				}
 			}
-			if (sel.clientSellingPayment) {
-				for (const method of sel.clientSellingPayment.clientSellingPaymentMethods) {
+			if (sel.payment) {
+				for (const method of sel.payment.methods) {
+					if (isExcludedFromDebt(method.type)) continue
 					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
 					debtMap.set(method.currencyId, curr.minus(method.amount))
 				}
 			}
 		}
 
-		for (const payment of clientPayments) {
-			for (const method of payment.clientPaymentMethods) {
+		for (const payment of payments) {
+			for (const method of payment.methods) {
+				if (isExcludedFromDebt(method.type)) continue
 				const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
 				debtMap.set(method.currencyId, curr.minus(method.amount))
 			}
@@ -65,7 +70,7 @@ export class ClientService {
 		const clients = await this.clientRepository.findMany({ ...query, pagination: false })
 
 		const mappedClients = clients.map((c) => {
-			const debtMap = this.calcDebtByCurrency(c.sellings, c.clientPayments)
+			const debtMap = this.calcDebtByCurrency(c.sellings, c.payments)
 			const debtByCurrency: ClientDebtByCurrency[] = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 			const totalDebt = Array.from(debtMap.values()).reduce((a, b) => a.plus(b), new Decimal(0))
 
@@ -149,16 +154,17 @@ export class ClientService {
 				}
 			}
 
-			if (sel.clientSellingPayment) {
-				for (const method of sel.clientSellingPayment.clientSellingPaymentMethods) {
-					const payDate = sel.clientSellingPayment.createdAt
+			if (sel.payment) {
+				for (const method of sel.payment.methods) {
+					if (isExcludedFromDebt(method.type)) continue
+					const payDate = sel.payment.createdAt
 					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
 						deeds.push({
 							type: 'credit',
 							action: 'payment',
 							value: method.amount,
 							date: payDate,
-							description: sel.clientSellingPayment.description ?? '',
+							description: sel.payment.description ?? '',
 							currencyId: method.currencyId,
 						})
 						addToMap(totalCreditMap, method.currencyId, method.amount)
@@ -168,16 +174,16 @@ export class ClientService {
 		}
 
 		for (const returning of client.returnings) {
-			if (returning.clientReturningPayments) {
-				for (const method of returning.clientReturningPayments.clientReturningPaymentMethods) {
-					const payDate = returning.clientReturningPayments.createdAt
+			if (returning.payment) {
+				for (const method of returning.payment.methods) {
+					const payDate = returning.payment.createdAt
 					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
 						deeds.push({
 							type: 'credit',
 							action: 'returning',
 							value: method.amount,
 							date: payDate,
-							description: returning.clientReturningPayments.description ?? '',
+							description: returning.payment.description ?? '',
 							currencyId: method.currencyId,
 						})
 						addToMap(totalCreditMap, method.currencyId, method.amount)
@@ -186,8 +192,9 @@ export class ClientService {
 			}
 		}
 
-		for (const payment of client.clientPayments) {
-			for (const method of payment.clientPaymentMethods) {
+		for (const payment of client.payments) {
+			for (const method of payment.methods) {
+				if (isExcludedFromDebt(method.type)) continue
 				if ((!deedStartDate || payment.createdAt >= deedStartDate) && (!deedEndDate || payment.createdAt <= deedEndDate)) {
 					deeds.push({
 						type: 'credit',
@@ -216,7 +223,7 @@ export class ClientService {
 		const totalDebitByCurrency = Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 		const debtByCurrency = Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
-		const fullDebtMap = this.calcDebtByCurrency(client.sellings, client.clientPayments)
+		const fullDebtMap = this.calcDebtByCurrency(client.sellings, client.payments)
 		const fullDebt = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
 		return createResponse({

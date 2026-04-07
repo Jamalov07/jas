@@ -21,6 +21,7 @@ export class SupplierPaymentRepository {
 		type: true,
 		currencyId: true,
 		amount: true,
+		currency: { select: { id: true, symbol: true } },
 	}
 
 	async findMany(query: SupplierPaymentFindManyRequest) {
@@ -44,7 +45,7 @@ export class SupplierPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				supplierPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -63,7 +64,7 @@ export class SupplierPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				supplierPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -113,7 +114,7 @@ export class SupplierPaymentRepository {
 				id: true,
 				supplierId: true,
 				supplier: true,
-				supplierPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 			},
 		})
 
@@ -149,7 +150,7 @@ export class SupplierPaymentRepository {
 				staffId: body.staffId,
 				description: body.description,
 				createdAt: dayClose ? date : undefined,
-				supplierPaymentMethods: {
+				methods: {
 					create: body.paymentMethods.map((m) => ({
 						type: m.type as any,
 						currencyId: m.currencyId,
@@ -162,7 +163,7 @@ export class SupplierPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				supplierPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 				createdAt: true,
 				updatedAt: true,
 				deletedAt: true,
@@ -181,7 +182,7 @@ export class SupplierPaymentRepository {
 				deletedAt: body.deletedAt,
 				...(body.paymentMethods
 					? {
-							supplierPaymentMethods: {
+							methods: {
 								deleteMany: {},
 								create: body.paymentMethods.map((m) => ({
 									type: m.type as any,
@@ -196,7 +197,7 @@ export class SupplierPaymentRepository {
 				id: true,
 				supplierId: true,
 				supplier: { select: { id: true, fullname: true, phone: true } },
-				supplierPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 				createdAt: true,
 			},
 		})
@@ -209,5 +210,4 @@ export class SupplierPaymentRepository {
 			where: { id: query.id },
 		})
 	}
-
 }

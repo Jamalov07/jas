@@ -12,7 +12,10 @@ import {
 	SupplierDebtByCurrency,
 	SupplierDeed,
 } from './interfaces'
+import { PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
+
+const isExcludedFromDebt = (type: string) => type === PaymentMethodEnum.fromCash || type === PaymentMethodEnum.fromBalance
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 
@@ -30,9 +33,9 @@ export class SupplierService {
 	private calcDebtByCurrency(
 		arrivals: Array<{
 			products: Array<{ prices: Array<{ totalPrice: Decimal; currencyId: string }> }>
-			supplierArrivalPayment?: { supplierArrivalPaymentMethods: Array<{ amount: Decimal; currencyId: string }> } | null
+			payment?: { methods: Array<{ type: string; amount: Decimal; currencyId: string }> } | null
 		}>,
-		supplierPayments: Array<{ supplierPaymentMethods: Array<{ amount: Decimal; currencyId: string }> }>,
+		payments: Array<{ methods: Array<{ type: string; amount: Decimal; currencyId: string }> }>,
 	): Map<string, Decimal> {
 		const debtMap = new Map<string, Decimal>()
 
@@ -43,16 +46,18 @@ export class SupplierService {
 					debtMap.set(price.currencyId, curr.plus(price.totalPrice))
 				}
 			}
-			if (arr.supplierArrivalPayment) {
-				for (const method of arr.supplierArrivalPayment.supplierArrivalPaymentMethods) {
+			if (arr.payment) {
+				for (const method of arr.payment.methods) {
+					if (isExcludedFromDebt(method.type)) continue
 					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
 					debtMap.set(method.currencyId, curr.minus(method.amount))
 				}
 			}
 		}
 
-		for (const payment of supplierPayments) {
-			for (const method of payment.supplierPaymentMethods) {
+		for (const payment of payments) {
+			for (const method of payment.methods) {
+				if (isExcludedFromDebt(method.type)) continue
 				const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
 				debtMap.set(method.currencyId, curr.minus(method.amount))
 			}
@@ -65,7 +70,7 @@ export class SupplierService {
 		const suppliers = await this.supplierRepository.findMany({ ...query, pagination: false })
 
 		const mappedSuppliers = suppliers.map((s) => {
-			const debtMap = this.calcDebtByCurrency(s.arrivals, s.supplierPayments)
+			const debtMap = this.calcDebtByCurrency(s.arrivals, s.payments)
 			const debtByCurrency: SupplierDebtByCurrency[] = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 			const totalDebt = Array.from(debtMap.values()).reduce((a, b) => a.plus(b), new Decimal(0))
 
@@ -142,16 +147,17 @@ export class SupplierService {
 				}
 			}
 
-			if (arr.supplierArrivalPayment) {
-				for (const method of arr.supplierArrivalPayment.supplierArrivalPaymentMethods) {
-					const payDate = arr.supplierArrivalPayment.createdAt
+			if (arr.payment) {
+				for (const method of arr.payment.methods) {
+					if (isExcludedFromDebt(method.type)) continue
+					const payDate = arr.payment.createdAt
 					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
 						deeds.push({
 							type: 'credit',
 							action: 'payment',
 							value: method.amount,
 							date: payDate,
-							description: arr.supplierArrivalPayment.description ?? '',
+							description: arr.payment.description ?? '',
 							currencyId: method.currencyId,
 						})
 						addToMap(totalCreditMap, method.currencyId, method.amount)
@@ -160,8 +166,9 @@ export class SupplierService {
 			}
 		}
 
-		for (const payment of supplier.supplierPayments) {
-			for (const method of payment.supplierPaymentMethods) {
+		for (const payment of supplier.payments) {
+			for (const method of payment.methods) {
+				if (isExcludedFromDebt(method.type)) continue
 				if ((!deedStartDate || payment.createdAt >= deedStartDate) && (!deedEndDate || payment.createdAt <= deedEndDate)) {
 					deeds.push({
 						type: 'credit',
@@ -190,7 +197,7 @@ export class SupplierService {
 		const totalDebitByCurrency = Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 		const debtByCurrency = Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
-		const fullDebtMap = this.calcDebtByCurrency(supplier.arrivals, supplier.supplierPayments)
+		const fullDebtMap = this.calcDebtByCurrency(supplier.arrivals, supplier.payments)
 		const fullDebt = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
 		return createResponse({

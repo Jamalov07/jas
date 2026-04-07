@@ -24,7 +24,7 @@ const SELLING_PAYMENT_SELECT = {
 	id: true,
 	description: true,
 	createdAt: true,
-	clientSellingPaymentMethods: { select: { type: true, currencyId: true, amount: true } },
+	methods: { select: { type: true, currencyId: true, amount: true, currency: { select: { symbol: true } } } },
 }
 const SELLING_SELECT = {
 	id: true as const,
@@ -36,7 +36,7 @@ const SELLING_SELECT = {
 	deletedAt: true as const,
 	client: { select: { id: true, fullname: true, phone: true, createdAt: true } },
 	staff: { select: { id: true, fullname: true, phone: true, createdAt: true } },
-	clientSellingPayment: { select: SELLING_PAYMENT_SELECT },
+	payment: { select: SELLING_PAYMENT_SELECT },
 	products: {
 		orderBy: [{ createdAt: 'desc' as const }, { id: 'asc' as const }],
 		select: PRODUCT_MV_SELECT,
@@ -141,7 +141,7 @@ export class SellingRepository {
 						product: { select: { id: true, name: true, count: true } },
 					},
 				},
-				clientSellingPayment: { select: { id: true, clientSellingPaymentMethods: { select: { type: true, currencyId: true, amount: true } } } },
+				payment: { select: { id: true, methods: { select: { type: true, currencyId: true, amount: true } } } },
 			},
 		})
 	}
@@ -170,12 +170,12 @@ export class SellingRepository {
 				date: body.date ? new Date(body.date) : undefined,
 				staffId: body.staffId,
 				...(body.payment?.paymentMethods?.length && {
-					clientSellingPayment: {
+					payment: {
 						create: {
 							clientId: body.clientId,
 							staffId: body.staffId,
 							description: body.payment.description,
-							clientSellingPaymentMethods: {
+							methods: {
 								createMany: {
 									data: body.payment.paymentMethods.map((m) => ({
 										type: m.type,
@@ -233,14 +233,14 @@ export class SellingRepository {
 		if (body.payment?.paymentMethods) {
 			const existingPayment = await this.prisma.clientSellingPaymentModel.findFirst({ where: { sellingId: query.id } })
 			if (existingPayment) {
-				await this.prisma.clientSellingPaymentMethodModel.deleteMany({ where: { clientSellingPaymentId: existingPayment.id } })
+				await this.prisma.clientSellingPaymentMethodModel.deleteMany({ where: { paymentId: existingPayment.id } })
 				if (body.payment.paymentMethods.length) {
 					await this.prisma.clientSellingPaymentMethodModel.createMany({
 						data: body.payment.paymentMethods.map((m) => ({
 							type: m.type,
 							currencyId: m.currencyId,
 							amount: m.amount,
-							clientSellingPaymentId: existingPayment.id,
+							paymentId: existingPayment.id,
 						})),
 					})
 				}
@@ -254,7 +254,7 @@ export class SellingRepository {
 						clientId: existing.clientId,
 						staffId: existing.staffId,
 						description: body.payment.description,
-						clientSellingPaymentMethods: {
+						methods: {
 							createMany: { data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) },
 						},
 					},
@@ -294,5 +294,4 @@ export class SellingRepository {
 
 		return selling
 	}
-
 }

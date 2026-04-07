@@ -44,6 +44,7 @@ enum PaymentMethodEnum {
   uzum         @map("uzum")
   other        @map("other")
   
+  fromCash     @map("from_cash")
   fromBalance  @map("from_balance")
 
   @@map("payment_method")
@@ -178,9 +179,9 @@ model ClientModel {
 
   sellings   SellingModel[]
   returnings ReturningModel[]
-  clientPayments   ClientPaymentModel[]
-  clientSellingPayments ClientSellingPaymentModel[]
-  clientReturningPayments ClientReturningPaymentModel[]
+  payments   ClientPaymentModel[]
+  sellingPayments ClientSellingPaymentModel[]
+  returningPayments ClientReturningPaymentModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -203,8 +204,8 @@ model SupplierModel {
   phone    String  @map("phone")    @db.VarChar()      @unique
 
   arrivals ArrivalModel[]
-  supplierPayments SupplierPaymentModel[]
-  supplierArrivalPayments  SupplierArrivalPaymentModel[]
+  payments SupplierPaymentModel[]
+  arrivalPayments  SupplierArrivalPaymentModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -327,7 +328,7 @@ model SellingModel {
   staff    StaffModel              @relation(fields: [staffId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
   
   products SellingProductMVModel[]
-  clientSellingPayment ClientSellingPaymentModel?
+  payment ClientSellingPaymentModel?
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -372,16 +373,16 @@ model SellingProductMVPriceModel {
   price       Decimal       @map("price")                 @db.Decimal(10, 3) @default(0)
   totalPrice  Decimal       @map("total_price")           @db.Decimal(10, 3) @default(0)
   currencyId  String        @map("currency_id")           @db.Uuid
-  sellingProductMVId String        @map("selling_product_mv_id") @db.Uuid
+  productMVId String        @map("product_mv_id") @db.Uuid
 
   currency  CurrencyModel         @relation(fields: [currencyId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
-  sellingProductMV SellingProductMVModel @relation(fields: [sellingProductMVId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  productMV SellingProductMVModel @relation(fields: [productMVId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([id])
   @@index([id])
-  @@index([sellingProductMVId])
+  @@index([productMVId])
   @@index([currencyId])
-  @@unique([type, sellingProductMVId])
+  @@unique([type, productMVId])
   @@map("selling_product_mv_price")
 }
 
@@ -396,7 +397,7 @@ model ClientSellingPaymentModel {
   staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
   selling   SellingModel    @relation(fields: [sellingId],   references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  clientSellingPaymentMethods ClientSellingPaymentMethodModel[]
+  methods ClientSellingPaymentMethodModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -411,10 +412,10 @@ model ClientSellingPaymentMethodModel {
   type        PaymentMethodEnum 
   currencyId  String  @map("currency_id") @db.Uuid
   amount      Decimal @map("amount")      @db.Decimal(10, 3)
-  clientSellingPaymentId String  @map("client_selling_payment_id") @db.Uuid
+  paymentId String  @map("payment_id") @db.Uuid
 
   currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  clientSellingPayment ClientSellingPaymentModel @relation(fields: [clientSellingPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payment ClientSellingPaymentModel @relation(fields: [paymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -438,7 +439,7 @@ model ArrivalModel {
   supplier SupplierModel           @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   staff    StaffModel              @relation(fields: [staffId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
   products ArrivalProductMVModel[]
-  supplierArrivalPayment  SupplierArrivalPaymentModel?
+  payment  SupplierArrivalPaymentModel?
 
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
@@ -483,16 +484,16 @@ model ArrivalProductMVPriceModel {
   price       Decimal       @map("price")                 @db.Decimal(10, 3) @default(0)
   totalPrice  Decimal       @map("total_price")           @db.Decimal(10, 3) @default(0)
   currencyId  String        @map("currency_id")           @db.Uuid
-  arrivalProductMVId String        @map("arrival_product_mv_id") @db.Uuid
+  productMVId String        @map("product_mv_id") @db.Uuid
 
   currency  CurrencyModel         @relation(fields: [currencyId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
-  arrivalProductMV ArrivalProductMVModel @relation(fields: [arrivalProductMVId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  arrivalProductMV ArrivalProductMVModel @relation(fields: [productMVId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([id])
   @@index([id])
-  @@index([arrivalProductMVId])
+  @@index([productMVId])
   @@index([currencyId])
-  @@unique([type, arrivalProductMVId])
+  @@unique([type, productMVId])
   @@map("arrival_product_mv_price")
 }
 
@@ -508,7 +509,7 @@ model SupplierArrivalPaymentModel {
   staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
   arrival   ArrivalModel    @relation(fields: [arrivalId],   references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  supplierArrivalPaymentMethods SupplierArrivalPaymentMethodModel[]
+  methods SupplierArrivalPaymentMethodModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -523,10 +524,10 @@ model SupplierArrivalPaymentMethodModel {
   type        PaymentMethodEnum 
   currencyId  String  @map("currency_id") @db.Uuid
   amount      Decimal @map("amount")      @db.Decimal(10, 3)
-  supplierArrivalPaymentId String  @map("supplier_arrival_payment_id") @db.Uuid
+  paymentId String  @map("payment_id") @db.Uuid
 
   currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  supplierArrivalPayment SupplierArrivalPaymentModel @relation(fields: [supplierArrivalPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payment SupplierArrivalPaymentModel @relation(fields: [paymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -551,8 +552,7 @@ model ReturningModel {
   client   ClientModel              @relation(fields: [clientId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   staff    StaffModel               @relation(fields: [staffId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
   products ReturningProductMVModel[]
-  clientReturningPayments ClientReturningPaymentModel?
-
+  payment  ClientReturningPaymentModel?
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -598,16 +598,16 @@ model ReturningProductMVPriceModel {
   price         Decimal       @map("price")                   @db.Decimal(10, 3) @default(0)
   totalPrice    Decimal       @map("total_price")             @db.Decimal(10, 3) @default(0)
   currencyId    String        @map("currency_id")             @db.Uuid
-  returningProductMVId String        @map("returning_product_mv_id") @db.Uuid
+  productMVId   String        @map("product_mv_id") @db.Uuid
 
   currency    CurrencyModel           @relation(fields: [currencyId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
-  returningProductMV ReturningProductMVModel @relation(fields: [returningProductMVId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  productMV   ReturningProductMVModel @relation(fields: [productMVId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([id])
   @@index([id])
-  @@index([returningProductMVId])
+  @@index([productMVId])
   @@index([currencyId])
-  @@unique([type, returningProductMVId])
+  @@unique([type, productMVId])
   @@map("returning_product_mv_price")
 }
 
@@ -623,7 +623,7 @@ model ClientReturningPaymentModel {
   staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
   returning   ReturningModel    @relation(fields: [returningId],   references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  clientReturningPaymentMethods ClientReturningPaymentMethodModel[]
+  methods ClientReturningPaymentMethodModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -638,10 +638,10 @@ model ClientReturningPaymentMethodModel {
   type        PaymentMethodEnum 
   currencyId  String  @map("currency_id") @db.Uuid
   amount      Decimal @map("amount")      @db.Decimal(10, 3)
-  clientReturningPaymentId String  @map("client_returning_payment_id") @db.Uuid
+  paymentId String  @map("payment_id") @db.Uuid
 
   currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  clientReturningPayment ClientReturningPaymentModel @relation(fields: [clientReturningPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payment ClientReturningPaymentModel @relation(fields: [paymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -665,7 +665,7 @@ model ClientPaymentModel {
   client    ClientModel     @relation(fields: [clientId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
   staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  clientPaymentMethods ClientPaymentMethodModel[]
+  methods ClientPaymentMethodModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -680,10 +680,10 @@ model ClientPaymentMethodModel {
   type        PaymentMethodEnum 
   currencyId  String  @map("currency_id") @db.Uuid
   amount      Decimal @map("amount")      @db.Decimal(10, 3)
-  clientPaymentId String  @map("client_payment_id") @db.Uuid
+  paymentId String  @map("payment_id") @db.Uuid
 
   currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  clientPayment ClientPaymentModel @relation(fields: [clientPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payment ClientPaymentModel @relation(fields: [paymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -708,7 +708,7 @@ model SupplierPaymentModel {
   supplier    SupplierModel     @relation(fields: [supplierId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
   staff     StaffModel      @relation(fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  supplierPaymentMethods SupplierPaymentMethodModel[]
+  methods SupplierPaymentMethodModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -723,10 +723,10 @@ model SupplierPaymentMethodModel {
   type        PaymentMethodEnum 
   currencyId  String  @map("currency_id") @db.Uuid
   amount      Decimal @map("amount")      @db.Decimal(10, 3)
-  supplierPaymentId String  @map("supplier_payment_id") @db.Uuid
+  paymentId String  @map("payment_id")    @db.Uuid
 
-  currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  supplierPayment SupplierPaymentModel @relation(fields: [supplierPaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  currency CurrencyModel       @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payment SupplierPaymentModel @relation(fields: [paymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -742,15 +742,15 @@ model SupplierPaymentMethodModel {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model StaffPaymentModel {
-  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
-  employeeId    String  @map("employee_id")    @db.Uuid
-  staffId     String  @map("staff_id")     @db.Uuid
-  description String? @map("description")  @db.VarChar()      @default("")
+  id           String   @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  staffId      String   @map("staff_id")     @db.Uuid
+  employeeId   String   @map("employee_id")  @db.Uuid
+  description  String?  @map("description")  @db.VarChar()      @default("")
 
-  employee    StaffModel     @relation(name: "employee", fields: [employeeId],    references: [id], onDelete: Cascade, onUpdate: NoAction)
-  staff     StaffModel      @relation(name: "staff", fields: [staffId],     references: [id], onDelete: Cascade, onUpdate: NoAction)
+  staff     StaffModel  @relation(name: "staff",    fields: [ staffId    ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  employee  StaffModel  @relation(name: "employee", fields: [ employeeId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
 
-  employeePaymentMethods StaffPaymentMethodModel[]
+  methods  StaffPaymentMethodModel[]
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
@@ -761,41 +761,54 @@ model StaffPaymentModel {
 }
 
 model StaffPaymentMethodModel {
-  id          String  @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
-  type        PaymentMethodEnum 
-  currencyId  String  @map("currency_id") @db.Uuid
-  amount      Decimal @map("amount")      @db.Decimal(10, 3)
-  employeePaymentId String  @map("employee_payment_id") @db.Uuid
+  id          String             @map("id")           @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type        PaymentMethodEnum  @map("type")
+  amount      Decimal            @map("amount")       @db.Decimal(10, 3)
+  paymentId   String             @map("payment_id")   @db.Uuid
+  currencyId  String             @map("currency_id")  @db.Uuid
 
-  currency CurrencyModel @relation(fields: [currencyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  employeePayment StaffPaymentModel @relation(fields: [employeePaymentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  currency  CurrencyModel      @relation(fields: [ currencyId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+  payment   StaffPaymentModel  @relation(fields: [ paymentId  ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
   updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz 
 
   @@id([id])
   @@map("employee_payment_method")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Day Close Log
+// ─────────────────────────────────────────────────────────────────────────────
+
 model DayCloseLog {
-  id         String    @map("id")          @db.Uuid            @default(dbgenerated("GEN_RANDOM_UUID()"))
-  closedDate DateTime  @db.Date 
-  createdAt  DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
-  updatedAt  DateTime  @map("updated_at") @db.Timestamptz @updatedAt
-  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz
+  id          String     @map("id")           @db.Uuid         @default(dbgenerated("GEN_RANDOM_UUID()"))
+  closedDate  DateTime   @map("closed_date")  @db.Date         @default(dbgenerated("NOW()")) 
+ 
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([ id ])
   @@map("day_close_log")
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Bot User
+// ─────────────────────────────────────────────────────────────────────────────
+
 model BotUserModel {
-  id        String          @map("id")         @db.VarChar()  @unique
-  isActive  Boolean         @map("is_active")  @db.Boolean    @default(true) 
-  clientId  String?         @map("client_id")  @db.Uuid       @unique
-  language  BotLanguageEnum @map("language")                  @default(uz)               
+  id        String           @map("id")         @db.VarChar()  @unique
+  isActive  Boolean          @map("is_active")  @db.Boolean    @default(true) 
+  clientId  String?          @map("client_id")  @db.Uuid       @unique
+  language  BotLanguageEnum  @map("language")                  @default(uz)               
 
   client  ClientModel?  @relation(fields: [ clientId ], references: [ id ], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([ id ])
   @@index([ id ])

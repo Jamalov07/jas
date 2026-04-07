@@ -12,6 +12,10 @@ import {
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 import { PaymentMethodEnum } from '@prisma/client'
+
+type PriceEntry = { type: string; price: Decimal; totalPrice: Decimal; currencyId: string; currency: { symbol: string } }
+type ProductEntry = { prices: PriceEntry[] }
+type PaymentMethodEntry = { type: string; currencyId: string; amount: Decimal; currency?: { symbol: string } | null }
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 
@@ -22,19 +26,61 @@ export class ArrivalService {
 		private readonly excelService: ExcelService,
 	) {}
 
+	private calcTotalPricesByType(products: ProductEntry[]) {
+		const map = new Map<string, Map<string, { total: Decimal; symbol: string }>>()
+
+		for (const product of products) {
+			for (const price of product.prices) {
+				if (!map.has(price.type)) map.set(price.type, new Map())
+				const currMap = map.get(price.type)
+				const existing = currMap.get(price.currencyId)
+				currMap.set(price.currencyId, {
+					total: (existing?.total ?? new Decimal(0)).plus(price.totalPrice),
+					symbol: existing?.symbol || price.currency?.symbol || '',
+				})
+			}
+		}
+
+		const result: Record<string, { currencyId: string; total: Decimal; currency: { symbol: string } }[]> = {}
+		for (const [type, currMap] of map.entries()) {
+			result[type] = Array.from(currMap.entries()).map(([currencyId, { total, symbol }]) => ({ currencyId, total, currency: { symbol } }))
+		}
+		return result
+	}
+
+	private calcDebtByCurrency(totalPrices: Record<string, { currencyId: string; total: Decimal; currency: { symbol: string } }[]>, paymentMethods: PaymentMethodEntry[]) {
+		const debtMap = new Map<string, { amount: Decimal; symbol: string }>()
+
+		for (const entry of totalPrices['cost'] ?? []) {
+			const existing = debtMap.get(entry.currencyId)
+			debtMap.set(entry.currencyId, { amount: (existing?.amount ?? new Decimal(0)).plus(entry.total), symbol: existing?.symbol || entry.currency.symbol })
+		}
+
+		for (const method of paymentMethods) {
+			if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
+			const existing = debtMap.get(method.currencyId)
+			const symbol = existing?.symbol || method.currency?.symbol || ''
+			debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
+		}
+
+		return Array.from(debtMap.entries()).map(([currencyId, { amount, symbol }]) => ({ currencyId, amount, currency: { symbol } }))
+	}
+
 	async findMany(query: ArrivalFindManyRequest) {
 		const arrivals = await this.arrivalRepository.findMany(query)
 		const arrivalsCount = await this.arrivalRepository.countFindMany(query)
 
 		const calcMap = new Map<string, Decimal>()
 		const mappedArrivals = arrivals.map((arrival) => {
-			for (const method of arrival.supplierArrivalPayment?.supplierArrivalPaymentMethods ?? []) {
+			for (const method of arrival.payment?.methods ?? []) {
 				const key = `${method.type}_${method.currencyId}`
 				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(method.amount))
 			}
-			const sap = arrival.supplierArrivalPayment
-			const payment = sap ? { id: sap.id, description: sap.description, createdAt: sap.createdAt, paymentMethods: sap.supplierArrivalPaymentMethods } : undefined
-			return { ...arrival, payment }
+			const sap = arrival.payment
+			const payment = sap ? { id: sap.id, description: sap.description, createdAt: sap.createdAt, paymentMethods: sap.methods } : undefined
+			const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
+			const debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[])
+			return { ...arrival, payment, totalPrices, debtByCurrency }
 		})
 
 		const calc = Array.from(calcMap.entries()).map(([key, total]) => {
@@ -56,9 +102,11 @@ export class ArrivalService {
 			throw new BadRequestException(ERROR_MSG.ARRIVAL.NOT_FOUND.UZ)
 		}
 
-		const sap = arrival.supplierArrivalPayment
-		const payment = sap ? { id: sap.id, description: sap.description, createdAt: sap.createdAt, paymentMethods: sap.supplierArrivalPaymentMethods } : undefined
-		return createResponse({ data: { ...arrival, payment }, success: { messages: ['find one success'] } })
+		const sap = arrival.payment
+		const payment = sap ? { id: sap.id, description: sap.description, createdAt: sap.createdAt, paymentMethods: sap.methods } : undefined
+		const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
+		const debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[])
+		return createResponse({ data: { ...arrival, payment, totalPrices, debtByCurrency }, success: { messages: ['find one success'] } })
 	}
 
 	async getMany(query: ArrivalGetManyRequest) {
@@ -83,7 +131,11 @@ export class ArrivalService {
 	async createOne(request: CRequest, body: ArrivalCreateOneRequest) {
 		body.staffId = request.user.id
 		const arrival = await this.arrivalRepository.createOne(body)
-		return createResponse({ data: arrival, success: { messages: ['create one success'] } })
+		const data = {
+			...arrival,
+			payment: arrival.payment ? { ...arrival.payment, paymentMethods: arrival.payment.methods } : undefined,
+		}
+		return createResponse({ data, success: { messages: ['create one success'] } })
 	}
 
 	async updateOne(query: ArrivalGetOneRequest, body: ArrivalUpdateOneRequest) {

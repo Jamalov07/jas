@@ -4,7 +4,7 @@ import { StatisticsGetAllProductMVRequest, StatisticsGetSellingPeriodStatsReques
 import { ClientReportByCurrency, ClientReportCalc, ClientReportRow } from './interfaces/response.interfaces'
 import { StatsTypeEnum } from '../selling/enums'
 
-import { SellingStatusEnum } from '@prisma/client'
+import { PaymentMethodEnum, SellingStatusEnum } from '@prisma/client'
 import { convertUTCtoLocal, extractDateParts } from '@common'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -70,7 +70,7 @@ export class StatisticsRepository {
 	private async getTotalsByCurrencyForPeriod(start: Date, end: Date) {
 		const prices = await this.prisma.sellingProductMVPriceModel.findMany({
 			where: {
-				sellingProductMV: {
+				productMV: {
 					selling: { status: SellingStatusEnum.accepted, createdAt: { gte: start, lte: end } },
 				},
 			},
@@ -347,9 +347,9 @@ export class StatisticsRepository {
 						},
 					},
 				},
-				clientSellingPayment: {
+				payment: {
 					select: {
-						clientSellingPaymentMethods: { select: { currencyId: true, amount: true } },
+						methods: { select: { type: true, currencyId: true, amount: true } },
 					},
 				},
 			},
@@ -360,7 +360,7 @@ export class StatisticsRepository {
 			where: { deletedAt: null, ...(dateFilter && { createdAt: dateFilter }) },
 			select: {
 				clientId: true,
-				clientPaymentMethods: { select: { currencyId: true, amount: true } },
+				methods: { select: { type: true, currencyId: true, amount: true } },
 			},
 		})
 
@@ -369,9 +369,9 @@ export class StatisticsRepository {
 			where: { status: SellingStatusEnum.accepted, ...(dateFilter && { date: dateFilter }) },
 			select: {
 				clientId: true,
-				clientReturningPayments: {
+				payment: {
 					select: {
-						clientReturningPaymentMethods: { select: { currencyId: true, amount: true } },
+						methods: { select: { type: true, currencyId: true, amount: true } },
 					},
 				},
 			},
@@ -403,9 +403,10 @@ export class StatisticsRepository {
 					addToCurrencyMap(c.selling.priceMap, price.currencyId, price.totalPrice)
 				}
 			}
-			if (sel.clientSellingPayment) {
+			if (sel.payment) {
 				c.selling.paymentCount += 1
-				for (const method of sel.clientSellingPayment.clientSellingPaymentMethods) {
+				for (const method of sel.payment.methods) {
+					if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
 					addToCurrencyMap(c.selling.paymentMap, method.currencyId, method.amount)
 				}
 			}
@@ -414,7 +415,8 @@ export class StatisticsRepository {
 		for (const payment of clientPayments) {
 			const c = getCalc(payment.clientId)
 			c.clientPayment.count += 1
-			for (const method of payment.clientPaymentMethods) {
+			for (const method of payment.methods) {
+				if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
 				addToCurrencyMap(c.clientPayment.paymentMap, method.currencyId, method.amount)
 			}
 		}
@@ -422,8 +424,9 @@ export class StatisticsRepository {
 		for (const returning of returnings) {
 			const c = getCalc(returning.clientId)
 			c.returning.count += 1
-			if (returning.clientReturningPayments) {
-				for (const method of returning.clientReturningPayments.clientReturningPaymentMethods) {
+			if (returning.payment) {
+				for (const method of returning.payment.methods) {
+					if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
 					addToCurrencyMap(c.returning.paymentMap, method.currencyId, method.amount)
 				}
 			}

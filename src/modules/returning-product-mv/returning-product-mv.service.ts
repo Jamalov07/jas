@@ -11,11 +11,11 @@ import {
 
 @Injectable()
 export class ReturningProductMVService {
-	constructor(private readonly returningProductMVRepository: ReturningProductMVRepository) {}
+	constructor(private readonly productMVRepository: ReturningProductMVRepository) {}
 
 	async findMany(query: ReturningProductMVFindManyRequest) {
-		const items = await this.returningProductMVRepository.findMany(query)
-		const count = await this.returningProductMVRepository.countFindMany(query)
+		const items = await this.productMVRepository.findMany(query)
+		const count = await this.productMVRepository.countFindMany(query)
 
 		const result = query.pagination ? { totalCount: count, pagesCount: Math.ceil(count / query.pageSize), pageSize: items.length, data: items } : { data: items }
 
@@ -23,24 +23,24 @@ export class ReturningProductMVService {
 	}
 
 	async findOne(query: ReturningProductMVFindOneRequest) {
-		const item = await this.returningProductMVRepository.findOne(query)
+		const item = await this.productMVRepository.findOne(query)
 		if (!item) throw new BadRequestException(ERROR_MSG.RETURNING.NOT_FOUND.UZ)
 		return createResponse({ data: item, success: { messages: ['find one success'] } })
 	}
 
 	async createOne(request: CRequest, body: ReturningProductMVCreateOneRequest) {
 		body.staffId = request.user.id
-		await this.returningProductMVRepository.createOne(body)
+		await this.productMVRepository.createOne(body)
 		return createResponse({ data: null, success: { messages: ['create one success'] } })
 	}
 
 	async updateOne(request: CRequest, query: ReturningProductMVFindOneRequest, body: ReturningProductMVUpdateOneRequest) {
-		await this.returningProductMVRepository.updateOne(query, body)
+		await this.productMVRepository.updateOne(query, body)
 		return createResponse({ data: null, success: { messages: ['update one success'] } })
 	}
 
 	async deleteOne(query: ReturningProductMVDeleteOneRequest) {
-		await this.returningProductMVRepository.deleteOne(query)
+		await this.productMVRepository.deleteOne(query)
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
 	}
 }

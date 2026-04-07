@@ -38,7 +38,7 @@ export class ClientPaymentService {
 
 		const calcMap = new Map<string, Decimal>()
 		for (const payment of payments) {
-			for (const method of payment.clientPaymentMethods) {
+			for (const method of payment.methods) {
 				const curr = calcMap.get(method.currencyId) ?? new Decimal(0)
 				calcMap.set(method.currencyId, curr.plus(method.amount))
 			}

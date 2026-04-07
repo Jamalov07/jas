@@ -21,6 +21,7 @@ export class ClientPaymentRepository {
 		type: true,
 		currencyId: true,
 		amount: true,
+		currency: { select: { id: true, symbol: true } },
 	}
 
 	async findMany(query: ClientPaymentFindManyRequest) {
@@ -44,7 +45,7 @@ export class ClientPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				clientPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -63,7 +64,7 @@ export class ClientPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				clientPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -113,7 +114,7 @@ export class ClientPaymentRepository {
 				id: true,
 				clientId: true,
 				client: true,
-				clientPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 			},
 		})
 
@@ -149,7 +150,7 @@ export class ClientPaymentRepository {
 				staffId: body.staffId,
 				description: body.description,
 				createdAt: dayClose ? date : undefined,
-				clientPaymentMethods: {
+				methods: {
 					create: body.paymentMethods.map((m) => ({
 						type: m.type as any,
 						currencyId: m.currencyId,
@@ -162,7 +163,7 @@ export class ClientPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				clientPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 				createdAt: true,
 				updatedAt: true,
 				deletedAt: true,
@@ -181,7 +182,7 @@ export class ClientPaymentRepository {
 				deletedAt: body.deletedAt,
 				...(body.paymentMethods
 					? {
-							clientPaymentMethods: {
+							methods: {
 								deleteMany: {},
 								create: body.paymentMethods.map((m) => ({
 									type: m.type as any,
@@ -196,7 +197,7 @@ export class ClientPaymentRepository {
 				id: true,
 				clientId: true,
 				client: { select: { id: true, fullname: true, phone: true } },
-				clientPaymentMethods: { select: this.paymentMethodsSelect },
+				methods: { select: this.paymentMethodsSelect },
 				createdAt: true,
 			},
 		})
@@ -209,5 +210,4 @@ export class ClientPaymentRepository {
 			where: { id: query.id },
 		})
 	}
-
 }
