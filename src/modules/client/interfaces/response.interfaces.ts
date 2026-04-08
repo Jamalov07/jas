@@ -9,7 +9,7 @@ export declare interface ClientDebtByCurrency {
 
 export declare interface ClientDeed {
 	type: 'debit' | 'credit'
-	action: 'selling' | 'payment' | 'returning'
+	action: 'selling' | 'payment' | 'returning' | 'change'
 	date: Date
 	value: Decimal
 	description: string

@@ -15,7 +15,7 @@ import {
 import { PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
-const isExcludedFromDebt = (type: string) => type === PaymentMethodEnum.fromCash || type === PaymentMethodEnum.fromBalance
+const isExcludedFromDebt = (type: string) => type === PaymentMethodEnum.fromBalance
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 
@@ -50,7 +50,11 @@ export class ClientService {
 				for (const method of sel.payment.methods) {
 					if (isExcludedFromDebt(method.type)) continue
 					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
-					debtMap.set(method.currencyId, curr.minus(method.amount))
+					if (method.type === PaymentMethodEnum.fromCash) {
+						debtMap.set(method.currencyId, curr.plus(method.amount))
+					} else {
+						debtMap.set(method.currencyId, curr.minus(method.amount))
+					}
 				}
 			}
 		}
@@ -158,16 +162,29 @@ export class ClientService {
 				for (const method of sel.payment.methods) {
 					if (isExcludedFromDebt(method.type)) continue
 					const payDate = sel.payment.createdAt
-					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
+					if (method.type === PaymentMethodEnum.fromCash) {
+						const payDate = sel.payment.createdAt
 						deeds.push({
-							type: 'credit',
-							action: 'payment',
+							type: 'debit',
+							action: 'change',
 							value: method.amount,
 							date: payDate,
 							description: sel.payment.description ?? '',
 							currencyId: method.currencyId,
 						})
-						addToMap(totalCreditMap, method.currencyId, method.amount)
+						addToMap(totalDebitMap, method.currencyId, method.amount)
+					} else {
+						if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
+							deeds.push({
+								type: 'credit',
+								action: 'payment',
+								value: method.amount,
+								date: payDate,
+								description: sel.payment.description ?? '',
+								currencyId: method.currencyId,
+							})
+							addToMap(totalCreditMap, method.currencyId, method.amount)
+						}
 					}
 				}
 			}

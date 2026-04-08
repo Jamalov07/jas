@@ -788,6 +788,10 @@ export class ExcelService {
 
 			if (sel.payment) {
 				const activeMethods = sel.payment.methods.filter((m) => m.type !== PaymentMethodEnum.fromCash && m.type !== PaymentMethodEnum.fromBalance)
+				const fromCash = sel.payment.methods.find((m) => m.type === PaymentMethodEnum.fromCash)
+				if (fromCash) {
+					deeds.push({ type: 'debit', action: 'Qaytim', amount: fromCash.amount.toFixed(2), date: sel.payment.createdAt, description: sel.payment.description ?? '' })
+				}
 				if (activeMethods.length) {
 					const paidStr = this.formatPaymentMethods(activeMethods)
 					deeds.push({ type: 'credit', action: "To'lov", amount: paidStr, date: sel.payment.createdAt, description: sel.payment.description ?? '' })
