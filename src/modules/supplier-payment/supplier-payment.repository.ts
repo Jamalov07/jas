@@ -16,14 +16,6 @@ export class SupplierPaymentRepository {
 		this.prisma = prisma
 	}
 
-	private paymentMethodsSelect = {
-		id: true,
-		type: true,
-		currencyId: true,
-		amount: true,
-		currency: { select: { id: true, symbol: true } },
-	}
-
 	async findMany(query: SupplierPaymentFindManyRequest) {
 		let paginationOptions = {}
 		if (query.pagination) {
@@ -45,7 +37,15 @@ export class SupplierPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: { select: this.paymentMethodsSelect },
+				methods: {
+					select: {
+						id: true,
+						type: true,
+						currencyId: true,
+						amount: true,
+						currency: { select: { id: true, symbol: true } },
+					},
+				},
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -64,7 +64,15 @@ export class SupplierPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: { select: this.paymentMethodsSelect },
+				methods: {
+					select: {
+						id: true,
+						type: true,
+						currencyId: true,
+						amount: true,
+						currency: { select: { id: true, symbol: true } },
+					},
+				},
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -114,7 +122,15 @@ export class SupplierPaymentRepository {
 				id: true,
 				supplierId: true,
 				supplier: true,
-				methods: { select: this.paymentMethodsSelect },
+				methods: {
+					select: {
+						id: true,
+						type: true,
+						currencyId: true,
+						amount: true,
+						currency: { select: { id: true, symbol: true } },
+					},
+				},
 			},
 		})
 
@@ -163,7 +179,15 @@ export class SupplierPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: { select: this.paymentMethodsSelect },
+				methods: {
+					select: {
+						id: true,
+						type: true,
+						currencyId: true,
+						amount: true,
+						currency: { select: { id: true, symbol: true } },
+					},
+				},
 				createdAt: true,
 				updatedAt: true,
 				deletedAt: true,
@@ -197,7 +221,15 @@ export class SupplierPaymentRepository {
 				id: true,
 				supplierId: true,
 				supplier: { select: { id: true, fullname: true, phone: true } },
-				methods: { select: this.paymentMethodsSelect },
+				methods: {
+					select: {
+						id: true,
+						type: true,
+						currencyId: true,
+						amount: true,
+						currency: { select: { id: true, symbol: true } },
+					},
+				},
 				createdAt: true,
 			},
 		})

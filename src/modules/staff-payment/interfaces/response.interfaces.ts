@@ -19,7 +19,7 @@ export declare interface StaffPaymentFindManyData extends PaginationResponse<Sta
 
 export declare interface StaffPaymentFindOneData extends Pick<StaffPaymentRequired, 'id'> {
 	description?: string | null
-	paymentMethods?: StaffPaymentMethodData[]
+	methods?: StaffPaymentMethodData[]
 }
 
 export declare interface StaffPaymentFindManyResponse extends GlobalResponse {

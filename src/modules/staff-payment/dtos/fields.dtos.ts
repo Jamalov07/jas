@@ -1,16 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto, IsDecimalIntOrBigInt } from '../../../common'
 import { StaffPaymentMethod, StaffPaymentOptional, StaffPaymentRequired } from '../interfaces'
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator'
-import { $Enums, PaymentMethodEnum } from '@prisma/client'
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export class StaffPaymentMethodDto implements StaffPaymentMethod {
-	@ApiProperty({ enum: PaymentMethodEnum })
-	@IsNotEmpty()
-	@IsEnum(PaymentMethodEnum)
-	type: $Enums.PaymentMethodEnum
-
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
 	@IsUUID('4')

@@ -2,7 +2,7 @@ import { PickType, IntersectionType, ApiProperty, ApiPropertyOptional } from '@n
 import { StaffPaymentCreateOneRequest, StaffPaymentDeleteOneRequest, StaffPaymentFindManyRequest, StaffPaymentFindOneRequest, StaffPaymentUpdateOneRequest } from '../interfaces'
 import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { StaffPaymentMethodDto, StaffPaymentOptionalDto, StaffPaymentRequiredDto } from './fields.dtos'
-import { IsArray, IsOptional, ValidateNested } from 'class-validator'
+import { IsOptional } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class StaffPaymentFindManyRequestDto
@@ -12,20 +12,16 @@ export class StaffPaymentFindManyRequestDto
 export class StaffPaymentFindOneRequestDto extends IntersectionType(PickType(StaffPaymentRequiredDto, ['id'])) implements StaffPaymentFindOneRequest {}
 
 export class StaffPaymentCreateOneRequestDto extends IntersectionType(PickType(StaffPaymentRequiredDto, ['employeeId', 'description'])) implements StaffPaymentCreateOneRequest {
-	@ApiProperty({ type: StaffPaymentMethodDto, isArray: true })
-	@IsArray()
-	@ValidateNested({ each: true })
+	@ApiProperty({ type: StaffPaymentMethodDto })
 	@Type(() => StaffPaymentMethodDto)
-	paymentMethods: StaffPaymentMethodDto[]
+	method: StaffPaymentMethodDto
 }
 
 export class StaffPaymentUpdateOneRequestDto extends IntersectionType(PickType(StaffPaymentOptionalDto, ['deletedAt', 'description'])) implements StaffPaymentUpdateOneRequest {
-	@ApiPropertyOptional({ type: StaffPaymentMethodDto, isArray: true })
+	@ApiPropertyOptional({ type: StaffPaymentMethodDto })
 	@IsOptional()
-	@IsArray()
-	@ValidateNested({ each: true })
 	@Type(() => StaffPaymentMethodDto)
-	paymentMethods?: StaffPaymentMethodDto[]
+	method?: StaffPaymentMethodDto
 }
 
 export class StaffPaymentDeleteOneRequestDto

@@ -13,11 +13,11 @@ export declare interface StaffPaymentGetManyRequest extends StaffPaymentOptional
 export declare interface StaffPaymentGetOneRequest extends StaffPaymentOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 
 export declare interface StaffPaymentCreateOneRequest extends Pick<StaffPaymentRequired, 'employeeId' | 'description'>, Pick<StaffPaymentOptional, 'staffId'> {
-	paymentMethods: StaffPaymentMethod[]
+	method: StaffPaymentMethod
 }
 
 export declare interface StaffPaymentUpdateOneRequest extends Pick<StaffPaymentOptional, 'employeeId' | 'description' | 'deletedAt'> {
-	paymentMethods?: StaffPaymentMethod[]
+	method?: StaffPaymentMethod
 }
 
 export declare interface StaffPaymentDeleteOneRequest extends Pick<StaffPaymentOptional, 'id'>, Pick<RequestOtherFields, 'method'> {}

@@ -36,6 +36,10 @@ export class ClientService {
 			payment?: { methods: Array<{ type: string; amount: Decimal; currencyId: string }> } | null
 		}>,
 		payments: Array<{ methods: Array<{ type: string; amount: Decimal; currencyId: string }> }>,
+		returnings: Array<{
+			products: Array<{ prices: Array<{ totalPrice: Decimal; currencyId: string }> }>
+			payment?: { methods: Array<{ type: string; amount: Decimal; currencyId: string }> } | null
+		}>,
 	): Map<string, Decimal> {
 		const debtMap = new Map<string, Decimal>()
 
@@ -48,9 +52,9 @@ export class ClientService {
 			}
 			if (sel.payment) {
 				for (const method of sel.payment.methods) {
-					if (isExcludedFromDebt(method.type)) continue
 					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
-					if (method.type === PaymentMethodEnum.fromCash) {
+					if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
+						// Change returned or credited to balance — reduces effective payment, increases debt
 						debtMap.set(method.currencyId, curr.plus(method.amount))
 					} else {
 						debtMap.set(method.currencyId, curr.minus(method.amount))
@@ -59,11 +63,32 @@ export class ClientService {
 			}
 		}
 
+		for (const ret of returnings) {
+			// Returning product reduces client debt (client returned goods)
+			for (const product of ret.products) {
+				for (const price of product.prices) {
+					const curr = debtMap.get(price.currencyId) ?? new Decimal(0)
+					debtMap.set(price.currencyId, curr.minus(price.totalPrice))
+				}
+			}
+			// All returning payment methods reverse the credit (business settled with client)
+			if (ret.payment) {
+				for (const method of ret.payment.methods) {
+					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
+					debtMap.set(method.currencyId, curr.plus(method.amount))
+				}
+			}
+		}
+
 		for (const payment of payments) {
 			for (const method of payment.methods) {
 				if (isExcludedFromDebt(method.type)) continue
 				const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
-				debtMap.set(method.currencyId, curr.minus(method.amount))
+				if (method.type === PaymentMethodEnum.fromCash) {
+					debtMap.set(method.currencyId, curr.plus(method.amount))
+				} else {
+					debtMap.set(method.currencyId, curr.minus(method.amount))
+				}
 			}
 		}
 
@@ -74,7 +99,7 @@ export class ClientService {
 		const clients = await this.clientRepository.findMany({ ...query, pagination: false })
 
 		const mappedClients = clients.map((c) => {
-			const debtMap = this.calcDebtByCurrency(c.sellings, c.payments)
+			const debtMap = this.calcDebtByCurrency(c.sellings, c.payments, c.returnings)
 			const debtByCurrency: ClientDebtByCurrency[] = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 			const totalDebt = Array.from(debtMap.values()).reduce((a, b) => a.plus(b), new Decimal(0))
 
@@ -160,10 +185,9 @@ export class ClientService {
 
 			if (sel.payment) {
 				for (const method of sel.payment.methods) {
-					if (isExcludedFromDebt(method.type)) continue
 					const payDate = sel.payment.createdAt
-					if (method.type === PaymentMethodEnum.fromCash) {
-						const payDate = sel.payment.createdAt
+					if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
+						// Change returned or credited to balance — debit (increases what client owes)
 						deeds.push({
 							type: 'debit',
 							action: 'change',
@@ -191,19 +215,36 @@ export class ClientService {
 		}
 
 		for (const returning of client.returnings) {
+			// Returning product: credit (reduces what client owes)
+			for (const product of returning.products) {
+				for (const price of product.prices) {
+					if ((!deedStartDate || returning.date >= deedStartDate) && (!deedEndDate || returning.date <= deedEndDate)) {
+						deeds.push({
+							type: 'credit',
+							action: 'returning',
+							value: price.totalPrice,
+							date: returning.date,
+							description: '',
+							currencyId: price.currencyId,
+						})
+						addToMap(totalCreditMap, price.currencyId, price.totalPrice)
+					}
+				}
+			}
+			// Returning payment methods: debit (business settled, reverses the credit)
 			if (returning.payment) {
 				for (const method of returning.payment.methods) {
 					const payDate = returning.payment.createdAt
 					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
 						deeds.push({
-							type: 'credit',
+							type: 'debit',
 							action: 'returning',
 							value: method.amount,
 							date: payDate,
 							description: returning.payment.description ?? '',
 							currencyId: method.currencyId,
 						})
-						addToMap(totalCreditMap, method.currencyId, method.amount)
+						addToMap(totalDebitMap, method.currencyId, method.amount)
 					}
 				}
 			}
@@ -240,7 +281,7 @@ export class ClientService {
 		const totalDebitByCurrency = Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 		const debtByCurrency = Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
-		const fullDebtMap = this.calcDebtByCurrency(client.sellings, client.payments)
+		const fullDebtMap = this.calcDebtByCurrency(client.sellings, client.payments, client.returnings)
 		const fullDebt = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
 
 		return createResponse({

@@ -9,7 +9,7 @@ import {
 	ClientGetOneRequest,
 	ClientUpdateOneRequest,
 } from './interfaces'
-import { SellingStatusEnum } from '@prisma/client'
+import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 
 @Injectable()
 export class ClientRepository {
@@ -42,7 +42,28 @@ export class ClientRepository {
 						products: {
 							select: {
 								prices: {
-									where: { type: 'selling' },
+									where: { type: PriceTypeEnum.selling },
+									select: { totalPrice: true, currencyId: true },
+								},
+							},
+						},
+						payment: {
+							select: {
+								methods: {
+									select: { type: true, amount: true, currencyId: true },
+								},
+							},
+						},
+					},
+					orderBy: { date: 'desc' },
+				},
+				returnings: {
+					where: { status: SellingStatusEnum.accepted },
+					select: {
+						products: {
+							select: {
+								prices: {
+									where: { type: PriceTypeEnum.selling },
 									select: { totalPrice: true, currencyId: true },
 								},
 							},
@@ -111,6 +132,14 @@ export class ClientRepository {
 					where: { status: SellingStatusEnum.accepted },
 					select: {
 						date: true,
+						products: {
+							select: {
+								prices: {
+									where: { type: PriceTypeEnum.selling },
+									select: { totalPrice: true, currencyId: true },
+								},
+							},
+						},
 						payment: {
 							select: {
 								createdAt: true,

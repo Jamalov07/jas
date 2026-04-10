@@ -9,6 +9,7 @@ import {
 	StaffPaymentGetOneRequest,
 	StaffPaymentUpdateOneRequest,
 } from './interfaces'
+import { PaymentMethodEnum } from '@prisma/client'
 @Injectable()
 export class StaffPaymentRepository {
 	private readonly prisma: PrismaService
@@ -133,11 +134,11 @@ export class StaffPaymentRepository {
 				staffId: body.staffId,
 				description: body.description,
 				methods: {
-					create: body.paymentMethods.map((m) => ({
-						type: m.type as any,
-						currencyId: m.currencyId,
-						amount: m.amount,
-					})),
+					create: {
+						type: PaymentMethodEnum.other,
+						currencyId: body.method.currencyId,
+						amount: body.method.amount,
+					},
 				},
 			},
 			select: {
@@ -162,15 +163,15 @@ export class StaffPaymentRepository {
 				employeeId: body.employeeId,
 				description: body.description,
 				deletedAt: body.deletedAt,
-				...(body.paymentMethods
+				...(body.method
 					? {
 							methods: {
 								deleteMany: {},
-								create: body.paymentMethods.map((m) => ({
-									type: m.type as any,
-									currencyId: m.currencyId,
-									amount: m.amount,
-								})),
+								create: {
+									type: PaymentMethodEnum.other,
+									currencyId: body.method.currencyId,
+									amount: body.method.amount,
+								},
 							},
 						}
 					: {}),

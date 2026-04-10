@@ -57,10 +57,14 @@ export class ArrivalService {
 		}
 
 		for (const method of paymentMethods) {
-			if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
 			const existing = debtMap.get(method.currencyId)
 			const symbol = existing?.symbol || method.currency?.symbol || ''
-			debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
+			if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
+				// Change returned to business or credited to balance — reduces effective payment, increases debt
+				debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).plus(method.amount), symbol })
+			} else {
+				debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
+			}
 		}
 
 		return Array.from(debtMap.entries()).map(([currencyId, { amount, symbol }]) => ({ currencyId, amount, currency: { symbol } }))

@@ -15,7 +15,7 @@ import {
 import { PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
-const isExcludedFromDebt = (type: string) => type === PaymentMethodEnum.fromCash || type === PaymentMethodEnum.fromBalance
+const isExcludedFromDebt = (type: string) => type === PaymentMethodEnum.fromBalance
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 
@@ -48,9 +48,13 @@ export class SupplierService {
 			}
 			if (arr.payment) {
 				for (const method of arr.payment.methods) {
-					if (isExcludedFromDebt(method.type)) continue
 					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
-					debtMap.set(method.currencyId, curr.minus(method.amount))
+					if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
+						// Change returned or credited to balance — reduces effective payment, increases debt
+						debtMap.set(method.currencyId, curr.plus(method.amount))
+					} else {
+						debtMap.set(method.currencyId, curr.minus(method.amount))
+					}
 				}
 			}
 		}
@@ -59,7 +63,11 @@ export class SupplierService {
 			for (const method of payment.methods) {
 				if (isExcludedFromDebt(method.type)) continue
 				const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
-				debtMap.set(method.currencyId, curr.minus(method.amount))
+				if (method.type === PaymentMethodEnum.fromCash) {
+					debtMap.set(method.currencyId, curr.plus(method.amount))
+				} else {
+					debtMap.set(method.currencyId, curr.minus(method.amount))
+				}
 			}
 		}
 
@@ -149,18 +157,30 @@ export class SupplierService {
 
 			if (arr.payment) {
 				for (const method of arr.payment.methods) {
-					if (isExcludedFromDebt(method.type)) continue
 					const payDate = arr.payment.createdAt
 					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
-						deeds.push({
-							type: 'credit',
-							action: 'payment',
-							value: method.amount,
-							date: payDate,
-							description: arr.payment.description ?? '',
-							currencyId: method.currencyId,
-						})
-						addToMap(totalCreditMap, method.currencyId, method.amount)
+						if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
+							// Change returned or balance credited — increases debt (debit)
+							deeds.push({
+								type: 'debit',
+								action: 'change',
+								value: method.amount,
+								date: payDate,
+								description: arr.payment.description ?? '',
+								currencyId: method.currencyId,
+							})
+							addToMap(totalDebitMap, method.currencyId, method.amount)
+						} else {
+							deeds.push({
+								type: 'credit',
+								action: 'payment',
+								value: method.amount,
+								date: payDate,
+								description: arr.payment.description ?? '',
+								currencyId: method.currencyId,
+							})
+							addToMap(totalCreditMap, method.currencyId, method.amount)
+						}
 					}
 				}
 			}

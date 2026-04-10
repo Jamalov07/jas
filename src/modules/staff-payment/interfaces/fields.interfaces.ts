@@ -6,7 +6,6 @@ export declare interface StaffPaymentRequired extends DefaultRequiredFields, Req
 export declare interface StaffPaymentOptional extends Partial<StaffPaymentRequired> {}
 
 export declare interface StaffPaymentMethod {
-	type: string
 	currencyId: string
 	amount: import('@prisma/client/runtime/library').Decimal
 }

@@ -34,7 +34,7 @@ export class StaffPaymentCalcByCurrencyDto implements StaffPaymentCalcByCurrency
 
 export class StaffPaymentFindOneDataDto extends PickType(StaffPaymentRequiredDto, ['id', 'createdAt']) implements StaffPaymentFindOneData {
 	@ApiProperty({ type: StaffPaymentMethodDataDto, isArray: true })
-	paymentMethods?: StaffPaymentMethodData[]
+	methods?: StaffPaymentMethodData[]
 }
 
 export class StaffPaymentFindManyDataDto extends PaginationResponseDto implements StaffPaymentFindManyData {
