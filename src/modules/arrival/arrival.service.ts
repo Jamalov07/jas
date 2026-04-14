@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ArrivalRepository } from './arrival.repository'
-import { createResponse, CRequest, ERROR_MSG } from '@common'
+import { createResponse, CRequest, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds } from '@common'
 import {
 	ArrivalGetOneRequest,
 	ArrivalCreateOneRequest,
@@ -18,12 +18,14 @@ type ProductEntry = { prices: PriceEntry[] }
 type PaymentMethodEntry = { type: string; currencyId: string; amount: Decimal; currency?: { symbol: string } | null }
 import { ExcelService } from '../shared'
 import { Response } from 'express'
+import { CurrencyRepository } from '../currency'
 
 @Injectable()
 export class ArrivalService {
 	constructor(
 		private readonly arrivalRepository: ArrivalRepository,
 		private readonly excelService: ExcelService,
+		private readonly currencyRepository: CurrencyRepository,
 	) {}
 
 	private calcTotalPricesByType(products: ProductEntry[]) {
@@ -46,6 +48,25 @@ export class ArrivalService {
 			result[type] = Array.from(currMap.entries()).map(([currencyId, { total, symbol }]) => ({ currencyId, total, currency: { symbol } }))
 		}
 		return result
+	}
+
+	/** findOne response: prices as { cost: {...}, selling: {...} } instead of array */
+	private pricesArrayToByTypeRecord(prices: { type: string }[]): Record<string, unknown> {
+		const out: Record<string, unknown> = {}
+		for (const price of prices) {
+			const { type, ...rest } = price as { type: string } & Record<string, unknown>
+			if (!(type in out)) {
+				out[type] = rest
+			} else {
+				const ex = out[type]
+				out[type] = Array.isArray(ex) ? [...ex, rest] : [ex, rest]
+			}
+		}
+		return out
+	}
+
+	private mapProductsPricesToByType<T extends { prices: { type: string }[] }>(products: T[]) {
+		return products.map((p) => ({ ...p, prices: this.pricesArrayToByTypeRecord(p.prices) }))
 	}
 
 	private calcDebtByCurrency(totalPrices: Record<string, { currencyId: string; total: Decimal; currency: { symbol: string } }[]>, paymentMethods: PaymentMethodEntry[]) {
@@ -73,6 +94,7 @@ export class ArrivalService {
 	async findMany(query: ArrivalFindManyRequest) {
 		const arrivals = await this.arrivalRepository.findMany(query)
 		const arrivalsCount = await this.arrivalRepository.countFindMany(query)
+		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
 
 		const calcMap = new Map<string, Decimal>()
 		const mappedArrivals = arrivals.map((arrival) => {
@@ -87,10 +109,7 @@ export class ArrivalService {
 			return { ...arrival, payment, totalPrices, debtByCurrency }
 		})
 
-		const calc = Array.from(calcMap.entries()).map(([key, total]) => {
-			const [type, currencyId] = key.split('_')
-			return { type: type as PaymentMethodEnum, currencyId, total }
-		})
+		const calc = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
 		const result = query.pagination
 			? { totalCount: arrivalsCount, pagesCount: Math.ceil(arrivalsCount / query.pageSize), pageSize: mappedArrivals.length, data: mappedArrivals, calc }
@@ -110,7 +129,8 @@ export class ArrivalService {
 		const payment = sap ? { id: sap.id, description: sap.description, createdAt: sap.createdAt, paymentMethods: sap.methods } : undefined
 		const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
 		const debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[])
-		return createResponse({ data: { ...arrival, payment, totalPrices, debtByCurrency }, success: { messages: ['find one success'] } })
+		const products = this.mapProductsPricesToByType(arrival.products as ProductEntry[])
+		return createResponse({ data: { ...arrival, products, payment, totalPrices, debtByCurrency }, success: { messages: ['find one success'] } })
 	}
 
 	async getMany(query: ArrivalGetManyRequest) {

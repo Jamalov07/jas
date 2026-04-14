@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SellingRepository } from './selling.repository'
-import { createResponse, CRequest, ERROR_MSG } from '@common'
+import { createResponse, CRequest, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds } from '@common'
 import { SellingStatusEnum } from '@prisma/client'
 import {
 	SellingGetOneRequest,
@@ -21,6 +21,7 @@ import { Response } from 'express'
 import { BotService } from '../bot'
 import { BotSellingProductTitleEnum, BotSellingTitleEnum } from './enums'
 import { ClientService } from '../client'
+import { CurrencyRepository } from '../currency'
 
 @Injectable()
 export class SellingService {
@@ -30,6 +31,7 @@ export class SellingService {
 		private readonly excelService: ExcelService,
 		private readonly botService: BotService,
 		private readonly clientService: ClientService,
+		private readonly currencyRepository: CurrencyRepository,
 	) {}
 
 	private calcTotalPricesFromProducts(products: { prices: { type: string; currencyId: string; totalPrice: Decimal; currency?: { symbol: string } }[] }[]) {
@@ -61,6 +63,25 @@ export class SellingService {
 		return csp?.methods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
 	}
 
+	/** findOne response: prices as { selling: {...}, cost: {...} } instead of array */
+	private pricesArrayToByTypeRecord(prices: { type: string }[]): Record<string, unknown> {
+		const out: Record<string, unknown> = {}
+		for (const price of prices) {
+			const { type, ...rest } = price as { type: string } & Record<string, unknown>
+			if (!(type in out)) {
+				out[type] = rest
+			} else {
+				const ex = out[type]
+				out[type] = Array.isArray(ex) ? [...ex, rest] : [ex, rest]
+			}
+		}
+		return out
+	}
+
+	private mapProductsPricesToByType<T extends { prices: { type: string }[] }>(products: T[]) {
+		return products.map((p) => ({ ...p, prices: this.pricesArrayToByTypeRecord(p.prices) }))
+	}
+
 	private calcDebtByCurrency(totalPrices: { currencyId: string; total: Decimal; currency?: { symbol: string } }[], payment: SellingPaymentData | undefined) {
 		const debtMap = new Map<string, { amount: Decimal; symbol?: string }>()
 
@@ -85,6 +106,7 @@ export class SellingService {
 	async findMany(query: SellingFindManyRequest) {
 		const sellings = await this.sellingRepository.findMany(query)
 		const sellingsCount = await this.sellingRepository.countFindMany(query)
+		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
 
 		const calcMap = new Map<string, Decimal>()
 		const mappedSellings = sellings.map((selling) => {
@@ -100,10 +122,7 @@ export class SellingService {
 			return { ...selling, payment, totalPrices, debtByCurrency }
 		})
 
-		const calc: SellingCalcEntry[] = Array.from(calcMap.entries()).map(([key, total]) => {
-			const [type, currencyId] = key.split('_')
-			return { type: type as PaymentMethodEnum, currencyId, total }
-		})
+		const calc: SellingCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
 		const result = query.pagination
 			? { totalCount: sellingsCount, pagesCount: Math.ceil(sellingsCount / query.pageSize), pageSize: sellings.length, data: mappedSellings, calc }
@@ -122,9 +141,10 @@ export class SellingService {
 		const totalPrices = this.calcTotalPricesFromProducts(selling.products)
 		const payment = this.buildPaymentData(selling.payment)
 		const debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
+		const products = this.mapProductsPricesToByType(selling.products)
 
 		return createResponse({
-			data: { ...selling, payment, totalPrices, debtByCurrency },
+			data: { ...selling, products, payment, totalPrices, debtByCurrency },
 			success: { messages: ['find one success'] },
 		})
 	}

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ReturningRepository } from './returning.repository'
-import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG } from '@common'
+import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds } from '@common'
 import {
 	ReturningGetOneRequest,
 	ReturningCreateOneRequest,
@@ -10,9 +10,11 @@ import {
 	ReturningFindOneRequest,
 	ReturningDeleteOneRequest,
 	ReturningPaymentData,
+	ReturningCalcEntry,
 } from './interfaces'
 import { SellingStatusEnum } from '@prisma/client'
 import { CommonService } from '../common'
+import { CurrencyRepository } from '../currency'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -22,6 +24,7 @@ export class ReturningService {
 	constructor(
 		private readonly returningRepository: ReturningRepository,
 		private readonly commonService: CommonService,
+		private readonly currencyRepository: CurrencyRepository,
 		private readonly excelService: ExcelService,
 	) {}
 
@@ -54,6 +57,25 @@ export class ReturningService {
 		return csp?.methods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
 	}
 
+	/** findOne response: prices as { selling: {...}, ... } instead of array */
+	private pricesArrayToByTypeRecord(prices: { type: string }[]): Record<string, unknown> {
+		const out: Record<string, unknown> = {}
+		for (const price of prices) {
+			const { type, ...rest } = price as { type: string } & Record<string, unknown>
+			if (!(type in out)) {
+				out[type] = rest
+			} else {
+				const ex = out[type]
+				out[type] = Array.isArray(ex) ? [...ex, rest] : [ex, rest]
+			}
+		}
+		return out
+	}
+
+	private mapProductsPricesToByType<T extends { prices: { type: string }[] }>(products: T[]) {
+		return products.map((p) => ({ ...p, prices: this.pricesArrayToByTypeRecord(p.prices) }))
+	}
+
 	private calcDebtByCurrency(totalPrices: { currencyId: string; total: Decimal; currency?: { symbol: string } }[], payment: ReturningPaymentData | undefined) {
 		const debtMap = new Map<string, { amount: Decimal; symbol?: string }>()
 
@@ -74,6 +96,7 @@ export class ReturningService {
 	async findMany(query: ReturningFindManyRequest) {
 		const returnings = await this.returningRepository.findMany(query)
 		const returningsCount = await this.returningRepository.countFindMany(query)
+		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
 
 		const calcMap = new Map<string, Decimal>()
 		const mappedReturnings = returnings.map((returning) => {
@@ -89,9 +112,17 @@ export class ReturningService {
 			return { ...returning, payment, totalPrices, debtByCurrency }
 		})
 
+		const calc: ReturningCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
+
 		const result = query.pagination
-			? { totalCount: returningsCount, pagesCount: Math.ceil(returningsCount / query.pageSize), pageSize: mappedReturnings.length, data: mappedReturnings }
-			: { data: mappedReturnings }
+			? {
+					totalCount: returningsCount,
+					pagesCount: Math.ceil(returningsCount / query.pageSize),
+					pageSize: mappedReturnings.length,
+					data: mappedReturnings,
+					calc,
+				}
+			: { data: mappedReturnings, calc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -103,7 +134,8 @@ export class ReturningService {
 			throw new BadRequestException(ERROR_MSG.RETURNING.NOT_FOUND.UZ)
 		}
 
-		return createResponse({ data: { ...returning, payment: returning.payment }, success: { messages: ['find one success'] } })
+		const products = this.mapProductsPricesToByType(returning.products)
+		return createResponse({ data: { ...returning, products, payment: returning.payment }, success: { messages: ['find one success'] } })
 	}
 
 	async getMany(query: ReturningGetManyRequest) {

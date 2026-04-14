@@ -4,9 +4,10 @@ import { StaffPaymentController } from './staff-payment.controller'
 import { StaffPaymentService } from './staff-payment.service'
 import { StaffPaymentRepository } from './staff-payment.repository'
 import { StaffModule } from '../staff'
+import { CurrencyModule } from '../currency'
 
 @Module({
-	imports: [PrismaModule, ExcelModule, StaffModule],
+	imports: [PrismaModule, ExcelModule, StaffModule, CurrencyModule],
 	controllers: [StaffPaymentController],
 	providers: [StaffPaymentService, StaffPaymentRepository],
 	exports: [StaffPaymentService, StaffPaymentRepository],

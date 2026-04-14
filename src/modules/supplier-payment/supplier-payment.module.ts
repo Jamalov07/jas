@@ -5,9 +5,10 @@ import { SupplierPaymentService } from './supplier-payment.service'
 import { SupplierPaymentRepository } from './supplier-payment.repository'
 import { SupplierModule } from '../supplier'
 import { BotModule } from '../bot'
+import { CurrencyModule } from '../currency'
 
 @Module({
-	imports: [PrismaModule, ExcelModule, forwardRef(() => SupplierModule), BotModule],
+	imports: [PrismaModule, ExcelModule, forwardRef(() => SupplierModule), BotModule, CurrencyModule],
 	controllers: [SupplierPaymentController],
 	providers: [SupplierPaymentService, SupplierPaymentRepository],
 	exports: [SupplierPaymentService, SupplierPaymentRepository],

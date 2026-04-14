@@ -2,7 +2,16 @@ import { GlobalResponse, PaginationResponse } from '@common'
 import { ReturningRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 import { PaymentMethodEnum } from '@prisma/client'
-export declare interface ReturningFindManyData extends PaginationResponse<ReturningFindOneData> {}
+
+export declare interface ReturningCalcEntry {
+	type: PaymentMethodEnum
+	currencyId: string
+	total: Decimal
+}
+
+export declare interface ReturningFindManyData extends PaginationResponse<ReturningFindOneData> {
+	calc: ReturningCalcEntry[]
+}
 
 export declare interface ReturningFindOneData extends Pick<ReturningRequired, 'id' | 'status' | 'date' | 'createdAt'> {
 	payment?: any

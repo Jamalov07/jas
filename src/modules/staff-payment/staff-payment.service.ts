@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { StaffPaymentRepository } from './staff-payment.repository'
-import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG } from '@common'
+import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG, fillCurrencyTotalsByActiveIds } from '@common'
 import {
 	StaffPaymentGetOneRequest,
 	StaffPaymentCreateOneRequest,
@@ -12,6 +12,7 @@ import {
 	StaffPaymentCalcByCurrency,
 } from './interfaces'
 import { StaffService } from '../staff'
+import { CurrencyRepository } from '../currency'
 import { Decimal } from '@prisma/client/runtime/library'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
@@ -21,12 +22,14 @@ export class StaffPaymentService {
 	constructor(
 		private readonly staffPaymentRepository: StaffPaymentRepository,
 		private readonly staffService: StaffService,
+		private readonly currencyRepository: CurrencyRepository,
 		private readonly excelService: ExcelService,
 	) {}
 
 	async findMany(query: StaffPaymentFindManyRequest) {
 		const payments = await this.staffPaymentRepository.findMany(query)
 		const paymentsCount = await this.staffPaymentRepository.countFindMany(query)
+		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
 
 		const calcMap = new Map<string, Decimal>()
 		for (const payment of payments) {
@@ -35,7 +38,7 @@ export class StaffPaymentService {
 				calcMap.set(method.currencyId, curr.plus(method.amount))
 			}
 		}
-		const calcByCurrency: StaffPaymentCalcByCurrency[] = Array.from(calcMap.entries()).map(([currencyId, total]) => ({ currencyId, total }))
+		const calcByCurrency: StaffPaymentCalcByCurrency[] = fillCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
 		const result = query.pagination
 			? {

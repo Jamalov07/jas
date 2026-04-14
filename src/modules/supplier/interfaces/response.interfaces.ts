@@ -10,7 +10,7 @@ export declare interface SupplierDebtByCurrency {
 export declare interface SupplierDeed {
 	type: 'debit' | 'credit'
 	date: Date
-	action?: 'payment' | 'arrival'
+	action?: 'payment' | 'arrival' | 'change'
 	value: Decimal
 	description: string
 	currencyId?: string

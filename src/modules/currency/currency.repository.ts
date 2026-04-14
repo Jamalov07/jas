@@ -56,6 +56,15 @@ export class CurrencyRepository {
 		return currencies
 	}
 
+	async findAllActiveIds(): Promise<string[]> {
+		const rows = await this.prisma.currencyModel.findMany({
+			where: { isActive: true, deletedAt: null },
+			select: { id: true },
+			orderBy: { name: 'asc' },
+		})
+		return rows.map((r) => r.id)
+	}
+
 	async countFindMany(query: CurrencyFindManyRequest) {
 		let nameFilter: any = {}
 		if (query.search) {
