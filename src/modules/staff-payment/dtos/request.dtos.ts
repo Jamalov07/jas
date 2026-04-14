@@ -1,8 +1,15 @@
 import { PickType, IntersectionType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { StaffPaymentCreateOneRequest, StaffPaymentDeleteOneRequest, StaffPaymentFindManyRequest, StaffPaymentFindOneRequest, StaffPaymentUpdateOneRequest } from '../interfaces'
+import {
+	StaffPaymentCreateOneRequest,
+	StaffPaymentDeleteOneRequest,
+	StaffPaymentFindManyRequest,
+	StaffPaymentFindOneRequest,
+	StaffPaymentMethod,
+	StaffPaymentUpdateOneRequest,
+} from '../interfaces'
 import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { StaffPaymentMethodDto, StaffPaymentOptionalDto, StaffPaymentRequiredDto } from './fields.dtos'
-import { IsOptional } from 'class-validator'
+import { IsObject, IsOptional } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class StaffPaymentFindManyRequestDto
@@ -13,8 +20,9 @@ export class StaffPaymentFindOneRequestDto extends IntersectionType(PickType(Sta
 
 export class StaffPaymentCreateOneRequestDto extends IntersectionType(PickType(StaffPaymentRequiredDto, ['employeeId', 'description'])) implements StaffPaymentCreateOneRequest {
 	@ApiProperty({ type: StaffPaymentMethodDto })
+	@IsObject()
 	@Type(() => StaffPaymentMethodDto)
-	method: StaffPaymentMethodDto
+	method: StaffPaymentMethod
 }
 
 export class StaffPaymentUpdateOneRequestDto extends IntersectionType(PickType(StaffPaymentOptionalDto, ['deletedAt', 'description'])) implements StaffPaymentUpdateOneRequest {
