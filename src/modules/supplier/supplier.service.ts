@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SupplierRepository } from './supplier.repository'
-import { createResponse, DebtTypeEnum, DeleteMethodEnum, ERROR_MSG } from '@common'
+import { createResponse, currencyBriefMapFromRows, DebtTypeEnum, DeleteMethodEnum, ERROR_MSG, withCurrencyBriefAmountMany } from '@common'
 import {
 	SupplierGetOneRequest,
 	SupplierCreateOneRequest,
@@ -18,6 +18,7 @@ import { Decimal } from '@prisma/client/runtime/library'
 const isExcludedFromDebt = (type: string) => type === PaymentMethodEnum.fromBalance
 import { ExcelService } from '../shared'
 import { Response } from 'express'
+import { CurrencyRepository } from '../currency'
 
 @Injectable()
 export class SupplierService {
@@ -25,6 +26,7 @@ export class SupplierService {
 
 	constructor(
 		supplierRepository: SupplierRepository,
+		private readonly currencyRepository: CurrencyRepository,
 		private readonly excelService: ExcelService,
 	) {
 		this.supplierRepository = supplierRepository
@@ -77,9 +79,14 @@ export class SupplierService {
 	async findMany(query: SupplierFindManyRequest) {
 		const suppliers = await this.supplierRepository.findMany({ ...query, pagination: false })
 
+		const currencyIdSet = new Set<string>()
 		const mappedSuppliers = suppliers.map((s) => {
 			const debtMap = this.calcDebtByCurrency(s.arrivals, s.payments)
-			const debtByCurrency: SupplierDebtByCurrency[] = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+			for (const id of debtMap.keys()) currencyIdSet.add(id)
+			const debtByCurrency: Array<{ currencyId: string; amount: Decimal }> = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({
+				currencyId,
+				amount,
+			}))
 			const totalDebt = Array.from(debtMap.values()).reduce((a, b) => a.plus(b), new Decimal(0))
 
 			return {
@@ -93,7 +100,13 @@ export class SupplierService {
 			}
 		})
 
-		const filteredSuppliers = mappedSuppliers.filter((s) => {
+		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdSet]))
+		const suppliersWithDebtCurrency = mappedSuppliers.map((row) => ({
+			...row,
+			debtByCurrency: withCurrencyBriefAmountMany(row.debtByCurrency, currencyMap),
+		}))
+
+		const filteredSuppliers = suppliersWithDebtCurrency.filter((s) => {
 			if (query.debtType && query.debtValue !== undefined) {
 				const value = new Decimal(query.debtValue)
 				switch (query.debtType) {
@@ -213,12 +226,29 @@ export class SupplierService {
 			debtByCurrencyMap.set(currId, debit.minus(credit))
 		}
 
-		const totalCreditByCurrency = Array.from(totalCreditMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
-		const totalDebitByCurrency = Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
-		const debtByCurrency = Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
-
+		const deedCurrencyIds = new Set<string>([...totalCreditMap.keys(), ...totalDebitMap.keys(), ...debtByCurrencyMap.keys()])
 		const fullDebtMap = this.calcDebtByCurrency(supplier.arrivals, supplier.payments)
-		const fullDebt = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+		for (const id of fullDebtMap.keys()) deedCurrencyIds.add(id)
+
+		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...deedCurrencyIds]))
+
+		const totalCreditByCurrency: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(
+			Array.from(totalCreditMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
+			currencyMap,
+		)
+		const totalDebitByCurrency: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(
+			Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
+			currencyMap,
+		)
+		const deedDebtByCurrency: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(
+			Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
+			currencyMap,
+		)
+
+		const fullDebt: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(
+			Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
+			currencyMap,
+		)
 
 		return createResponse({
 			data: {
@@ -232,7 +262,7 @@ export class SupplierService {
 				deedInfo: {
 					totalDebitByCurrency,
 					totalCreditByCurrency,
-					debtByCurrency,
+					debtByCurrency: deedDebtByCurrency,
 					deeds: filteredDeeds,
 				},
 				lastArrivalDate: supplier.arrivals?.length ? supplier.arrivals[0].date : null,

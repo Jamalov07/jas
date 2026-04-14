@@ -1,6 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SellingRepository } from './selling.repository'
-import { createResponse, CRequest, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds } from '@common'
+import {
+	createResponse,
+	CRequest,
+	currencyBriefMapFromRows,
+	ERROR_MSG,
+	fillPaymentMethodCurrencyTotalsByActiveIds,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import { SellingStatusEnum } from '@prisma/client'
 import {
 	SellingGetOneRequest,
@@ -100,7 +107,7 @@ export class SellingService {
 			}
 		}
 
-		return Array.from(debtMap.entries()).map(([currencyId, { amount, symbol }]) => ({ currencyId, amount, currency: { symbol: symbol ?? '' } }))
+		return Array.from(debtMap.entries()).map(([currencyId, { amount }]) => ({ currencyId, amount }))
 	}
 
 	async findMany(query: SellingFindManyRequest) {
@@ -124,9 +131,25 @@ export class SellingService {
 
 		const calc: SellingCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
+		const debtCurrencyIds = new Set<string>()
+		for (const s of mappedSellings) {
+			for (const d of s.debtByCurrency) debtCurrencyIds.add(d.currencyId)
+		}
+		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...debtCurrencyIds]))
+		const sellingsWithDebtCurrency = mappedSellings.map((s) => ({
+			...s,
+			debtByCurrency: withCurrencyBriefAmountMany(s.debtByCurrency, debtCurrencyMap),
+		}))
+
 		const result = query.pagination
-			? { totalCount: sellingsCount, pagesCount: Math.ceil(sellingsCount / query.pageSize), pageSize: sellings.length, data: mappedSellings, calc }
-			: { data: mappedSellings, calc }
+			? {
+					totalCount: sellingsCount,
+					pagesCount: Math.ceil(sellingsCount / query.pageSize),
+					pageSize: sellings.length,
+					data: sellingsWithDebtCurrency,
+					calc,
+				}
+			: { data: sellingsWithDebtCurrency, calc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -140,8 +163,13 @@ export class SellingService {
 
 		const totalPrices = this.calcTotalPricesFromProducts(selling.products)
 		const payment = this.buildPaymentData(selling.payment)
-		const debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
+		let debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
 		const products = this.mapProductsPricesToByType(selling.products)
+
+		const debtCurrencyMap = currencyBriefMapFromRows(
+			await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)),
+		)
+		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, debtCurrencyMap)
 
 		return createResponse({
 			data: { ...selling, products, payment, totalPrices, debtByCurrency },

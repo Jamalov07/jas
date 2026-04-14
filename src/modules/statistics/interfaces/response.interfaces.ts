@@ -1,4 +1,4 @@
-import { GlobalResponse, PaginationResponse } from '@common'
+import { CurrencyBrief, GlobalResponse, PaginationResponse } from '@common'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export declare interface StatsCurrencyEntry {
@@ -32,6 +32,7 @@ export declare interface StatisticsGetAllProductMVResponse extends GlobalRespons
 export declare interface ClientReportByCurrency {
 	currencyId: string
 	amount: Decimal
+	currency: CurrencyBrief
 }
 
 export declare interface ClientReportCalc {

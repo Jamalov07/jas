@@ -65,6 +65,15 @@ export class CurrencyRepository {
 		return rows.map((r) => r.id)
 	}
 
+	async findBriefByIds(ids: string[]): Promise<Array<{ id: string; name: string; symbol: string }>> {
+		const unique = [...new Set(ids.filter(Boolean))]
+		if (unique.length === 0) return []
+		return this.prisma.currencyModel.findMany({
+			where: { id: { in: unique } },
+			select: { id: true, name: true, symbol: true },
+		})
+	}
+
 	async countFindMany(query: CurrencyFindManyRequest) {
 		let nameFilter: any = {}
 		if (query.search) {

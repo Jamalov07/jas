@@ -1,6 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ArrivalRepository } from './arrival.repository'
-import { createResponse, CRequest, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds } from '@common'
+import {
+	createResponse,
+	CRequest,
+	currencyBriefMapFromRows,
+	ERROR_MSG,
+	fillPaymentMethodCurrencyTotalsByActiveIds,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import {
 	ArrivalGetOneRequest,
 	ArrivalCreateOneRequest,
@@ -88,7 +95,7 @@ export class ArrivalService {
 			}
 		}
 
-		return Array.from(debtMap.entries()).map(([currencyId, { amount, symbol }]) => ({ currencyId, amount, currency: { symbol } }))
+		return Array.from(debtMap.entries()).map(([currencyId, { amount }]) => ({ currencyId, amount }))
 	}
 
 	async findMany(query: ArrivalFindManyRequest) {
@@ -111,9 +118,25 @@ export class ArrivalService {
 
 		const calc = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
+		const debtCurrencyIds = new Set<string>()
+		for (const a of mappedArrivals) {
+			for (const d of a.debtByCurrency) debtCurrencyIds.add(d.currencyId)
+		}
+		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...debtCurrencyIds]))
+		const arrivalsWithDebtCurrency = mappedArrivals.map((a) => ({
+			...a,
+			debtByCurrency: withCurrencyBriefAmountMany(a.debtByCurrency, debtCurrencyMap),
+		}))
+
 		const result = query.pagination
-			? { totalCount: arrivalsCount, pagesCount: Math.ceil(arrivalsCount / query.pageSize), pageSize: mappedArrivals.length, data: mappedArrivals, calc }
-			: { data: mappedArrivals, calc }
+			? {
+					totalCount: arrivalsCount,
+					pagesCount: Math.ceil(arrivalsCount / query.pageSize),
+					pageSize: arrivalsWithDebtCurrency.length,
+					data: arrivalsWithDebtCurrency,
+					calc,
+				}
+			: { data: arrivalsWithDebtCurrency, calc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -128,8 +151,12 @@ export class ArrivalService {
 		const sap = arrival.payment
 		const payment = sap ? { id: sap.id, description: sap.description, createdAt: sap.createdAt, paymentMethods: sap.methods } : undefined
 		const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
-		const debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[])
+		let debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[])
 		const products = this.mapProductsPricesToByType(arrival.products as ProductEntry[])
+		const debtCurrencyMap = currencyBriefMapFromRows(
+			await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)),
+		)
+		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, debtCurrencyMap)
 		return createResponse({ data: { ...arrival, products, payment, totalPrices, debtByCurrency }, success: { messages: ['find one success'] } })
 	}
 

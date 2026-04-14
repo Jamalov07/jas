@@ -1,6 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ReturningRepository } from './returning.repository'
-import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds } from '@common'
+import {
+	createResponse,
+	CRequest,
+	currencyBriefMapFromRows,
+	DeleteMethodEnum,
+	ERROR_MSG,
+	fillPaymentMethodCurrencyTotalsByActiveIds,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import {
 	ReturningGetOneRequest,
 	ReturningCreateOneRequest,
@@ -90,7 +98,7 @@ export class ReturningService {
 			debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
 		}
 
-		return Array.from(debtMap.entries()).map(([currencyId, { amount, symbol }]) => ({ currencyId, amount, currency: { symbol: symbol ?? '' } }))
+		return Array.from(debtMap.entries()).map(([currencyId, { amount }]) => ({ currencyId, amount }))
 	}
 
 	async findMany(query: ReturningFindManyRequest) {
@@ -114,15 +122,25 @@ export class ReturningService {
 
 		const calc: ReturningCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
+		const debtCurrencyIds = new Set<string>()
+		for (const r of mappedReturnings) {
+			for (const d of r.debtByCurrency) debtCurrencyIds.add(d.currencyId)
+		}
+		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...debtCurrencyIds]))
+		const returningsWithDebtCurrency = mappedReturnings.map((r) => ({
+			...r,
+			debtByCurrency: withCurrencyBriefAmountMany(r.debtByCurrency, debtCurrencyMap),
+		}))
+
 		const result = query.pagination
 			? {
 					totalCount: returningsCount,
 					pagesCount: Math.ceil(returningsCount / query.pageSize),
-					pageSize: mappedReturnings.length,
-					data: mappedReturnings,
+					pageSize: returningsWithDebtCurrency.length,
+					data: returningsWithDebtCurrency,
 					calc,
 				}
-			: { data: mappedReturnings, calc }
+			: { data: returningsWithDebtCurrency, calc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}

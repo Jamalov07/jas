@@ -1,10 +1,11 @@
-import { GlobalResponse, PaginationResponse } from '@common'
+import { CurrencyBrief, GlobalResponse, PaginationResponse } from '@common'
 import { ClientRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export declare interface ClientDebtByCurrency {
 	currencyId: string
 	amount: Decimal
+	currency: CurrencyBrief
 }
 
 export declare interface ClientDeed {

@@ -5,8 +5,9 @@ import { ClientReportByCurrency, ClientReportCalc, ClientReportRow } from './int
 import { StatsTypeEnum } from '../selling/enums'
 
 import { PaymentMethodEnum, SellingStatusEnum } from '@prisma/client'
-import { convertUTCtoLocal, extractDateParts } from '@common'
+import { convertUTCtoLocal, currencyBriefMapFromRows, extractDateParts, withCurrencyBriefAmountMany } from '@common'
 import { Decimal } from '@prisma/client/runtime/library'
+import { CurrencyRepository } from '../currency'
 
 type CurrencyMap = Map<string, Decimal>
 
@@ -50,7 +51,33 @@ const RETURNING_MV_SELECT = {
 
 @Injectable()
 export class StatisticsRepository {
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly currencyRepository: CurrencyRepository,
+	) {}
+
+	private enrichClientReportRow(row: ClientReportRow, map: ReturnType<typeof currencyBriefMapFromRows>): ClientReportRow {
+		const enrich = (arr: Array<{ currencyId: string; amount: Decimal }>) => withCurrencyBriefAmountMany(arr, map)
+		return {
+			...row,
+			calc: {
+				selling: {
+					...row.calc.selling,
+					totalPriceByCurrency: enrich(row.calc.selling.totalPriceByCurrency),
+					paymentByCurrency: enrich(row.calc.selling.paymentByCurrency),
+				},
+				clientPayment: {
+					...row.calc.clientPayment,
+					totalByCurrency: enrich(row.calc.clientPayment.totalByCurrency),
+				},
+				returning: {
+					...row.calc.returning,
+					paymentByCurrency: enrich(row.calc.returning.paymentByCurrency),
+				},
+				debtByCurrency: enrich(row.calc.debtByCurrency),
+			},
+		}
+	}
 
 	// ─── Selling Stats ─────────────────────────────────────────────────────────
 
@@ -432,8 +459,13 @@ export class StatisticsRepository {
 			}
 		}
 
-		// 6. Convert to response rows
-		const toArr = (map: CurrencyMap): ClientReportByCurrency[] => Array.from(map.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+		// 6. Convert to response rows (currency filled properly in step 7)
+		const toArr = (map: CurrencyMap): ClientReportByCurrency[] =>
+			Array.from(map.entries()).map(([currencyId, amount]) => ({
+				currencyId,
+				amount,
+				currency: { id: currencyId, name: '', symbol: '' },
+			}))
 
 		const rows: ClientReportRow[] = clients.map((client) => {
 			const raw = calcMap.get(client.id)
@@ -477,14 +509,26 @@ export class StatisticsRepository {
 			return { ...client, calc }
 		})
 
+		const currencyIdSet = new Set<string>()
+		for (const row of rows) {
+			const c = row.calc
+			for (const x of c.selling.totalPriceByCurrency) currencyIdSet.add(x.currencyId)
+			for (const x of c.selling.paymentByCurrency) currencyIdSet.add(x.currencyId)
+			for (const x of c.clientPayment.totalByCurrency) currencyIdSet.add(x.currencyId)
+			for (const x of c.returning.paymentByCurrency) currencyIdSet.add(x.currencyId)
+			for (const x of c.debtByCurrency) currencyIdSet.add(x.currencyId)
+		}
+		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdSet]))
+		const enrichedRows = rows.map((row) => this.enrichClientReportRow(row, currencyMap))
+
 		if (query.pagination) {
-			const totalCount = rows.length
+			const totalCount = enrichedRows.length
 			const pagesCount = Math.ceil(totalCount / query.pageSize)
 			const pageSize = query.pageSize
-			const data = rows.slice((query.pageNumber - 1) * pageSize, query.pageNumber * pageSize)
+			const data = enrichedRows.slice((query.pageNumber - 1) * pageSize, query.pageNumber * pageSize)
 			return { data, totalCount, pagesCount, pageSize: data.length }
 		}
 
-		return { data: rows }
+		return { data: enrichedRows }
 	}
 }

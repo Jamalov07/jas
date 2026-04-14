@@ -15,12 +15,26 @@ import {
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ClientRequiredDto } from './fields.dtos'
 
+export class CurrencyBriefDto {
+	@ApiProperty({ type: String })
+	id: string
+
+	@ApiProperty({ type: String })
+	name: string
+
+	@ApiProperty({ type: String })
+	symbol: string
+}
+
 export class ClientDebtByCurrencyDto implements ClientDebtByCurrency {
 	@ApiProperty({ type: String })
 	currencyId: string
 
 	@ApiProperty({ type: Number })
 	amount: Decimal
+
+	@ApiProperty({ type: CurrencyBriefDto })
+	currency: CurrencyBriefDto
 }
 
 export class ClientDeedDto implements ClientDeed {
@@ -30,8 +44,8 @@ export class ClientDeedDto implements ClientDeed {
 	@ApiProperty({ enum: ['debit', 'credit'] })
 	type: 'debit' | 'credit'
 
-	@ApiProperty({ enum: ['selling', 'payment', 'returning'] })
-	action: 'selling' | 'payment' | 'returning'
+	@ApiProperty({ enum: ['selling', 'payment', 'returning', 'change'] })
+	action: 'selling' | 'payment' | 'returning' | 'change'
 
 	@ApiProperty({ type: Number })
 	value: Decimal

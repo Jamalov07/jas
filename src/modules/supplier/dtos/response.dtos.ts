@@ -14,12 +14,26 @@ import {
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { SupplierRequiredDto } from './fields.dtos'
 
+export class SupplierCurrencyBriefDto {
+	@ApiProperty({ type: String })
+	id: string
+
+	@ApiProperty({ type: String })
+	name: string
+
+	@ApiProperty({ type: String })
+	symbol: string
+}
+
 export class SupplierDebtByCurrencyDto implements SupplierDebtByCurrency {
 	@ApiProperty({ type: String })
 	currencyId: string
 
 	@ApiProperty({ type: Number })
 	amount: Decimal
+
+	@ApiProperty({ type: SupplierCurrencyBriefDto })
+	currency: SupplierCurrencyBriefDto
 }
 
 export class SupplierDeedDto implements SupplierDeed {
@@ -35,8 +49,8 @@ export class SupplierDeedDto implements SupplierDeed {
 	@ApiProperty({ type: String })
 	description: string
 
-	@ApiProperty({ enum: ['payment', 'arrival'] })
-	action?: 'payment' | 'arrival'
+	@ApiProperty({ enum: ['payment', 'arrival', 'change'] })
+	action?: 'payment' | 'arrival' | 'change'
 
 	@ApiProperty({ type: String })
 	currencyId?: string
