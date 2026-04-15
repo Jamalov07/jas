@@ -16,12 +16,10 @@ export declare interface SellingPaymentData {
 	createdAt: Date
 }
 
-export declare interface SellingProductPriceData {
-	type: PriceTypeEnum
+/** Selling qatorida MV narxlari faqat `selling` turi — javobda obyekt ko‘rinishi */
+export declare interface SellingProductSellingPrice {
 	price: Decimal
 	totalPrice: Decimal
-	currencyId: string
-	currency?: { symbol: string }
 }
 
 export declare interface SellingProductData {
@@ -29,7 +27,7 @@ export declare interface SellingProductData {
 	count: number
 	createdAt: Date
 	product: { id: string; name: string; createdAt: Date }
-	prices: SellingProductPriceData[]
+	prices: { selling: SellingProductSellingPrice | null }
 }
 
 export declare interface SellingTotalByCurrency {

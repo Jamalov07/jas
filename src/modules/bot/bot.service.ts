@@ -131,7 +131,14 @@ export class BotService {
 	}
 
 	private getProductPrice(product: SellingProductData): number {
-		return product.prices?.[0]?.price?.toNumber() ?? 0
+		const p = product.prices as any
+		if (p && typeof p === 'object' && !Array.isArray(p) && p.selling?.price) {
+			return p.selling.price.toNumber?.() ?? 0
+		}
+		if (Array.isArray(p) && p[0]?.price) {
+			return p[0].price.toNumber?.() ?? 0
+		}
+		return 0
 	}
 
 	private buildSellingCaption(selling: BotSellingData): string {

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SellingRepository } from './selling.repository'
 import { createResponse, CRequest, currencyBriefMapFromRows, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
-import { SellingStatusEnum } from '@prisma/client'
+import { PaymentMethodEnum, PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import {
 	SellingGetOneRequest,
 	SellingCreateOneRequest,
@@ -13,7 +13,6 @@ import {
 	SellingCalcEntry,
 	SellingPaymentData,
 } from './interfaces'
-import { PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { CommonService } from '../common'
 import { ExcelService } from '../shared'
@@ -34,15 +33,14 @@ export class SellingService {
 		private readonly currencyRepository: CurrencyRepository,
 	) {}
 
-	private calcTotalPricesFromProducts(products: { prices: { type: string; currencyId: string; totalPrice: Decimal; currency?: { symbol: string } }[] }[]) {
+	/** Selling MV da har bir qatorda narxlarda faqat `selling` — bitta qatorni valyuta bo‘yicha yig‘amiz */
+	private calcTotalPricesFromProducts(products: { prices: { type: PriceTypeEnum; currencyId: string; totalPrice: Decimal; currency?: { symbol: string } }[] }[]) {
 		const map = new Map<string, { total: Decimal; currency?: { symbol: string } }>()
 		for (const product of products) {
-			for (const price of product.prices) {
-				if (price.type === 'selling') {
-					const existing = map.get(price.currencyId) ?? { total: new Decimal(0), currency: price.currency }
-					map.set(price.currencyId, { total: existing.total.plus(price.totalPrice), currency: existing.currency || price.currency })
-				}
-			}
+			const row = product.prices.find((p) => p.type === PriceTypeEnum.selling) ?? product.prices[0]
+			if (!row) continue
+			const existing = map.get(row.currencyId) ?? { total: new Decimal(0), currency: row.currency }
+			map.set(row.currencyId, { total: existing.total.plus(row.totalPrice), currency: existing.currency || row.currency })
 		}
 		return Array.from(map.entries()).map(([currencyId, { total, currency }]) => ({ currencyId, total, currency }))
 	}
@@ -63,23 +61,16 @@ export class SellingService {
 		return csp?.methods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
 	}
 
-	/** findOne response: prices as { selling: {...}, cost: {...} } instead of array */
-	private pricesArrayToByTypeRecord(prices: { type: string }[]): Record<string, unknown> {
-		const out: Record<string, unknown> = {}
-		for (const price of prices) {
-			const { type, ...rest } = price as { type: string } & Record<string, unknown>
-			if (!(type in out)) {
-				out[type] = rest
-			} else {
-				const ex = out[type]
-				out[type] = Array.isArray(ex) ? [...ex, rest] : [ex, rest]
-			}
+	private mapSellingLinePricesToObject<T extends { prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal }[] }>(line: T) {
+		const row = line.prices.find((p) => p.type === PriceTypeEnum.selling) ?? line.prices[0]
+		return {
+			...line,
+			prices: row ? { selling: { price: row.price, totalPrice: row.totalPrice } } : { selling: null },
 		}
-		return out
 	}
 
-	private mapProductsPricesToByType<T extends { prices: { type: string }[] }>(products: T[]) {
-		return products.map((p) => ({ ...p, prices: this.pricesArrayToByTypeRecord(p.prices) }))
+	private mapSellingProductsPrices<T extends { prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal }[] }>(products: T[]) {
+		return products.map((p) => this.mapSellingLinePricesToObject(p))
 	}
 
 	private calcDebtByCurrency(totalPrices: { currencyId: string; total: Decimal; currency?: { symbol: string } }[], payment: SellingPaymentData | undefined) {
@@ -118,8 +109,9 @@ export class SellingService {
 			const totalPrices = this.calcTotalPricesFromProducts(selling.products)
 			const payment = this.buildPaymentData(selling.payment)
 			const debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
+			const products = this.mapSellingProductsPrices(selling.products)
 
-			return { ...selling, payment, totalPrices, debtByCurrency }
+			return { ...selling, products, payment, totalPrices, debtByCurrency }
 		})
 
 		const calc: SellingCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
@@ -157,7 +149,7 @@ export class SellingService {
 		const totalPrices = this.calcTotalPricesFromProducts(selling.products)
 		const payment = this.buildPaymentData(selling.payment)
 		let debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
-		const products = this.mapProductsPricesToByType(selling.products)
+		const products = this.mapSellingProductsPrices(selling.products)
 
 		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)))
 		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, debtCurrencyMap)

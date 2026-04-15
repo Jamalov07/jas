@@ -12,6 +12,25 @@ import { logoBase64 } from './constants'
 export class PdfService {
 	constructor(private readonly prisma: PrismaService) {}
 
+	/** API javobi `{ selling: { price, totalPrice } }` yoki bot/DB dan massiv */
+	private lineSellingPriceParts(item: { prices: unknown }) {
+		const p = item.prices as any
+		if (p && typeof p === 'object' && !Array.isArray(p) && p.selling) {
+			const s = p.selling
+			return {
+				price: s?.price,
+				totalPrice: s?.totalPrice,
+				symbol: '' as string,
+			}
+		}
+		const row = Array.isArray(p) ? p[0] : undefined
+		return {
+			price: row?.price,
+			totalPrice: row?.totalPrice,
+			symbol: row?.currency?.symbol ?? '',
+		}
+	}
+
 	async generateInvoicePdfBuffer(selling: SellingFindOneData): Promise<Buffer> {
 		const docDefinition: TDocumentDefinitions = {
 			content: [
@@ -47,9 +66,9 @@ export class PdfService {
 							...(selling.products ?? [])
 								.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
 								.map((item, index) => {
-									const price = item.prices?.[0]?.price?.toNumber() ?? 0
-									const totalPrice = item.prices?.[0]?.totalPrice?.toNumber() ?? price * item.count
-									const sym = item.prices?.[0]?.currency?.symbol ?? ''
+									const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
+									const price = pr?.toNumber?.() ?? 0
+									const totalPrice = tpr?.toNumber?.() ?? price * item.count
 									return [index + 1, item.product.name, item.count, `${price} ${sym}`, `${totalPrice} ${sym}`]
 								}),
 						],
@@ -127,9 +146,9 @@ export class PdfService {
 							...(selling.products ?? [])
 								.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
 								.map((item, index) => {
-									const price = item.prices?.[0]?.price?.toNumber() ?? 0
-									const totalPrice = item.prices?.[0]?.totalPrice?.toNumber() ?? price * item.count
-									const sym = item.prices?.[0]?.currency?.symbol ?? ''
+									const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
+									const price = pr?.toNumber?.() ?? 0
+									const totalPrice = tpr?.toNumber?.() ?? price * item.count
 									return [
 										{ text: index + 1, fontSize: 12, alignment: 'center' },
 										{ text: item.product.name, fontSize: 12, alignment: 'left' },
