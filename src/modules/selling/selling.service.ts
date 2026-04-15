@@ -233,7 +233,12 @@ export class SellingService {
 			}
 		}
 
-		const data = { ...selling, payment: this.buildPaymentData(selling.payment) }
+		const data = {
+			...selling,
+			products: this.mapSellingProductsPrices(selling.products),
+			totalPrices: this.calcTotalPricesFromProducts(selling.products),
+			payment: this.buildPaymentData(selling.payment),
+		}
 		return createResponse({ data, success: { messages: ['create one success'] } })
 	}
 
