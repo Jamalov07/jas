@@ -9,7 +9,7 @@ import {
 	SupplierPaymentMethodData,
 	SupplierPaymentModifyResponse,
 } from '../interfaces'
-import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
+import { CurrencyBriefDto, GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { SupplierPaymentRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -30,6 +30,9 @@ export class SupplierPaymentCalcByCurrencyDto implements SupplierPaymentCalcByCu
 
 	@ApiProperty({ type: Number })
 	total: Decimal
+
+	@ApiProperty({ type: CurrencyBriefDto })
+	currency: CurrencyBriefDto
 }
 
 export class SupplierPaymentFindOneDataDto extends PickType(SupplierPaymentRequiredDto, ['id', 'createdAt']) implements SupplierPaymentFindOneData {

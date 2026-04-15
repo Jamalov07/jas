@@ -1,4 +1,4 @@
-import { GlobalResponse, PaginationResponse } from '@common'
+import { CurrencyBrief, GlobalResponse, PaginationResponse } from '@common'
 import { StaffPaymentRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -11,6 +11,7 @@ export declare interface StaffPaymentMethodData {
 export declare interface StaffPaymentCalcByCurrency {
 	currencyId: string
 	total: Decimal
+	currency: CurrencyBrief
 }
 
 export declare interface StaffPaymentFindManyData extends PaginationResponse<StaffPaymentFindOneData> {

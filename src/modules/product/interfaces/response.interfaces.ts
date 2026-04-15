@@ -13,7 +13,16 @@ export declare interface ProductPriceData {
 	exchangeRate: Decimal
 }
 
-export declare interface ProductFindManyData extends PaginationResponse<ProductFindOneData> {}
+/** Joriy sahifa / filter bo‘yicha ombor qiymati yig‘indilari (cost va selling `product_price.total_price`) */
+export declare interface ProductFindManyCalc {
+	totalCost: Decimal
+	totalPrice: Decimal
+	totalCount: Decimal
+}
+
+export declare interface ProductFindManyData extends PaginationResponse<ProductFindOneData> {
+	calc: { calcPage: ProductFindManyCalc; calcTotal: ProductFindManyCalc }
+}
 
 export declare interface ProductFindOneData extends Pick<ProductRequired, 'id' | 'name' | 'createdAt'>, Pick<ProductOptional, 'count' | 'minAmount' | 'description'> {
 	prices?: Record<PriceTypeEnum, ProductPriceData>

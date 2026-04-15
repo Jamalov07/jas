@@ -1,13 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SellingRepository } from './selling.repository'
-import {
-	createResponse,
-	CRequest,
-	currencyBriefMapFromRows,
-	ERROR_MSG,
-	fillPaymentMethodCurrencyTotalsByActiveIds,
-	withCurrencyBriefAmountMany,
-} from '@common'
+import { createResponse, CRequest, currencyBriefMapFromRows, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
 import { SellingStatusEnum } from '@prisma/client'
 import {
 	SellingGetOneRequest,
@@ -166,9 +159,7 @@ export class SellingService {
 		let debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
 		const products = this.mapProductsPricesToByType(selling.products)
 
-		const debtCurrencyMap = currencyBriefMapFromRows(
-			await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)),
-		)
+		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)))
 		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, debtCurrencyMap)
 
 		return createResponse({

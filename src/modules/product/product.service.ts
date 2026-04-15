@@ -17,6 +17,31 @@ export class ProductService {
 	async findMany(query: ProductFindManyRequest) {
 		const products = await this.productRepository.findMany(query)
 		const productsCount = await this.productRepository.countFindMany(query)
+		const inventoryRows = await this.productRepository.findManyForInventoryCalc(query)
+
+		const calcPage = {
+			totalCost: new Decimal(0),
+			totalPrice: new Decimal(0),
+			totalCount: new Decimal(0),
+			totalWholesale: new Decimal(0),
+		}
+
+		const calcTotal = {
+			totalCost: new Decimal(0),
+			totalPrice: new Decimal(0),
+			totalCount: new Decimal(0),
+			totalWholesale: new Decimal(0),
+		}
+
+		for (const row of inventoryRows) {
+			const costTotal = row.prices.find((pr) => pr.type === PriceTypeEnum.cost)?.totalPrice ?? new Decimal(0)
+			const sellingTotal = row.prices.find((pr) => pr.type === PriceTypeEnum.selling)?.totalPrice ?? new Decimal(0)
+			const wholesaleTotal = row.prices.find((pr) => pr.type === PriceTypeEnum.wholesale)?.totalPrice ?? new Decimal(0)
+			calcTotal.totalCost = calcTotal.totalCost.plus(costTotal)
+			calcTotal.totalPrice = calcTotal.totalPrice.plus(sellingTotal)
+			calcTotal.totalCount = calcTotal.totalCount.plus(row.count)
+			calcTotal.totalWholesale = calcTotal.totalWholesale.plus(wholesaleTotal)
+		}
 
 		const mappedProducts = products.map((p) => {
 			const lastSellingMV = p.sellingMVs?.length ? p.sellingMVs[0] : null
@@ -43,14 +68,29 @@ export class ProductService {
 			return new Date(b.lastSellingDate).getTime() - new Date(a.lastSellingDate).getTime()
 		})
 
+		for (const p of sortedProducts) {
+			const costTotal = p.prices.cost?.totalPrice ?? new Decimal(0)
+			const sellingTotal = p.prices.selling?.totalPrice ?? new Decimal(0)
+			const wholesaleTotal = p.prices.wholesale?.totalPrice ?? new Decimal(0)
+
+			calcPage.totalCount = calcPage.totalCount.plus(p.count)
+
+			calcPage.totalCost = calcPage.totalCost.plus(costTotal)
+			calcPage.totalPrice = calcPage.totalPrice.plus(sellingTotal)
+			calcPage.totalWholesale = calcPage.totalWholesale.plus(wholesaleTotal)
+		}
+
+		const calc = { calcPage, calcTotal }
+
 		const result = query.pagination
 			? {
 					totalCount: productsCount,
 					pagesCount: Math.ceil(productsCount / query.pageSize),
 					pageSize: sortedProducts.length,
 					data: sortedProducts,
+					calc,
 				}
-			: { data: sortedProducts }
+			: { data: sortedProducts, calc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}

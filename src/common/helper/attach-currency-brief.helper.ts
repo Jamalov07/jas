@@ -23,3 +23,14 @@ export function withCurrencyBriefAmountMany(
 ): Array<{ currencyId: string; amount: Decimal; currency: CurrencyBrief }> {
 	return withCurrencyBriefMany(rows, map)
 }
+
+/** For rows with `total` (payment list aggregates) */
+export function withCurrencyBriefTotalMany(
+	rows: Array<{ currencyId: string; total: Decimal }>,
+	map: Map<string, CurrencyBrief>,
+): Array<{ currencyId: string; total: Decimal; currency: CurrencyBrief }> {
+	return rows.map((r) => ({
+		...r,
+		currency: map.get(r.currencyId) ?? fallbackBrief(r.currencyId),
+	}))
+}

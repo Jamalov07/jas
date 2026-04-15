@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@nestjs/swagger'
-import { ProductFindManyData, ProductFindManyResponse, ProductFindOneData, ProductFindOneResponse, ProductModifyResponse, ProductPriceData } from '../interfaces'
+import {
+	ProductFindManyCalc,
+	ProductFindManyData,
+	ProductFindManyResponse,
+	ProductFindOneData,
+	ProductFindOneResponse,
+	ProductModifyResponse,
+	ProductPriceData,
+} from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ProductRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -39,9 +47,31 @@ export class ProductFindOneDataDto extends PickType(ProductRequiredDto, ['id', '
 	lastSellingPrice?: Decimal
 }
 
+export class ProductFindManyCalcDto implements ProductFindManyCalc {
+	@ApiProperty({ type: Number })
+	totalCost: Decimal
+
+	@ApiProperty({ type: Number })
+	totalPrice: Decimal
+
+	@ApiProperty({ type: Number })
+	totalCount: Decimal
+}
+
+export class ProductFindManyCalcBundleDto {
+	@ApiProperty({ type: ProductFindManyCalcDto })
+	calcPage: ProductFindManyCalcDto
+
+	@ApiProperty({ type: ProductFindManyCalcDto })
+	calcTotal: ProductFindManyCalcDto
+}
+
 export class ProductFindManyDataDto extends PaginationResponseDto implements ProductFindManyData {
 	@ApiProperty({ type: ProductFindOneDataDto, isArray: true })
 	data: ProductFindOneData[]
+
+	@ApiProperty({ type: ProductFindManyCalcBundleDto })
+	calc: { calcPage: ProductFindManyCalc; calcTotal: ProductFindManyCalc }
 }
 
 export class ProductFindManyResponseDto extends GlobalResponseDto implements ProductFindManyResponse {

@@ -107,6 +107,17 @@ export class ProductRepository {
 		return count
 	}
 
+	/** `findMany` filteri bilan mos keladigan barcha mahsulotlar uchun calcTotal (yengil select) */
+	async findManyForInventoryCalc(query: ProductFindManyRequest) {
+		return this.prisma.productModel.findMany({
+			where: { ...this.buildSearchFilter(query.search) },
+			select: {
+				count: true,
+				prices: { select: { type: true, totalPrice: true } },
+			},
+		})
+	}
+
 	async getMany(query: ProductGetManyRequest) {
 		let paginationOptions = {}
 		if (query.pagination) {

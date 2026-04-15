@@ -101,6 +101,9 @@ export class ClientPaymentRepository {
 				id: { in: query.ids },
 				staffId: query.staffId,
 			},
+			include: {
+				methods: { select: this.paymentMethodsSelect },
+			},
 			...paginationOptions,
 		})
 

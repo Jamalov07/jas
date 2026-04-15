@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { StaffPaymentRepository } from './staff-payment.repository'
-import { createResponse, CRequest, DeleteMethodEnum, ERROR_MSG, fillCurrencyTotalsByActiveIds } from '@common'
+import { createResponse, CRequest, DeleteMethodEnum, enrichedCalcByCurrencyForPayments, ERROR_MSG } from '@common'
 import {
 	StaffPaymentGetOneRequest,
 	StaffPaymentCreateOneRequest,
@@ -13,7 +13,6 @@ import {
 } from './interfaces'
 import { StaffService } from '../staff'
 import { CurrencyRepository } from '../currency'
-import { Decimal } from '@prisma/client/runtime/library'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 
@@ -29,16 +28,10 @@ export class StaffPaymentService {
 	async findMany(query: StaffPaymentFindManyRequest) {
 		const payments = await this.staffPaymentRepository.findMany(query)
 		const paymentsCount = await this.staffPaymentRepository.countFindMany(query)
-		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
-
-		const calcMap = new Map<string, Decimal>()
-		for (const payment of payments) {
-			for (const method of payment.methods) {
-				const curr = calcMap.get(method.currencyId) ?? new Decimal(0)
-				calcMap.set(method.currencyId, curr.plus(method.amount))
-			}
-		}
-		const calcByCurrency: StaffPaymentCalcByCurrency[] = fillCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
+		const calcByCurrency: StaffPaymentCalcByCurrency[] = await enrichedCalcByCurrencyForPayments(payments, {
+			findAllActiveIds: () => this.currencyRepository.findAllActiveIds(),
+			findBriefByIds: (ids) => this.currencyRepository.findBriefByIds(ids),
+		})
 
 		const result = query.pagination
 			? {
@@ -66,14 +59,19 @@ export class StaffPaymentService {
 	async getMany(query: StaffPaymentGetManyRequest) {
 		const payments = await this.staffPaymentRepository.getMany(query)
 		const paymentsCount = await this.staffPaymentRepository.countGetMany(query)
+		const calcByCurrency: StaffPaymentCalcByCurrency[] = await enrichedCalcByCurrencyForPayments(payments, {
+			findAllActiveIds: () => this.currencyRepository.findAllActiveIds(),
+			findBriefByIds: (ids) => this.currencyRepository.findBriefByIds(ids),
+		})
 
 		const result = query.pagination
 			? {
 					pagesCount: Math.ceil(paymentsCount / query.pageSize),
 					pageSize: payments.length,
 					data: payments,
+					calcByCurrency,
 				}
-			: { data: payments }
+			: { data: payments, calcByCurrency }
 
 		return createResponse({ data: result, success: { messages: ['get many success'] } })
 	}

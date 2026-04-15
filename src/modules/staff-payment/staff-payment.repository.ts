@@ -96,6 +96,9 @@ export class StaffPaymentRepository {
 				id: { in: query.ids },
 				staffId: query.staffId,
 			},
+			include: {
+				methods: { select: this.paymentMethodsSelect },
+			},
 			...paginationOptions,
 		})
 

@@ -9,7 +9,7 @@ import {
 	StaffPaymentMethodData,
 	StaffPaymentModifyResponse,
 } from '../interfaces'
-import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
+import { CurrencyBriefDto, GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { StaffPaymentRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -30,6 +30,9 @@ export class StaffPaymentCalcByCurrencyDto implements StaffPaymentCalcByCurrency
 
 	@ApiProperty({ type: Number })
 	total: Decimal
+
+	@ApiProperty({ type: CurrencyBriefDto })
+	currency: CurrencyBriefDto
 }
 
 export class StaffPaymentFindOneDataDto extends PickType(StaffPaymentRequiredDto, ['id', 'createdAt']) implements StaffPaymentFindOneData {

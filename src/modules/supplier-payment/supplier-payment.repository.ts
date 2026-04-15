@@ -109,6 +109,17 @@ export class SupplierPaymentRepository {
 				id: { in: query.ids },
 				staffId: query.staffId,
 			},
+			include: {
+				methods: {
+					select: {
+						id: true,
+						type: true,
+						currencyId: true,
+						amount: true,
+						currency: { select: { id: true, symbol: true } },
+					},
+				},
+			},
 			...paginationOptions,
 		})
 
