@@ -27,6 +27,7 @@ export class StaffPaymentCreateOneRequestDto extends IntersectionType(PickType(S
 
 export class StaffPaymentUpdateOneRequestDto extends IntersectionType(PickType(StaffPaymentOptionalDto, ['deletedAt', 'description'])) implements StaffPaymentUpdateOneRequest {
 	@ApiPropertyOptional({ type: StaffPaymentMethodDto })
+	@IsObject()
 	@IsOptional()
 	@Type(() => StaffPaymentMethodDto)
 	method?: StaffPaymentMethodDto
