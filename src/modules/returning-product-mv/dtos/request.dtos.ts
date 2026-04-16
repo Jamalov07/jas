@@ -1,8 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { Allow, IsNumber, IsOptional, IsUUID } from 'class-validator'
+import { IsNotEmpty, IsNumber, IsOptional, IsUUID } from 'class-validator'
 import { Type } from 'class-transformer'
-import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
+import { IsDecimalIntOrBigInt, PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { IntersectionType } from '@nestjs/swagger'
+import { Decimal } from '@prisma/client/runtime/library'
 
 export class ReturningProductMVFindManyRequestDto extends IntersectionType(PaginationRequestDto, RequestOtherFieldsDto) {
 	@ApiPropertyOptional()
@@ -37,13 +38,15 @@ export class ReturningProductMVCreateOneRequestDto {
 	productId: string
 
 	@ApiProperty()
+	@IsNotEmpty()
 	@IsNumber()
 	@Type(() => Number)
 	count: number
 
-	@Allow()
-	@ApiProperty()
-	price: any
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	price: Decimal
 
 	@ApiProperty()
 	@IsUUID()
@@ -57,9 +60,10 @@ export class ReturningProductMVUpdateOneRequestDto {
 	@Type(() => Number)
 	count?: number
 
-	@ApiPropertyOptional()
+	@ApiPropertyOptional({ type: Number })
 	@IsOptional()
-	price?: any
+	@IsDecimalIntOrBigInt()
+	price?: Decimal
 
 	@ApiPropertyOptional()
 	@IsOptional()
