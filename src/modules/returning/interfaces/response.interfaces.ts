@@ -24,6 +24,10 @@ export declare interface ReturningFindManyData extends PaginationResponse<Return
 export declare interface ReturningFindOneData extends Pick<ReturningRequired, 'id' | 'status' | 'date' | 'createdAt'> {
 	payment?: any
 	products?: any[]
+	totalPrices?: { currencyId: string; total: Decimal; currency?: { symbol: string } }[]
+	totalPayments?: Array<{ currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }>
+	totalChanges?: Array<{ currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }>
+	debtByCurrency?: { currencyId: string; amount: Decimal; currency?: { id: string; name: string; symbol: string } }[]
 	/** `findMany` / `findOne` da client `findMany` bilan bir xil joriy qarz */
 	client?: { id: string; fullname: string; phone: string; debtByCurrency: ClientDebtByCurrency[] }
 	staff?: any

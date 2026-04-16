@@ -33,6 +33,11 @@ export class ProductPriceUpdateInputDto implements ProductPriceUpdateInput {
 	@IsOptional()
 	@IsDecimalIntOrBigInt()
 	price?: Decimal
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	currencyId?: string
 }
 
 export class ProductPricesInputDto implements ProductPricesInput {

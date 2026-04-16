@@ -9,6 +9,7 @@ export declare interface ProductPriceInput {
 
 export declare interface ProductPriceUpdateInput {
 	price?: Decimal
+	currencyId?: string
 }
 
 export declare interface ProductPricesInput {

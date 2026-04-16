@@ -3,8 +3,11 @@ import {
 	SellingCalcEntry,
 	SellingChangeCalcEntry,
 	SellingCreateOneResponse,
+	SellingFindManyCalcPage,
 	SellingFindManyData,
+	SellingFindManyMoneyByCurrency,
 	SellingFindManyResponse,
+	SellingFindManyCalcPageMethod,
 	SellingFindOneData,
 	SellingFindOneResponse,
 	SellingModifyResponse,
@@ -36,6 +39,45 @@ export class SellingChangeCalcEntryDto implements SellingChangeCalcEntry {
 	total: Decimal
 }
 
+export class SellingFindManyMoneyByCurrencyDto implements SellingFindManyMoneyByCurrency {
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+
+	@ApiProperty()
+	currency: { id: string; name: string; symbol: string }
+}
+
+export class SellingFindManyCalcPageMethodDto implements SellingFindManyCalcPageMethod {
+	@ApiProperty({ enum: PaymentMethodEnum })
+	type: PaymentMethodEnum
+
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+
+	@ApiProperty()
+	currency: { id: string; name: string; symbol: string }
+}
+
+export class SellingFindManyCalcPageDto implements SellingFindManyCalcPage {
+	@ApiProperty({ type: SellingFindManyMoneyByCurrencyDto, isArray: true })
+	totalPrices: SellingFindManyMoneyByCurrency[]
+
+	@ApiProperty({ type: SellingFindManyMoneyByCurrencyDto, isArray: true })
+	totalPayments: SellingFindManyMoneyByCurrency[]
+
+	@ApiProperty({ type: SellingFindManyCalcPageMethodDto, isArray: true })
+	totalMethods: SellingFindManyCalcPageMethod[]
+
+	@ApiProperty({ type: SellingFindManyMoneyByCurrencyDto, isArray: true })
+	totalDebts: SellingFindManyMoneyByCurrency[]
+}
+
 export class SellingFindOneDataDto extends PickType(SellingRequiredDto, ['id', 'status', 'createdAt', 'date']) implements SellingFindOneData {
 	@ApiPropertyOptional({ type: Number })
 	publicId?: number
@@ -65,6 +107,9 @@ export class SellingFindManyDataDto extends PaginationResponseDto implements Sel
 
 	@ApiProperty({ type: SellingChangeCalcEntryDto, isArray: true })
 	changeCalc: SellingChangeCalcEntry[]
+
+	@ApiProperty({ type: SellingFindManyCalcPageDto })
+	calcPage: SellingFindManyCalcPage
 }
 
 export class SellingFindManyResponseDto extends GlobalResponseDto implements SellingFindManyResponse {

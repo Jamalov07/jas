@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ReturningRepository } from './returning.repository'
 import {
+	aggregateAmountsByCurrencyId,
 	createResponse,
 	CRequest,
 	currencyBriefMapFromRows,
@@ -9,6 +10,7 @@ import {
 	fillChangeMethodCurrencyTotalsByActiveIds,
 	fillPaymentMethodCurrencyTotalsByActiveIds,
 	withCurrencyBriefAmountMany,
+	withCurrencyBriefTotalMany,
 } from '@common'
 import {
 	ReturningGetOneRequest,
@@ -137,21 +139,27 @@ export class ReturningService {
 			const payment = this.buildPaymentData(returning.payment)
 			const debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
 			const products = this.mapReturningProductsPrices(returning.products)
+			const totalPayments = aggregateAmountsByCurrencyId(returning.payment?.paymentMethods)
+			const totalChanges = aggregateAmountsByCurrencyId(returning.payment?.changeMethods)
 
-			return { ...returning, products, payment, totalPrices, debtByCurrency }
+			return { ...returning, products, payment, totalPrices, totalPayments, totalChanges, debtByCurrency }
 		})
 
 		const calc: ReturningCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 		const changeCalc: ReturningChangeCalcEntry[] = fillChangeMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
-		const debtCurrencyIds = new Set<string>()
+		const currencyIdsForBrief = new Set<string>()
 		for (const r of mappedReturnings) {
-			for (const d of r.debtByCurrency) debtCurrencyIds.add(d.currencyId)
+			for (const d of r.debtByCurrency) currencyIdsForBrief.add(d.currencyId)
+			for (const t of r.totalPayments) currencyIdsForBrief.add(t.currencyId)
+			for (const t of r.totalChanges) currencyIdsForBrief.add(t.currencyId)
 		}
-		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...debtCurrencyIds]))
+		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
 		const returningsWithDebtCurrency = mappedReturnings.map((r) => ({
 			...r,
-			debtByCurrency: withCurrencyBriefAmountMany(r.debtByCurrency, debtCurrencyMap),
+			debtByCurrency: withCurrencyBriefAmountMany(r.debtByCurrency, currencyBriefMap),
+			totalPayments: withCurrencyBriefTotalMany(r.totalPayments, currencyBriefMap),
+			totalChanges: withCurrencyBriefTotalMany(r.totalChanges, currencyBriefMap),
 		}))
 
 		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds(returningsWithDebtCurrency.map((r) => r.client.id))
@@ -184,14 +192,31 @@ export class ReturningService {
 			throw new BadRequestException(ERROR_MSG.RETURNING.NOT_FOUND.UZ)
 		}
 
+		const totalPrices = this.calcTotalPricesFromProducts(returning.products)
+		const payment = this.buildPaymentData(returning.payment)
+		let debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
 		const products = this.mapReturningProductsPrices(returning.products)
+		const totalPayments = aggregateAmountsByCurrencyId(returning.payment?.paymentMethods)
+		const totalChanges = aggregateAmountsByCurrencyId(returning.payment?.changeMethods)
+
+		const currencyIdsForBrief = new Set<string>()
+		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)
+		for (const t of totalPayments) currencyIdsForBrief.add(t.currencyId)
+		for (const t of totalChanges) currencyIdsForBrief.add(t.currencyId)
+		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
+		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, currencyBriefMap)
+
 		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds([returning.client.id])
 		const clientDebt = clientDebtMap.get(returning.client.id) ?? []
 		return createResponse({
 			data: {
 				...returning,
 				products,
-				payment: this.buildPaymentData(returning.payment),
+				payment,
+				totalPrices,
+				totalPayments: withCurrencyBriefTotalMany(totalPayments, currencyBriefMap),
+				totalChanges: withCurrencyBriefTotalMany(totalChanges, currencyBriefMap),
+				debtByCurrency,
 				client: { ...returning.client, debtByCurrency: clientDebt },
 			},
 			success: { messages: ['find one success'] },

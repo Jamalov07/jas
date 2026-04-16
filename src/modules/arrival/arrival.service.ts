@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ArrivalRepository } from './arrival.repository'
 import {
+	aggregateAmountsByCurrencyId,
 	createResponse,
 	CRequest,
 	currencyBriefMapFromRows,
@@ -8,6 +9,7 @@ import {
 	fillChangeMethodCurrencyTotalsByActiveIds,
 	fillPaymentMethodCurrencyTotalsByActiveIds,
 	withCurrencyBriefAmountMany,
+	withCurrencyBriefTotalMany,
 } from '@common'
 import {
 	ArrivalGetOneRequest,
@@ -137,20 +139,26 @@ export class ArrivalService {
 			const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
 			const debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[], (payment?.changeMethods ?? []) as ChangeMethodEntry[])
 			const products = this.mapArrivalProductsPrices(arrival.products as { prices: ArrivalMvPriceRow[] }[])
-			return { ...arrival, products, payment, totalPrices, debtByCurrency }
+			const totalPayments = aggregateAmountsByCurrencyId(sap?.paymentMethods as { currencyId: string; amount: Decimal }[] | undefined)
+			const totalChanges = aggregateAmountsByCurrencyId(sap?.changeMethods as { currencyId: string; amount: Decimal }[] | undefined)
+			return { ...arrival, products, payment, totalPrices, totalPayments, totalChanges, debtByCurrency }
 		})
 
 		const calc = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 		const changeCalc = fillChangeMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
-		const debtCurrencyIds = new Set<string>()
+		const currencyIdsForBrief = new Set<string>()
 		for (const a of mappedArrivals) {
-			for (const d of a.debtByCurrency) debtCurrencyIds.add(d.currencyId)
+			for (const d of a.debtByCurrency) currencyIdsForBrief.add(d.currencyId)
+			for (const t of a.totalPayments) currencyIdsForBrief.add(t.currencyId)
+			for (const t of a.totalChanges) currencyIdsForBrief.add(t.currencyId)
 		}
-		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...debtCurrencyIds]))
+		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
 		const arrivalsWithDebtCurrency = mappedArrivals.map((a) => ({
 			...a,
-			debtByCurrency: withCurrencyBriefAmountMany(a.debtByCurrency, debtCurrencyMap),
+			debtByCurrency: withCurrencyBriefAmountMany(a.debtByCurrency, currencyBriefMap),
+			totalPayments: withCurrencyBriefTotalMany(a.totalPayments, currencyBriefMap),
+			totalChanges: withCurrencyBriefTotalMany(a.totalChanges, currencyBriefMap),
 		}))
 
 		const result = query.pagination
@@ -187,9 +195,27 @@ export class ArrivalService {
 		const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
 		let debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[], (payment?.changeMethods ?? []) as ChangeMethodEntry[])
 		const products = this.mapArrivalProductsPrices(arrival.products as { prices: ArrivalMvPriceRow[] }[])
-		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)))
-		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, debtCurrencyMap)
-		return createResponse({ data: { ...arrival, products, payment, totalPrices, debtByCurrency }, success: { messages: ['find one success'] } })
+		const totalPayments = aggregateAmountsByCurrencyId(arrival.payment?.paymentMethods as { currencyId: string; amount: Decimal }[] | undefined)
+		const totalChanges = aggregateAmountsByCurrencyId(arrival.payment?.changeMethods as { currencyId: string; amount: Decimal }[] | undefined)
+
+		const currencyIdsForBrief = new Set<string>()
+		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)
+		for (const t of totalPayments) currencyIdsForBrief.add(t.currencyId)
+		for (const t of totalChanges) currencyIdsForBrief.add(t.currencyId)
+		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
+		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, currencyBriefMap)
+		return createResponse({
+			data: {
+				...arrival,
+				products,
+				payment,
+				totalPrices,
+				totalPayments: withCurrencyBriefTotalMany(totalPayments, currencyBriefMap),
+				totalChanges: withCurrencyBriefTotalMany(totalChanges, currencyBriefMap),
+				debtByCurrency,
+			},
+			success: { messages: ['find one success'] },
+		})
 	}
 
 	async getMany(query: ArrivalGetManyRequest) {

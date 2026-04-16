@@ -54,15 +54,46 @@ export declare interface SellingChangeCalcEntry {
 	total: Decimal
 }
 
+/** `findMany` joriy sahifasi bo‘yicha yig‘indilar (barcha `data` qatorlari) */
+export declare interface SellingFindManyMoneyByCurrency {
+	currencyId: string
+	total: Decimal
+	currency: { id: string; name: string; symbol: string }
+}
+
+/** To‘lov usuli + valyuta bo‘yicha (Visa $, Uzcard $, …) */
+export declare interface SellingFindManyCalcPageMethod {
+	type: PaymentMethodEnum
+	currencyId: string
+	total: Decimal
+	currency: { id: string; name: string; symbol: string }
+}
+
+export declare interface SellingFindManyCalcPage {
+	/** Sahifadagi barcha selling mahsulotlari `selling` narxi yig‘indisi, valyuta bo‘yicha */
+	totalPrices: SellingFindManyMoneyByCurrency[]
+	/** To‘lovlar (usul farqi yo‘q), valyuta bo‘yicha */
+	totalPayments: SellingFindManyMoneyByCurrency[]
+	/** To‘lov usuli + valyuta bo‘yicha (aktiv valyutalar × barcha `PaymentMethodEnum`) */
+	totalMethods: SellingFindManyCalcPageMethod[]
+	/** Har bir valyutada qolgan qarz yig‘indisi (sahifa bo‘yicha) */
+	totalDebts: SellingFindManyMoneyByCurrency[]
+}
+
 export declare interface SellingFindManyData extends PaginationResponse<SellingFindOneData> {
 	calc: SellingCalcEntry[]
 	changeCalc: SellingChangeCalcEntry[]
+	calcPage: SellingFindManyCalcPage
 }
 
 export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' | 'status' | 'createdAt' | 'date'>, Pick<SellingOptional, 'publicId'> {
 	client?: any
 	staff?: any
 	totalPrices?: SellingTotalByCurrency[]
+	/** Barcha to'lov usullari (turi farqi yo'q) valyuta bo'yicha yig'indisi */
+	totalPayments?: Array<{ currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }>
+	/** Qaytimlar valyuta bo'yicha yig'indisi */
+	totalChanges?: Array<{ currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }>
 	payment?: SellingPaymentData
 	products?: SellingProductData[]
 }

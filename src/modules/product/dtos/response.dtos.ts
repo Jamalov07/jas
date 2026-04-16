@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@n
 import {
 	ProductFindManyCalc,
 	ProductFindManyData,
+	ProductFindManyMoneyByCurrency,
 	ProductFindManyResponse,
 	ProductFindOneData,
 	ProductFindOneResponse,
@@ -47,15 +48,29 @@ export class ProductFindOneDataDto extends PickType(ProductRequiredDto, ['id', '
 	lastSellingPrice?: Decimal
 }
 
+export class ProductFindManyMoneyByCurrencyDto implements ProductFindManyMoneyByCurrency {
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+
+	@ApiProperty()
+	currency: { id: string; name: string; symbol: string }
+}
+
 export class ProductFindManyCalcDto implements ProductFindManyCalc {
 	@ApiProperty({ type: Number })
-	totalCost: Decimal
+	totalCount: number
 
-	@ApiProperty({ type: Number })
-	totalPrice: Decimal
+	@ApiProperty({ type: ProductFindManyMoneyByCurrencyDto, isArray: true })
+	totalCosts: ProductFindManyMoneyByCurrency[]
 
-	@ApiProperty({ type: Number })
-	totalCount: Decimal
+	@ApiProperty({ type: ProductFindManyMoneyByCurrencyDto, isArray: true })
+	totalPrices: ProductFindManyMoneyByCurrency[]
+
+	@ApiProperty({ type: ProductFindManyMoneyByCurrencyDto, isArray: true })
+	totalWholesales: ProductFindManyMoneyByCurrency[]
 }
 
 export class ProductFindManyCalcBundleDto {

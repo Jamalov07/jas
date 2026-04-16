@@ -13,11 +13,19 @@ export declare interface ProductPriceData {
 	exchangeRate: Decimal
 }
 
-/** Joriy sahifa / filter bo‘yicha ombor qiymati yig‘indilari (cost va selling `product_price.total_price`) */
+/** Valyuta bo‘yicha yig‘indi (faqat aktiv valyutalar ro‘yxati bo‘yicha) */
+export declare interface ProductFindManyMoneyByCurrency {
+	currencyId: string
+	total: Decimal
+	currency: { id: string; name: string; symbol: string }
+}
+
+/** Joriy sahifa / filter bo‘yicha ombor: `totalCount` bitta, narxlari valyuta bo‘yicha massiv */
 export declare interface ProductFindManyCalc {
-	totalCost: Decimal
-	totalPrice: Decimal
-	totalCount: Decimal
+	totalCount: number
+	totalCosts: ProductFindManyMoneyByCurrency[]
+	totalPrices: ProductFindManyMoneyByCurrency[]
+	totalWholesales: ProductFindManyMoneyByCurrency[]
 }
 
 export declare interface ProductFindManyData extends PaginationResponse<ProductFindOneData> {

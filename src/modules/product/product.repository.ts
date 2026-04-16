@@ -55,7 +55,7 @@ export class ProductRepository {
 				name: true,
 				minAmount: true,
 				prices: {
-					select: { id: true, type: true, price: true, totalPrice: true, currency: true, exchangeRate: true },
+					select: { id: true, type: true, price: true, totalPrice: true, currencyId: true, currency: true, exchangeRate: true },
 				},
 				sellingMVs: {
 					orderBy: { selling: { date: 'desc' } },
@@ -113,7 +113,7 @@ export class ProductRepository {
 			where: { ...this.buildSearchFilter(query.search) },
 			select: {
 				count: true,
-				prices: { select: { type: true, totalPrice: true } },
+				prices: { select: { type: true, totalPrice: true, currencyId: true } },
 			},
 		})
 	}
@@ -219,10 +219,27 @@ export class ProductRepository {
 		return product
 	}
 
-	async updateProductPrice(priceId: string, price: Decimal, totalPrice: Decimal) {
+	async findCurrencyExchangeRatesByIds(ids: string[]) {
+		if (ids.length === 0) return new Map<string, Decimal>()
+		const rows = await this.prisma.currencyModel.findMany({
+			where: { id: { in: ids } },
+			select: { id: true, exchangeRate: true },
+		})
+		return new Map(rows.map((r) => [r.id, r.exchangeRate ?? new Decimal(0)]))
+	}
+
+	async updateProductPrice(
+		priceId: string,
+		data: { price: Decimal; totalPrice: Decimal; currencyId: string; exchangeRate: Decimal },
+	) {
 		return await this.prisma.productPriceModel.update({
 			where: { id: priceId },
-			data: { price, totalPrice },
+			data: {
+				price: data.price,
+				totalPrice: data.totalPrice,
+				currencyId: data.currencyId,
+				exchangeRate: data.exchangeRate,
+			},
 		})
 	}
 
