@@ -1,6 +1,7 @@
-import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@nestjs/swagger'
 import {
 	ClientPaymentCalcByCurrency,
+	ClientPaymentChangeMethodData,
 	ClientPaymentCreateOneResponse,
 	ClientPaymentFindManyData,
 	ClientPaymentFindManyResponse,
@@ -14,6 +15,17 @@ import { ClientPaymentRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export class ClientPaymentMethodDataDto implements ClientPaymentMethodData {
+	@ApiProperty({ type: String })
+	type: string
+
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	amount: Decimal
+}
+
+export class ClientPaymentChangeMethodDataDto implements ClientPaymentChangeMethodData {
 	@ApiProperty({ type: String })
 	type: string
 
@@ -38,6 +50,9 @@ export class ClientPaymentCalcByCurrencyDto implements ClientPaymentCalcByCurren
 export class ClientPaymentFindOneDataDto extends PickType(ClientPaymentRequiredDto, ['id', 'createdAt']) implements ClientPaymentFindOneData {
 	@ApiProperty({ type: ClientPaymentMethodDataDto, isArray: true })
 	paymentMethods?: ClientPaymentMethodData[]
+
+	@ApiPropertyOptional({ type: ClientPaymentChangeMethodDataDto, isArray: true })
+	changeMethods?: ClientPaymentChangeMethodData[]
 }
 
 export class ClientPaymentFindManyDataDto extends PaginationResponseDto implements ClientPaymentFindManyData {

@@ -8,6 +8,12 @@ export declare interface ClientPaymentMethodData {
 	amount: Decimal
 }
 
+export declare interface ClientPaymentChangeMethodData {
+	type: string
+	currencyId: string
+	amount: Decimal
+}
+
 export declare interface ClientPaymentCalcByCurrency {
 	currencyId: string
 	total: Decimal
@@ -21,6 +27,7 @@ export declare interface ClientPaymentFindManyData extends PaginationResponse<Cl
 export declare interface ClientPaymentFindOneData extends Pick<ClientPaymentRequired, 'id'> {
 	description?: string | null
 	paymentMethods?: ClientPaymentMethodData[]
+	changeMethods?: ClientPaymentChangeMethodData[]
 }
 
 export declare interface ClientPaymentFindManyResponse extends GlobalResponse {

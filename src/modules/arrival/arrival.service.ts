@@ -1,13 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ArrivalRepository } from './arrival.repository'
-import {
-	createResponse,
-	CRequest,
-	currencyBriefMapFromRows,
-	ERROR_MSG,
-	fillPaymentMethodCurrencyTotalsByActiveIds,
-	withCurrencyBriefAmountMany,
-} from '@common'
+import { createResponse, CRequest, currencyBriefMapFromRows, ERROR_MSG, fillChangeMethodCurrencyTotalsByActiveIds, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
 import {
 	ArrivalGetOneRequest,
 	ArrivalCreateOneRequest,
@@ -18,11 +11,11 @@ import {
 	ArrivalDeleteOneRequest,
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
-import { PaymentMethodEnum } from '@prisma/client'
 
 type PriceEntry = { type: string; price: Decimal; totalPrice: Decimal; currencyId: string; currency: { symbol: string } }
 type ProductEntry = { prices: PriceEntry[] }
 type PaymentMethodEntry = { type: string; currencyId: string; amount: Decimal; currency?: { symbol: string } | null }
+type ChangeMethodEntry = { type: string; currencyId: string; amount: Decimal; currency?: { symbol: string } | null }
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { CurrencyRepository } from '../currency'
@@ -76,7 +69,11 @@ export class ArrivalService {
 		return products.map((p) => ({ ...p, prices: this.pricesArrayToByTypeRecord(p.prices) }))
 	}
 
-	private calcDebtByCurrency(totalPrices: Record<string, { currencyId: string; total: Decimal; currency: { symbol: string } }[]>, paymentMethods: PaymentMethodEntry[]) {
+	private calcDebtByCurrency(
+		totalPrices: Record<string, { currencyId: string; total: Decimal; currency: { symbol: string } }[]>,
+		paymentMethods: PaymentMethodEntry[],
+		changeMethods: ChangeMethodEntry[],
+	) {
 		const debtMap = new Map<string, { amount: Decimal; symbol: string }>()
 
 		for (const entry of totalPrices['cost'] ?? []) {
@@ -87,12 +84,13 @@ export class ArrivalService {
 		for (const method of paymentMethods) {
 			const existing = debtMap.get(method.currencyId)
 			const symbol = existing?.symbol || method.currency?.symbol || ''
-			if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
-				// Change returned to business or credited to balance — reduces effective payment, increases debt
-				debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).plus(method.amount), symbol })
-			} else {
-				debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
-			}
+			debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
+		}
+
+		for (const ch of changeMethods) {
+			const existing = debtMap.get(ch.currencyId)
+			const symbol = existing?.symbol || ch.currency?.symbol || ''
+			debtMap.set(ch.currencyId, { amount: (existing?.amount ?? new Decimal(0)).plus(ch.amount), symbol })
 		}
 
 		return Array.from(debtMap.entries()).map(([currencyId, { amount }]) => ({ currencyId, amount }))
@@ -105,18 +103,35 @@ export class ArrivalService {
 
 		const calcMap = new Map<string, Decimal>()
 		const mappedArrivals = arrivals.map((arrival) => {
-			for (const method of arrival.payment?.methods ?? []) {
+			for (const method of arrival.payment?.paymentMethods ?? []) {
 				const key = `${method.type}_${method.currencyId}`
 				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(method.amount))
 			}
+			for (const ch of arrival.payment?.changeMethods ?? []) {
+				const key = `change_${ch.type}_${ch.currencyId}`
+				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(ch.amount))
+			}
 			const sap = arrival.payment
-			const payment = sap ? { id: sap.id, description: sap.description, createdAt: sap.createdAt, paymentMethods: sap.methods } : undefined
+			const payment = sap
+				? {
+						id: sap.id,
+						description: sap.description,
+						createdAt: sap.createdAt,
+						paymentMethods: sap.paymentMethods,
+						changeMethods: sap.changeMethods ?? [],
+					}
+				: undefined
 			const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
-			const debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[])
+			const debtByCurrency = this.calcDebtByCurrency(
+				totalPrices,
+				(payment?.paymentMethods ?? []) as PaymentMethodEntry[],
+				(payment?.changeMethods ?? []) as ChangeMethodEntry[],
+			)
 			return { ...arrival, payment, totalPrices, debtByCurrency }
 		})
 
 		const calc = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
+		const changeCalc = fillChangeMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
 		const debtCurrencyIds = new Set<string>()
 		for (const a of mappedArrivals) {
@@ -135,8 +150,9 @@ export class ArrivalService {
 					pageSize: arrivalsWithDebtCurrency.length,
 					data: arrivalsWithDebtCurrency,
 					calc,
+					changeCalc,
 				}
-			: { data: arrivalsWithDebtCurrency, calc }
+			: { data: arrivalsWithDebtCurrency, calc, changeCalc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -149,13 +165,23 @@ export class ArrivalService {
 		}
 
 		const sap = arrival.payment
-		const payment = sap ? { id: sap.id, description: sap.description, createdAt: sap.createdAt, paymentMethods: sap.methods } : undefined
+		const payment = sap
+			? {
+					id: sap.id,
+					description: sap.description,
+					createdAt: sap.createdAt,
+					paymentMethods: sap.paymentMethods,
+					changeMethods: sap.changeMethods ?? [],
+				}
+			: undefined
 		const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
-		let debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[])
-		const products = this.mapProductsPricesToByType(arrival.products as ProductEntry[])
-		const debtCurrencyMap = currencyBriefMapFromRows(
-			await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)),
+		let debtByCurrency = this.calcDebtByCurrency(
+			totalPrices,
+			(payment?.paymentMethods ?? []) as PaymentMethodEntry[],
+			(payment?.changeMethods ?? []) as ChangeMethodEntry[],
 		)
+		const products = this.mapProductsPricesToByType(arrival.products as ProductEntry[])
+		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)))
 		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, debtCurrencyMap)
 		return createResponse({ data: { ...arrival, products, payment, totalPrices, debtByCurrency }, success: { messages: ['find one success'] } })
 	}
@@ -184,7 +210,13 @@ export class ArrivalService {
 		const arrival = await this.arrivalRepository.createOne(body)
 		const data = {
 			...arrival,
-			payment: arrival.payment ? { ...arrival.payment, paymentMethods: arrival.payment.methods } : undefined,
+			payment: arrival.payment
+				? {
+						...arrival.payment,
+						paymentMethods: arrival.payment.paymentMethods,
+						changeMethods: arrival.payment.changeMethods ?? [],
+					}
+				: undefined,
 		}
 		return createResponse({ data, success: { messages: ['create one success'] } })
 	}

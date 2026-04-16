@@ -44,7 +44,10 @@ export class SupplierRepository {
 						},
 						payment: {
 							select: {
-								methods: {
+								paymentMethods: {
+									select: { type: true, amount: true, currencyId: true },
+								},
+								changeMethods: {
 									select: { type: true, amount: true, currencyId: true },
 								},
 							},
@@ -55,7 +58,10 @@ export class SupplierRepository {
 				payments: {
 					where: { deletedAt: null },
 					select: {
-						methods: {
+						paymentMethods: {
+							select: { type: true, amount: true, currencyId: true },
+						},
+						changeMethods: {
 							select: { type: true, amount: true, currencyId: true },
 						},
 					},
@@ -92,7 +98,10 @@ export class SupplierRepository {
 							select: {
 								createdAt: true,
 								description: true,
-								methods: {
+								paymentMethods: {
+									select: { amount: true, currencyId: true, type: true },
+								},
+								changeMethods: {
 									select: { amount: true, currencyId: true, type: true },
 								},
 							},
@@ -105,7 +114,10 @@ export class SupplierRepository {
 					select: {
 						createdAt: true,
 						description: true,
-						methods: {
+						paymentMethods: {
+							select: { amount: true, currencyId: true, type: true },
+						},
+						changeMethods: {
 							select: { amount: true, currencyId: true, type: true },
 						},
 					},

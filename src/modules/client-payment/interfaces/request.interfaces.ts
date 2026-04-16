@@ -1,5 +1,5 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
-import { ClientPaymentMethod, ClientPaymentOptional, ClientPaymentRequired } from './fields.interfaces'
+import { ClientPaymentChangeMethod, ClientPaymentMethod, ClientPaymentOptional, ClientPaymentRequired } from './fields.interfaces'
 
 export declare interface ClientPaymentFindManyRequest
 	extends Pick<ClientPaymentOptional, 'staffId' | 'clientId'>,
@@ -14,10 +14,12 @@ export declare interface ClientPaymentGetOneRequest extends ClientPaymentOptiona
 
 export declare interface ClientPaymentCreateOneRequest extends Pick<ClientPaymentRequired, 'clientId'>, Pick<ClientPaymentOptional, 'description' | 'staffId'> {
 	paymentMethods: ClientPaymentMethod[]
+	changeMethods?: ClientPaymentChangeMethod[]
 }
 
 export declare interface ClientPaymentUpdateOneRequest extends Pick<ClientPaymentOptional, 'clientId' | 'description' | 'deletedAt'> {
 	paymentMethods?: ClientPaymentMethod[]
+	changeMethods?: ClientPaymentChangeMethod[]
 }
 
 export declare interface ClientPaymentDeleteOneRequest extends Pick<ClientPaymentOptional, 'id'>, Pick<RequestOtherFields, 'method'> {}

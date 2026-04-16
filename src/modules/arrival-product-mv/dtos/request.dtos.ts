@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsNumber, IsOptional, IsUUID } from 'class-validator'
+import { Allow, IsNumber, IsOptional, IsUUID } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { IntersectionType } from '@nestjs/swagger'
@@ -41,6 +41,8 @@ export class ArrivalProductMVCreateOneRequestDto {
 	@Type(() => Number)
 	count: number
 
+	/** Numeric; `@Allow()` keeps `ValidationPipe({ whitelist: true })` from stripping untyped fields. */
+	@Allow()
 	@ApiProperty()
 	cost: any
 
@@ -48,6 +50,7 @@ export class ArrivalProductMVCreateOneRequestDto {
 	@IsUUID()
 	costCurrencyId: string
 
+	@Allow()
 	@ApiProperty()
 	price: any
 

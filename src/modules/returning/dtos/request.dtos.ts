@@ -1,5 +1,6 @@
 import { PickType, IntersectionType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
+	ReturningChangeMethod,
 	ReturningCreateOneRequest,
 	ReturningDeleteOneRequest,
 	ReturningFindManyRequest,
@@ -14,13 +15,30 @@ import { ReturningOptionalDto, ReturningRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
 import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { PaymentMethodEnum } from '@prisma/client'
+import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 
 export class ReturningPaymentMethodDto implements ReturningPaymentMethod {
 	@ApiProperty({ enum: PaymentMethodEnum })
 	@IsNotEmpty()
 	@IsEnum(PaymentMethodEnum)
 	type: PaymentMethodEnum
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	amount: Decimal
+}
+
+export class ReturningChangeMethodDto implements ReturningChangeMethod {
+	@ApiProperty({ enum: ChangeMethodEnum })
+	@IsNotEmpty()
+	@IsEnum(ChangeMethodEnum)
+	type: ChangeMethodEnum
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
@@ -40,6 +58,13 @@ export class ReturningPaymentDto implements ReturningPayment {
 	@ValidateNested({ each: true })
 	@Type(() => ReturningPaymentMethodDto)
 	paymentMethods?: ReturningPaymentMethod[]
+
+	@ApiPropertyOptional({ type: ReturningChangeMethodDto, isArray: true })
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => ReturningChangeMethodDto)
+	changeMethods?: ReturningChangeMethod[]
 
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()

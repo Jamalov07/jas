@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@nestjs/swagger'
 import {
 	ReturningCalcEntry,
+	ReturningChangeCalcEntry,
 	ReturningCreateOneResponse,
 	ReturningFindManyData,
 	ReturningFindManyResponse,
@@ -10,12 +11,23 @@ import {
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ReturningRequiredDto } from './fields.dtos'
-import { PaymentMethodEnum } from '@prisma/client'
+import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export class ReturningCalcEntryDto implements ReturningCalcEntry {
 	@ApiProperty({ enum: PaymentMethodEnum })
 	type: PaymentMethodEnum
+
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+}
+
+export class ReturningChangeCalcEntryDto implements ReturningChangeCalcEntry {
+	@ApiProperty({ enum: ChangeMethodEnum })
+	type: ChangeMethodEnum
 
 	@ApiProperty({ type: String })
 	currencyId: string
@@ -44,6 +56,9 @@ export class ReturningFindManyDataDto extends PaginationResponseDto implements R
 
 	@ApiProperty({ type: ReturningCalcEntryDto, isArray: true })
 	calc: ReturningCalcEntry[]
+
+	@ApiProperty({ type: ReturningChangeCalcEntryDto, isArray: true })
+	changeCalc: ReturningChangeCalcEntry[]
 }
 
 export class ReturningFindManyResponseDto extends GlobalResponseDto implements ReturningFindManyResponse {

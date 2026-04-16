@@ -12,10 +12,10 @@ import {
 	SupplierDebtByCurrency,
 	SupplierDeed,
 } from './interfaces'
-import { PaymentMethodEnum } from '@prisma/client'
+import { ChangeMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
-const isExcludedFromDebt = (type: string) => type === PaymentMethodEnum.fromBalance
+const isChangeBalanceExcludedFromDebt = (type: string) => type === ChangeMethodEnum.balance
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { CurrencyRepository } from '../currency'
@@ -35,9 +35,15 @@ export class SupplierService {
 	private calcDebtByCurrency(
 		arrivals: Array<{
 			products: Array<{ prices: Array<{ totalPrice: Decimal; currencyId: string }> }>
-			payment?: { methods: Array<{ type: string; amount: Decimal; currencyId: string }> } | null
+			payment?: {
+				paymentMethods: Array<{ type: string; amount: Decimal; currencyId: string }>
+				changeMethods?: Array<{ type: string; amount: Decimal; currencyId: string }> | null
+			} | null
 		}>,
-		payments: Array<{ methods: Array<{ type: string; amount: Decimal; currencyId: string }> }>,
+		payments: Array<{
+			paymentMethods: Array<{ type: string; amount: Decimal; currencyId: string }>
+			changeMethods?: Array<{ type: string; amount: Decimal; currencyId: string }> | null
+		}>,
 	): Map<string, Decimal> {
 		const debtMap = new Map<string, Decimal>()
 
@@ -49,26 +55,29 @@ export class SupplierService {
 				}
 			}
 			if (arr.payment) {
-				for (const method of arr.payment.methods) {
+				for (const method of arr.payment.paymentMethods) {
 					const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
-					if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
-						// Change returned or credited to balance — reduces effective payment, increases debt
-						debtMap.set(method.currencyId, curr.plus(method.amount))
-					} else {
-						debtMap.set(method.currencyId, curr.minus(method.amount))
-					}
+					debtMap.set(method.currencyId, curr.minus(method.amount))
+				}
+				for (const ch of arr.payment.changeMethods ?? []) {
+					const curr = debtMap.get(ch.currencyId) ?? new Decimal(0)
+					debtMap.set(ch.currencyId, curr.plus(ch.amount))
 				}
 			}
 		}
 
 		for (const payment of payments) {
-			for (const method of payment.methods) {
-				if (isExcludedFromDebt(method.type)) continue
+			for (const method of payment.paymentMethods) {
 				const curr = debtMap.get(method.currencyId) ?? new Decimal(0)
-				if (method.type === PaymentMethodEnum.fromCash) {
-					debtMap.set(method.currencyId, curr.plus(method.amount))
+				debtMap.set(method.currencyId, curr.minus(method.amount))
+			}
+			for (const ch of payment.changeMethods ?? []) {
+				if (isChangeBalanceExcludedFromDebt(ch.type)) continue
+				const curr = debtMap.get(ch.currencyId) ?? new Decimal(0)
+				if (ch.type === ChangeMethodEnum.cash) {
+					debtMap.set(ch.currencyId, curr.plus(ch.amount))
 				} else {
-					debtMap.set(method.currencyId, curr.minus(method.amount))
+					debtMap.set(ch.currencyId, curr.minus(ch.amount))
 				}
 			}
 		}
@@ -169,40 +178,37 @@ export class SupplierService {
 			}
 
 			if (arr.payment) {
-				for (const method of arr.payment.methods) {
-					const payDate = arr.payment.createdAt
+				const payDate = arr.payment.createdAt
+				for (const method of arr.payment.paymentMethods) {
 					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
-						if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
-							// Change returned or balance credited — increases debt (debit)
-							deeds.push({
-								type: 'debit',
-								action: 'change',
-								value: method.amount,
-								date: payDate,
-								description: arr.payment.description ?? '',
-								currencyId: method.currencyId,
-							})
-							addToMap(totalDebitMap, method.currencyId, method.amount)
-						} else {
-							deeds.push({
-								type: 'credit',
-								action: 'payment',
-								value: method.amount,
-								date: payDate,
-								description: arr.payment.description ?? '',
-								currencyId: method.currencyId,
-							})
-							addToMap(totalCreditMap, method.currencyId, method.amount)
-						}
+						deeds.push({
+							type: 'credit',
+							action: 'payment',
+							value: method.amount,
+							date: payDate,
+							description: arr.payment.description ?? '',
+							currencyId: method.currencyId,
+						})
+						addToMap(totalCreditMap, method.currencyId, method.amount)
 					}
+				}
+				for (const ch of arr.payment.changeMethods ?? []) {
+					deeds.push({
+						type: 'debit',
+						action: 'change',
+						value: ch.amount,
+						date: payDate,
+						description: arr.payment.description ?? '',
+						currencyId: ch.currencyId,
+					})
+					addToMap(totalDebitMap, ch.currencyId, ch.amount)
 				}
 			}
 		}
 
 		for (const payment of supplier.payments) {
-			for (const method of payment.methods) {
-				if (isExcludedFromDebt(method.type)) continue
-				if ((!deedStartDate || payment.createdAt >= deedStartDate) && (!deedEndDate || payment.createdAt <= deedEndDate)) {
+			if ((!deedStartDate || payment.createdAt >= deedStartDate) && (!deedEndDate || payment.createdAt <= deedEndDate)) {
+				for (const method of payment.paymentMethods) {
 					deeds.push({
 						type: 'credit',
 						action: 'payment',
@@ -212,6 +218,18 @@ export class SupplierService {
 						currencyId: method.currencyId,
 					})
 					addToMap(totalCreditMap, method.currencyId, method.amount)
+				}
+				for (const ch of payment.changeMethods ?? []) {
+					if (isChangeBalanceExcludedFromDebt(ch.type)) continue
+					deeds.push({
+						type: 'credit',
+						action: 'payment',
+						value: ch.amount,
+						date: payment.createdAt,
+						description: payment.description ?? '',
+						currencyId: ch.currencyId,
+					})
+					addToMap(totalCreditMap, ch.currencyId, ch.amount)
 				}
 			}
 		}

@@ -1,7 +1,7 @@
 import { PaginationRequest, RequestOtherFields } from '@common'
 import { SellingOptional, SellingRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
-import { PaymentMethodEnum } from '@prisma/client'
+import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 
 export declare interface SellingPaymentMethod {
 	type: PaymentMethodEnum
@@ -9,8 +9,15 @@ export declare interface SellingPaymentMethod {
 	amount: Decimal
 }
 
+export declare interface SellingChangeMethod {
+	type: ChangeMethodEnum
+	currencyId: string
+	amount: Decimal
+}
+
 export declare interface SellingPayment {
 	paymentMethods?: SellingPaymentMethod[]
+	changeMethods?: SellingChangeMethod[]
 	description?: string
 }
 

@@ -84,21 +84,28 @@ export class PermissionRepository {
 
 	async createOne(body: PermissionCreateOneRequest) {
 		const permission = await this.prisma.permissionModel.create({
-			data: { name: body.name, actions: { connect: body.actionsToConnect.map((a) => ({ id: a })) } },
+			data: { name: body.name, actions: { connect: (body.actionsToConnect ?? []).map((a) => ({ id: a })) } },
 		})
 		return permission
 	}
 
 	async updateOne(query: PermissionGetOneRequest, body: PermissionUpdateOneRequest) {
+		const data: { name?: string; deletedAt?: Date; actions?: { connect: { id: string }[]; disconnect: { id: string }[] } } = {}
+		if (body.name !== undefined) {
+			data.name = body.name
+		}
+		if (body.deletedAt !== undefined) {
+			data.deletedAt = body.deletedAt
+		}
+		const connect = (body.actionsToConnect ?? []).map((a) => ({ id: a }))
+		const disconnect = (body.actionsToDisconnect ?? []).map((a) => ({ id: a }))
+		if (connect.length > 0 || disconnect.length > 0) {
+			data.actions = { connect, disconnect }
+		}
+
 		const permission = await this.prisma.permissionModel.update({
 			where: { id: query.id },
-			data: {
-				name: body.name,
-				actions: {
-					connect: body.actionsToConnect.map((a) => ({ id: a })),
-					disconnect: body.actionsToDisconnect.map((a) => ({ id: a })),
-				},
-			},
+			data,
 		})
 
 		return permission

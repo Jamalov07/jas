@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SellingRepository } from './selling.repository'
-import { createResponse, CRequest, currencyBriefMapFromRows, ERROR_MSG, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
-import { PaymentMethodEnum, PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
+import { createResponse, CRequest, currencyBriefMapFromRows, ERROR_MSG, fillChangeMethodCurrencyTotalsByActiveIds, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
+import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import {
 	SellingGetOneRequest,
 	SellingCreateOneRequest,
@@ -11,6 +11,7 @@ import {
 	SellingFindOneRequest,
 	SellingDeleteOneRequest,
 	SellingCalcEntry,
+	SellingChangeCalcEntry,
 	SellingPaymentData,
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -46,30 +47,45 @@ export class SellingService {
 	}
 
 	private buildPaymentData(
-		csp: { id: string; description?: string | null; createdAt: Date; methods: { type: string; currencyId: string; amount: Decimal }[] } | null | undefined,
+		csp: {
+			id: string
+			description?: string | null
+			createdAt: Date
+			paymentMethods: { type: string; currencyId: string; amount: Decimal }[]
+			changeMethods: { type: string; currencyId: string; amount: Decimal }[]
+		} | null | undefined,
 	): SellingPaymentData | undefined {
 		if (!csp) return undefined
 		return {
 			id: csp.id,
 			description: csp.description,
-			paymentMethods: csp.methods as any,
+			paymentMethods: csp.paymentMethods as SellingPaymentData['paymentMethods'],
+			changeMethods: (csp.changeMethods ?? []) as SellingPaymentData['changeMethods'],
 			createdAt: csp.createdAt,
 		}
 	}
 
-	private calcPaymentTotal(csp: { methods: { amount: Decimal }[] } | null | undefined): Decimal {
-		return csp?.methods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+	private calcPaymentTotal(
+		csp: { paymentMethods?: { amount: Decimal }[]; changeMethods?: { amount: Decimal }[] } | null | undefined,
+	): Decimal {
+		const pm = csp?.paymentMethods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+		const cm = csp?.changeMethods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+		return pm.plus(cm)
 	}
 
-	private mapSellingLinePricesToObject<T extends { prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal }[] }>(line: T) {
+	private mapSellingLinePricesToObject<
+		T extends { prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currency: { id: string; name: string; symbol: string } }[] },
+	>(line: T) {
 		const row = line.prices.find((p) => p.type === PriceTypeEnum.selling) ?? line.prices[0]
 		return {
 			...line,
-			prices: row ? { selling: { price: row.price, totalPrice: row.totalPrice } } : { selling: null },
+			prices: row ? { selling: { price: row.price, totalPrice: row.totalPrice, currency: row.currency } } : { selling: null },
 		}
 	}
 
-	private mapSellingProductsPrices<T extends { prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal }[] }>(products: T[]) {
+	private mapSellingProductsPrices<
+		T extends { count: number; prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currency: { id: string; name: string; symbol: string } }[] },
+	>(products: T[]) {
 		return products.map((p) => this.mapSellingLinePricesToObject(p))
 	}
 
@@ -80,15 +96,15 @@ export class SellingService {
 			debtMap.set(tp.currencyId, { amount: tp.total, symbol: tp.currency?.symbol })
 		}
 
-		for (const method of (payment?.paymentMethods as any[]) ?? []) {
+		for (const method of payment?.paymentMethods ?? []) {
 			const existing = debtMap.get(method.currencyId)
-			const symbol = existing?.symbol ?? method.currency?.symbol
-			if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) {
-				// Change returned to client or credited to balance — reduces effective payment, increases debt
-				debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).plus(method.amount), symbol })
-			} else {
-				debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
-			}
+			const symbol = existing?.symbol ?? (method as { currency?: { symbol?: string } }).currency?.symbol
+			debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
+		}
+		for (const ch of payment?.changeMethods ?? []) {
+			const existing = debtMap.get(ch.currencyId)
+			const symbol = existing?.symbol ?? (ch as { currency?: { symbol?: string } }).currency?.symbol
+			debtMap.set(ch.currencyId, { amount: (existing?.amount ?? new Decimal(0)).plus(ch.amount), symbol })
 		}
 
 		return Array.from(debtMap.entries()).map(([currencyId, { amount }]) => ({ currencyId, amount }))
@@ -101,9 +117,13 @@ export class SellingService {
 
 		const calcMap = new Map<string, Decimal>()
 		const mappedSellings = sellings.map((selling) => {
-			for (const method of selling.payment?.methods ?? []) {
+			for (const method of selling.payment?.paymentMethods ?? []) {
 				const key = `${method.type}_${method.currencyId}`
 				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(method.amount))
+			}
+			for (const ch of selling.payment?.changeMethods ?? []) {
+				const key = `change_${ch.type}_${ch.currencyId}`
+				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(ch.amount))
 			}
 
 			const totalPrices = this.calcTotalPricesFromProducts(selling.products)
@@ -115,6 +135,7 @@ export class SellingService {
 		})
 
 		const calc: SellingCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
+		const changeCalc: SellingChangeCalcEntry[] = fillChangeMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
 		const debtCurrencyIds = new Set<string>()
 		for (const s of mappedSellings) {
@@ -133,8 +154,9 @@ export class SellingService {
 					pageSize: sellings.length,
 					data: sellingsWithDebtCurrency,
 					calc,
+					changeCalc,
 				}
-			: { data: sellingsWithDebtCurrency, calc }
+			: { data: sellingsWithDebtCurrency, calc, changeCalc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -180,7 +202,7 @@ export class SellingService {
 	}
 
 	async createOne(request: CRequest, body: SellingCreateOneRequest) {
-		if (body.payment?.paymentMethods?.length) {
+		if ((body.payment?.paymentMethods?.length ?? 0) > 0 || (body.payment?.changeMethods?.length ?? 0) > 0) {
 			body.status = SellingStatusEnum.accepted
 		}
 
@@ -225,7 +247,7 @@ export class SellingService {
 				}
 				await this.botService.sendSellingToChannel(sellingInfo).catch((e) => console.log('bot channel error:', e))
 
-				if (payment?.paymentMethods?.length) {
+				if ((payment?.paymentMethods?.length ?? 0) > 0 || (payment?.changeMethods?.length ?? 0) > 0) {
 					await this.botService.sendPaymentToChannel(payment, false, clientResult.data).catch((e) => console.log('bot payment error:', e))
 				}
 			} catch (e) {
@@ -284,7 +306,9 @@ export class SellingService {
 				const hadPaymentBefore = !prevPaymentTotal.isZero()
 				const isModified = hadPaymentBefore && paymentChanged
 
-				const shouldSendPayment = (isFirstAccept && payment?.paymentMethods?.length) || (wasAccepted && paymentChanged && payment?.paymentMethods?.length)
+				const shouldSendPayment =
+					(isFirstAccept && ((payment?.paymentMethods?.length ?? 0) > 0 || (payment?.changeMethods?.length ?? 0) > 0)) ||
+					(wasAccepted && paymentChanged && ((payment?.paymentMethods?.length ?? 0) > 0 || (payment?.changeMethods?.length ?? 0) > 0))
 
 				if (shouldSendPayment) {
 					await this.botService.sendPaymentToChannel(payment, isModified, clientResult.data).catch((e) => console.log('bot payment error:', e))
@@ -331,7 +355,7 @@ export class SellingService {
 
 				await this.botService.sendDeletedSellingToChannel(sellingInfo).catch((e) => console.log('bot channel error:', e))
 
-				if (payment?.paymentMethods?.length) {
+				if ((payment?.paymentMethods?.length ?? 0) > 0 || (payment?.changeMethods?.length ?? 0) > 0) {
 					await this.botService.sendDeletedPaymentToChannel(payment, clientResult.data).catch((e) => console.log('bot payment error:', e))
 				}
 			} catch (e) {

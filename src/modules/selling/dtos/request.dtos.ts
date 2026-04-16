@@ -1,5 +1,6 @@
 import { PickType, IntersectionType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import {
+	SellingChangeMethod,
 	SellingCreateOneRequest,
 	SellingDeleteOneRequest,
 	SellingFindManyRequest,
@@ -14,13 +15,30 @@ import { SellingOptionalDto, SellingRequiredDto } from './fields.dtos'
 import { ArrayNotEmpty, IsArray, IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { Decimal } from '@prisma/client/runtime/library'
-import { PaymentMethodEnum } from '@prisma/client'
+import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 
 export class SellingPaymentMethodDto implements SellingPaymentMethod {
 	@ApiProperty({ enum: PaymentMethodEnum })
 	@IsNotEmpty()
 	@IsEnum(PaymentMethodEnum)
 	type: PaymentMethodEnum
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	amount: Decimal
+}
+
+export class SellingChangeMethodDto implements SellingChangeMethod {
+	@ApiProperty({ enum: ChangeMethodEnum })
+	@IsNotEmpty()
+	@IsEnum(ChangeMethodEnum)
+	type: ChangeMethodEnum
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
@@ -40,6 +58,13 @@ export class SellingPaymentDto implements SellingPayment {
 	@ValidateNested({ each: true })
 	@Type(() => SellingPaymentMethodDto)
 	paymentMethods?: SellingPaymentMethod[]
+
+	@ApiPropertyOptional({ type: SellingChangeMethodDto, isArray: true })
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => SellingChangeMethodDto)
+	changeMethods?: SellingChangeMethod[]
 
 	@ApiPropertyOptional({ type: String })
 	@IsOptional()

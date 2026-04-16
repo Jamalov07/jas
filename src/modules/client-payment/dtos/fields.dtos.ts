@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto, IsDecimalIntOrBigInt } from '../../../common'
-import { ClientPaymentMethod, ClientPaymentOptional, ClientPaymentRequired } from '../interfaces'
+import { ClientPaymentChangeMethod, ClientPaymentMethod, ClientPaymentOptional, ClientPaymentRequired } from '../interfaces'
 import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
-import { $Enums, PaymentMethodEnum } from '@prisma/client'
+import { $Enums, ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export class ClientPaymentMethodDto implements ClientPaymentMethod {
@@ -11,6 +11,23 @@ export class ClientPaymentMethodDto implements ClientPaymentMethod {
 	@IsNotEmpty()
 	@IsEnum(PaymentMethodEnum)
 	type: $Enums.PaymentMethodEnum
+
+	@ApiProperty({ type: String })
+	@IsNotEmpty()
+	@IsUUID('4')
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	@IsNotEmpty()
+	@IsDecimalIntOrBigInt()
+	amount: Decimal
+}
+
+export class ClientPaymentChangeMethodDto implements ClientPaymentChangeMethod {
+	@ApiProperty({ enum: ChangeMethodEnum })
+	@IsNotEmpty()
+	@IsEnum(ChangeMethodEnum)
+	type: $Enums.ChangeMethodEnum
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()

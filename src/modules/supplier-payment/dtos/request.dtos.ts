@@ -7,7 +7,7 @@ import {
 	SupplierPaymentUpdateOneRequest,
 } from '../interfaces'
 import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
-import { SupplierPaymentMethodDto, SupplierPaymentOptionalDto, SupplierPaymentRequiredDto } from './fields.dtos'
+import { SupplierPaymentChangeMethodDto, SupplierPaymentMethodDto, SupplierPaymentOptionalDto, SupplierPaymentRequiredDto } from './fields.dtos'
 import { IsArray, IsOptional, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 
@@ -30,6 +30,13 @@ export class SupplierPaymentCreateOneRequestDto
 	@ValidateNested({ each: true })
 	@Type(() => SupplierPaymentMethodDto)
 	paymentMethods: SupplierPaymentMethodDto[]
+
+	@ApiPropertyOptional({ type: SupplierPaymentChangeMethodDto, isArray: true })
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => SupplierPaymentChangeMethodDto)
+	changeMethods?: SupplierPaymentChangeMethodDto[]
 }
 
 export class SupplierPaymentUpdateOneRequestDto
@@ -42,6 +49,13 @@ export class SupplierPaymentUpdateOneRequestDto
 	@ValidateNested({ each: true })
 	@Type(() => SupplierPaymentMethodDto)
 	paymentMethods?: SupplierPaymentMethodDto[]
+
+	@ApiPropertyOptional({ type: SupplierPaymentChangeMethodDto, isArray: true })
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => SupplierPaymentChangeMethodDto)
+	changeMethods?: SupplierPaymentChangeMethodDto[]
 }
 
 export class SupplierPaymentDeleteOneRequestDto

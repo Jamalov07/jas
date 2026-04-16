@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@nestjs/swagger'
 import {
 	SellingCalcEntry,
+	SellingChangeCalcEntry,
 	SellingCreateOneResponse,
 	SellingFindManyData,
 	SellingFindManyResponse,
@@ -11,11 +12,22 @@ import {
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { SellingRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
-import { PaymentMethodEnum } from '@prisma/client'
+import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 
 export class SellingCalcEntryDto implements SellingCalcEntry {
 	@ApiProperty({ enum: PaymentMethodEnum })
 	type: PaymentMethodEnum
+
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	total: Decimal
+}
+
+export class SellingChangeCalcEntryDto implements SellingChangeCalcEntry {
+	@ApiProperty({ enum: ChangeMethodEnum })
+	type: ChangeMethodEnum
 
 	@ApiProperty({ type: String })
 	currencyId: string
@@ -50,6 +62,9 @@ export class SellingFindManyDataDto extends PaginationResponseDto implements Sel
 
 	@ApiProperty({ type: SellingCalcEntryDto, isArray: true })
 	calc: SellingCalcEntry[]
+
+	@ApiProperty({ type: SellingChangeCalcEntryDto, isArray: true })
+	changeCalc: SellingChangeCalcEntry[]
 }
 
 export class SellingFindManyResponseDto extends GlobalResponseDto implements SellingFindManyResponse {

@@ -216,13 +216,16 @@ export class BotService {
 	private buildPaymentMessage(params: {
 		prefix: string
 		person: { fullname: string; phone: string }
-		methods: PaymentMethod[]
+		paymentMethods: PaymentMethod[]
+		changeMethods?: PaymentMethod[]
 		description?: string | null
 		date: Date
 		debtByCurrency: DebtEntry[]
 	}): string {
-		const total = params.methods.reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
-		const byType = (type: string) => params.methods.filter((m) => m.type === type).reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
+		const cm = params.changeMethods ?? []
+		const total = [...params.paymentMethods, ...cm].reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
+		const byType = (type: string) => params.paymentMethods.filter((m) => m.type === type).reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
+		const changeTotal = cm.reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
 
 		return (
 			`${params.prefix}` +
@@ -233,6 +236,7 @@ export class BotService {
 			`💳 Картой: ${byType('card').toNumber()}\n` +
 			`🏦 Переводом: ${byType('transfer').toNumber()}\n` +
 			`📦 Другое: ${byType('other').toNumber()}\n` +
+			`🔁 Кайтим: ${changeTotal.toNumber()}\n` +
 			`📅 Дата: ${this.formatDate(params.date)}\n` +
 			`📝 Описание: ${params.description ?? '-'}\n` +
 			`📊 Общий долг: ${this.formatDebt(params.debtByCurrency)}`
@@ -249,7 +253,8 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: isModified ? '♻️ Обновлено\n\n' : '',
 			person: { fullname: client.fullname, phone: client.phone },
-			methods: payment.paymentMethods ?? [],
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency: client.debtByCurrency ?? [],
@@ -266,7 +271,8 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: '🗑️ Удалено\n\n',
 			person: { fullname: client.fullname, phone: client.phone },
-			methods: payment.paymentMethods ?? [],
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency: client.debtByCurrency ?? [],
@@ -278,7 +284,13 @@ export class BotService {
 	// ─── Client standalone payment notifications ──────────────────────────────
 
 	async sendClientPaymentToChannel(
-		payment: { description?: string | null; createdAt: Date; methods: PaymentMethod[]; client: { fullname: string; phone: string } },
+		payment: {
+			description?: string | null
+			createdAt: Date
+			paymentMethods: PaymentMethod[]
+			changeMethods?: PaymentMethod[]
+			client: { fullname: string; phone: string }
+		},
 		isModified: boolean,
 		debtByCurrency: DebtEntry[],
 	) {
@@ -289,7 +301,8 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: isModified ? '♻️ Обновлено (оплата клиента)\n\n' : '💳 Оплата клиента\n\n',
 			person: payment.client,
-			methods: payment.methods,
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency,
@@ -299,7 +312,13 @@ export class BotService {
 	}
 
 	async sendDeletedClientPaymentToChannel(
-		payment: { description?: string | null; createdAt: Date; methods: PaymentMethod[]; client: { fullname: string; phone: string } },
+		payment: {
+			description?: string | null
+			createdAt: Date
+			paymentMethods: PaymentMethod[]
+			changeMethods?: PaymentMethod[]
+			client: { fullname: string; phone: string }
+		},
 		debtByCurrency: DebtEntry[],
 	) {
 		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
@@ -309,7 +328,8 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: '🗑️ Удалено (оплата клиента)\n\n',
 			person: payment.client,
-			methods: payment.methods,
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency,
@@ -321,7 +341,13 @@ export class BotService {
 	// ─── Supplier payment notifications ───────────────────────────────────────
 
 	async sendSupplierPaymentToChannel(
-		payment: { description?: string | null; createdAt: Date; methods: PaymentMethod[]; supplier: { fullname: string; phone: string } },
+		payment: {
+			description?: string | null
+			createdAt: Date
+			paymentMethods: PaymentMethod[]
+			changeMethods?: PaymentMethod[]
+			supplier: { fullname: string; phone: string }
+		},
 		isModified: boolean,
 		debtByCurrency: DebtEntry[],
 	) {
@@ -332,7 +358,8 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: isModified ? '♻️ Обновлено (оплата поставщику)\n\n' : '💳 Оплата поставщику\n\n',
 			person: payment.supplier,
-			methods: payment.methods,
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency,
@@ -342,7 +369,13 @@ export class BotService {
 	}
 
 	async sendDeletedSupplierPaymentToChannel(
-		payment: { description?: string | null; createdAt: Date; methods: PaymentMethod[]; supplier: { fullname: string; phone: string } },
+		payment: {
+			description?: string | null
+			createdAt: Date
+			paymentMethods: PaymentMethod[]
+			changeMethods?: PaymentMethod[]
+			supplier: { fullname: string; phone: string }
+		},
 		debtByCurrency: DebtEntry[],
 	) {
 		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
@@ -352,7 +385,8 @@ export class BotService {
 		const message = this.buildPaymentMessage({
 			prefix: '🗑️ Удалено (оплата поставщику)\n\n',
 			person: payment.supplier,
-			methods: payment.methods,
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
 			description: payment.description,
 			date: payment.createdAt,
 			debtByCurrency,

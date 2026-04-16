@@ -12,21 +12,32 @@ import {
 import { PriceTypeEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
+const ARRIVAL_PRODUCT_MV_PRICE_SELECT = {
+	type: true,
+	price: true,
+	totalPrice: true,
+	currencyId: true,
+	currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } },
+}
 const ARRIVAL_PRODUCT_MV_SELECT = {
 	id: true,
 	count: true,
 	createdAt: true,
-	prices: { select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true } } } },
+	prices: { select: ARRIVAL_PRODUCT_MV_PRICE_SELECT },
 	product: { select: { id: true, name: true } },
 }
+const ARRIVAL_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { symbol: true } } }
 const ARRIVAL_PAYMENT_SELECT = {
 	id: true,
 	description: true,
 	createdAt: true,
-	methods: { select: { type: true, currencyId: true, amount: true, currency: { select: { symbol: true } } } },
+	paymentMethods: { select: ARRIVAL_PAYMENT_LINE_SELECT },
+	changeMethods: { select: ARRIVAL_PAYMENT_LINE_SELECT },
 }
 const ARRIVAL_SELECT = {
 	id: true as const,
+	supplierId: true as const,
+	staffId: true as const,
 	publicId: true as const,
 	date: true as const,
 	createdAt: true as const,
@@ -101,12 +112,7 @@ export class ArrivalRepository {
 	async getOne(query: ArrivalGetOneRequest) {
 		return this.prisma.arrivalModel.findFirst({
 			where: { id: query.id, supplierId: query.supplierId, staffId: query.staffId },
-			select: {
-				id: true,
-				staffId: true,
-				supplierId: true,
-				payment: { select: { id: true } },
-			},
+			select: ARRIVAL_SELECT,
 		})
 	}
 
@@ -132,20 +138,30 @@ export class ArrivalRepository {
 				supplierId: body.supplierId,
 				date: new Date(body.date),
 				staffId: body.staffId,
-				...(body.payment?.paymentMethods?.length && {
-					payment: {
-						create: {
-							supplierId: body.supplierId,
-							staffId: body.staffId,
-							description: body.payment.description,
-							methods: {
-								createMany: {
-									data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })),
-								},
+				...(body.payment &&
+					((body.payment.paymentMethods?.length ?? 0) > 0 || (body.payment.changeMethods?.length ?? 0) > 0) && {
+						payment: {
+							create: {
+								supplierId: body.supplierId,
+								staffId: body.staffId,
+								description: body.payment.description,
+								...(body.payment.paymentMethods?.length && {
+									paymentMethods: {
+										createMany: {
+											data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })),
+										},
+									},
+								}),
+								...(body.payment.changeMethods?.length && {
+									changeMethods: {
+										createMany: {
+											data: body.payment.changeMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })),
+										},
+									},
+								}),
 							},
 						},
-					},
-				}),
+					}),
 				products: {
 					create: (body.products ?? []).map((p) => ({
 						productId: p.productId,
@@ -207,32 +223,50 @@ export class ArrivalRepository {
 			},
 		})
 
-		if (body.payment?.paymentMethods) {
+		if (body.payment?.paymentMethods !== undefined || body.payment?.changeMethods !== undefined) {
 			if (existing.payment) {
-				await this.prisma.supplierArrivalPaymentMethodModel.deleteMany({ where: { paymentId: existing.payment.id } })
-				if (body.payment.paymentMethods.length) {
-					await this.prisma.supplierArrivalPaymentMethodModel.createMany({
-						data: body.payment.paymentMethods.map((m) => ({
-							type: m.type,
-							currencyId: m.currencyId,
-							amount: m.amount,
-							paymentId: existing.payment.id,
-						})),
-					})
+				const pm = body.payment?.paymentMethods
+				const cm = body.payment?.changeMethods
+				if (pm !== undefined) {
+					await this.prisma.supplierArrivalPaymentMethodModel.deleteMany({ where: { paymentId: existing.payment.id } })
+					if (pm.length) {
+						await this.prisma.supplierArrivalPaymentMethodModel.createMany({
+							data: pm.map((m) => ({
+								type: m.type,
+								currencyId: m.currencyId,
+								amount: m.amount,
+								paymentId: existing.payment.id,
+							})),
+						})
+					}
 				}
-				if (body.payment.description !== undefined) {
+				if (cm !== undefined) {
+					await this.prisma.supplierArrivalPaymentChangeMethodModel.deleteMany({ where: { paymentId: existing.payment.id } })
+					if (cm.length) {
+						await this.prisma.supplierArrivalPaymentChangeMethodModel.createMany({
+							data: cm.map((m) => ({
+								type: m.type,
+								currencyId: m.currencyId,
+								amount: m.amount,
+								paymentId: existing.payment.id,
+							})),
+						})
+					}
+				}
+				if (body.payment?.description !== undefined) {
 					await this.prisma.supplierArrivalPaymentModel.update({ where: { id: existing.payment.id }, data: { description: body.payment.description } })
 				}
-			} else if (body.payment.paymentMethods.length) {
+			} else if ((body.payment?.paymentMethods?.length ?? 0) > 0 || (body.payment?.changeMethods?.length ?? 0) > 0) {
+				const pm = body.payment?.paymentMethods ?? []
+				const cm = body.payment?.changeMethods ?? []
 				await this.prisma.supplierArrivalPaymentModel.create({
 					data: {
 						arrivalId: query.id,
 						supplierId: existing.supplierId,
 						staffId: existing.staffId,
-						description: body.payment.description,
-						methods: {
-							createMany: { data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) },
-						},
+						description: body.payment?.description,
+						...(pm.length && { paymentMethods: { createMany: { data: pm.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) } } }),
+						...(cm.length && { changeMethods: { createMany: { data: cm.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) } } }),
 					},
 				})
 			}

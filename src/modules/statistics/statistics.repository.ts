@@ -4,7 +4,7 @@ import { StatisticsGetAllProductMVRequest, StatisticsGetSellingPeriodStatsReques
 import { ClientReportByCurrency, ClientReportCalc, ClientReportRow } from './interfaces/response.interfaces'
 import { StatsTypeEnum } from '../selling/enums'
 
-import { PaymentMethodEnum, SellingStatusEnum } from '@prisma/client'
+import { SellingStatusEnum } from '@prisma/client'
 import { convertUTCtoLocal, currencyBriefMapFromRows, extractDateParts, withCurrencyBriefAmountMany } from '@common'
 import { Decimal } from '@prisma/client/runtime/library'
 import { CurrencyRepository } from '../currency'
@@ -376,7 +376,7 @@ export class StatisticsRepository {
 				},
 				payment: {
 					select: {
-						methods: { select: { type: true, currencyId: true, amount: true } },
+						paymentMethods: { select: { type: true, currencyId: true, amount: true } },
 					},
 				},
 			},
@@ -387,7 +387,7 @@ export class StatisticsRepository {
 			where: { deletedAt: null, ...(dateFilter && { createdAt: dateFilter }) },
 			select: {
 				clientId: true,
-				methods: { select: { type: true, currencyId: true, amount: true } },
+				paymentMethods: { select: { type: true, currencyId: true, amount: true } },
 			},
 		})
 
@@ -398,7 +398,7 @@ export class StatisticsRepository {
 				clientId: true,
 				payment: {
 					select: {
-						methods: { select: { type: true, currencyId: true, amount: true } },
+						paymentMethods: { select: { type: true, currencyId: true, amount: true } },
 					},
 				},
 			},
@@ -432,8 +432,7 @@ export class StatisticsRepository {
 			}
 			if (sel.payment) {
 				c.selling.paymentCount += 1
-				for (const method of sel.payment.methods) {
-					if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
+				for (const method of sel.payment.paymentMethods) {
 					addToCurrencyMap(c.selling.paymentMap, method.currencyId, method.amount)
 				}
 			}
@@ -442,8 +441,7 @@ export class StatisticsRepository {
 		for (const payment of clientPayments) {
 			const c = getCalc(payment.clientId)
 			c.clientPayment.count += 1
-			for (const method of payment.methods) {
-				if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
+			for (const method of payment.paymentMethods) {
 				addToCurrencyMap(c.clientPayment.paymentMap, method.currencyId, method.amount)
 			}
 		}
@@ -452,8 +450,7 @@ export class StatisticsRepository {
 			const c = getCalc(returning.clientId)
 			c.returning.count += 1
 			if (returning.payment) {
-				for (const method of returning.payment.methods) {
-					if (method.type === PaymentMethodEnum.fromCash || method.type === PaymentMethodEnum.fromBalance) continue
+				for (const method of returning.payment.paymentMethods) {
 					addToCurrencyMap(c.returning.paymentMap, method.currencyId, method.amount)
 				}
 			}

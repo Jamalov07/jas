@@ -26,11 +26,54 @@ export declare interface ClientDeedInfo {
 
 export declare interface ClientFindManyData extends PaginationResponse<ClientFindOneData> {}
 
+/** Hisobot: to‘lov usuli × valyuta bo‘yicha yig‘ma */
+export declare interface ClientReportPaymentRow {
+	type: string
+	currencyId: string
+	amount: Decimal
+	currency: CurrencyBrief
+}
+
+/** Hisobot: mahsulot qatori yoki boshqa valyuta bo‘yicha summa */
+export declare interface ClientReportCurrencyTotal {
+	currencyId: string
+	amount: Decimal
+	currency: CurrencyBrief
+}
+
+export declare interface ClientReportPeriod {
+	startDate?: Date
+	endDate?: Date
+}
+
+/** `many/report` — sotuv / qaytish / alohida to‘lovlar: to‘lov usullari va qaytimlar alohida */
+export declare interface ClientReportSummary {
+	period: ClientReportPeriod | null
+	selling: {
+		documentsCount: number
+		productTotalsByCurrency: ClientReportCurrencyTotal[]
+		paymentMethods: ClientReportPaymentRow[]
+		changeMethods: ClientReportPaymentRow[]
+	}
+	returning: {
+		documentsCount: number
+		productTotalsByCurrency: ClientReportCurrencyTotal[]
+		paymentMethods: ClientReportPaymentRow[]
+		changeMethods: ClientReportPaymentRow[]
+	}
+	standalonePayments: {
+		paymentMethods: ClientReportPaymentRow[]
+		changeMethods: ClientReportPaymentRow[]
+	}
+}
+
 export declare interface ClientFindOneData extends Pick<ClientRequired, 'id' | 'fullname' | 'createdAt' | 'phone'> {
 	debtByCurrency?: ClientDebtByCurrency[]
 	lastSellingDate?: Date
 	deedInfo?: ClientDeedInfo
 	telegram?: { id?: string; isActive?: boolean }
+	/** Faqat `findManyForReport` */
+	report?: ClientReportSummary
 }
 
 export declare interface ClientFindManyResponse extends GlobalResponse {
@@ -49,17 +92,3 @@ export declare interface ClientModifyResponse extends GlobalResponse {
 	data: null
 }
 
-export interface ClientCalc {
-	selling: {
-		count: number
-		totalPrice: number
-		payment: {
-			count: number
-			total: number
-		}
-	}
-	returning: {
-		count: number
-		totalPrice: number
-	}
-}

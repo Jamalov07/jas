@@ -1,10 +1,16 @@
 import { GlobalResponse, PaginationResponse } from '@common'
 import { SellingOptional, SellingRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
-import { PaymentMethodEnum, PriceTypeEnum } from '@prisma/client'
+import { ChangeMethodEnum, PaymentMethodEnum, PriceTypeEnum } from '@prisma/client'
 
 export declare interface SellingPaymentMethodData {
 	type: PaymentMethodEnum
+	currencyId: string
+	amount: Decimal
+}
+
+export declare interface SellingChangeMethodData {
+	type: ChangeMethodEnum
 	currencyId: string
 	amount: Decimal
 }
@@ -13,6 +19,7 @@ export declare interface SellingPaymentData {
 	id: string
 	description?: string
 	paymentMethods: SellingPaymentMethodData[]
+	changeMethods: SellingChangeMethodData[]
 	createdAt: Date
 }
 
@@ -41,8 +48,15 @@ export declare interface SellingCalcEntry {
 	total: Decimal
 }
 
+export declare interface SellingChangeCalcEntry {
+	type: ChangeMethodEnum
+	currencyId: string
+	total: Decimal
+}
+
 export declare interface SellingFindManyData extends PaginationResponse<SellingFindOneData> {
 	calc: SellingCalcEntry[]
+	changeCalc: SellingChangeCalcEntry[]
 }
 
 export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' | 'status' | 'createdAt' | 'date'>, Pick<SellingOptional, 'publicId'> {

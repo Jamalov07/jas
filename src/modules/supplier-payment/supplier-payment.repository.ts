@@ -9,11 +9,20 @@ import {
 	SupplierPaymentGetOneRequest,
 	SupplierPaymentUpdateOneRequest,
 } from './interfaces'
+import { ChangeMethodEnum } from '@prisma/client'
 @Injectable()
 export class SupplierPaymentRepository {
 	private readonly prisma: PrismaService
 	constructor(prisma: PrismaService) {
 		this.prisma = prisma
+	}
+
+	private methodLineSelect = {
+		id: true,
+		type: true,
+		currencyId: true,
+		amount: true,
+		currency: { select: { id: true, symbol: true } },
 	}
 
 	async findMany(query: SupplierPaymentFindManyRequest) {
@@ -37,15 +46,8 @@ export class SupplierPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: {
-					select: {
-						id: true,
-						type: true,
-						currencyId: true,
-						amount: true,
-						currency: { select: { id: true, symbol: true } },
-					},
-				},
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -64,15 +66,8 @@ export class SupplierPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: {
-					select: {
-						id: true,
-						type: true,
-						currencyId: true,
-						amount: true,
-						currency: { select: { id: true, symbol: true } },
-					},
-				},
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -110,15 +105,8 @@ export class SupplierPaymentRepository {
 				staffId: query.staffId,
 			},
 			include: {
-				methods: {
-					select: {
-						id: true,
-						type: true,
-						currencyId: true,
-						amount: true,
-						currency: { select: { id: true, symbol: true } },
-					},
-				},
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 			},
 			...paginationOptions,
 		})
@@ -133,15 +121,8 @@ export class SupplierPaymentRepository {
 				id: true,
 				supplierId: true,
 				supplier: true,
-				methods: {
-					select: {
-						id: true,
-						type: true,
-						currencyId: true,
-						amount: true,
-						currency: { select: { id: true, symbol: true } },
-					},
-				},
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 			},
 		})
 
@@ -177,28 +158,30 @@ export class SupplierPaymentRepository {
 				staffId: body.staffId,
 				description: body.description,
 				createdAt: dayClose ? date : undefined,
-				methods: {
+				paymentMethods: {
 					create: body.paymentMethods.map((m) => ({
 						type: m.type as any,
 						currencyId: m.currencyId,
 						amount: m.amount,
 					})),
 				},
+				...(body.changeMethods?.length && {
+					changeMethods: {
+						create: body.changeMethods.map((m) => ({
+							type: m.type as ChangeMethodEnum,
+							currencyId: m.currencyId,
+							amount: m.amount,
+						})),
+					},
+				}),
 			},
 			select: {
 				id: true,
 				staff: { select: { id: true, fullname: true, phone: true } },
 				supplier: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: {
-					select: {
-						id: true,
-						type: true,
-						currencyId: true,
-						amount: true,
-						currency: { select: { id: true, symbol: true } },
-					},
-				},
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 				createdAt: true,
 				updatedAt: true,
 				deletedAt: true,
@@ -215,32 +198,33 @@ export class SupplierPaymentRepository {
 				supplierId: body.supplierId,
 				description: body.description,
 				deletedAt: body.deletedAt,
-				...(body.paymentMethods
-					? {
-							methods: {
-								deleteMany: {},
-								create: body.paymentMethods.map((m) => ({
-									type: m.type as any,
-									currencyId: m.currencyId,
-									amount: m.amount,
-								})),
-							},
-						}
-					: {}),
+				...(body.paymentMethods !== undefined && {
+					paymentMethods: {
+						deleteMany: {},
+						create: body.paymentMethods.map((m) => ({
+							type: m.type as any,
+							currencyId: m.currencyId,
+							amount: m.amount,
+						})),
+					},
+				}),
+				...(body.changeMethods !== undefined && {
+					changeMethods: {
+						deleteMany: {},
+						create: body.changeMethods.map((m) => ({
+							type: m.type as ChangeMethodEnum,
+							currencyId: m.currencyId,
+							amount: m.amount,
+						})),
+					},
+				}),
 			},
 			select: {
 				id: true,
 				supplierId: true,
 				supplier: { select: { id: true, fullname: true, phone: true } },
-				methods: {
-					select: {
-						id: true,
-						type: true,
-						currencyId: true,
-						amount: true,
-						currency: { select: { id: true, symbol: true } },
-					},
-				},
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 				createdAt: true,
 			},
 		})

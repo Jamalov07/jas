@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsNumber, IsOptional, IsUUID } from 'class-validator'
+import { Allow, IsNumber, IsOptional, IsUUID } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { IntersectionType } from '@nestjs/swagger'
@@ -41,6 +41,7 @@ export class ReturningProductMVCreateOneRequestDto {
 	@Type(() => Number)
 	count: number
 
+	@Allow()
 	@ApiProperty()
 	price: any
 

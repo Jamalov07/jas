@@ -1,7 +1,6 @@
 import { Decimal } from '@prisma/client/runtime/library'
-import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@nestjs/swagger'
 import {
-	ClientCalc,
 	ClientDebtByCurrency,
 	ClientDeed,
 	ClientDeedInfo,
@@ -11,6 +10,7 @@ import {
 	ClientFindOneResponse,
 	ClientModifyResponse,
 	ClientCreateOneResponse,
+	ClientReportSummary,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { ClientRequiredDto } from './fields.dtos'
@@ -71,6 +71,56 @@ export class ClientDeedInfoDto implements ClientDeedInfo {
 	totalDebitByCurrency: ClientDebtByCurrency[]
 }
 
+export class ClientReportPaymentRowDto {
+	@ApiProperty({ type: String })
+	type: string
+
+	@ApiProperty({ type: String })
+	currencyId: string
+
+	@ApiProperty({ type: Number })
+	amount: Decimal
+
+	@ApiProperty({ type: CurrencyBriefDto })
+	currency: CurrencyBriefDto
+}
+
+export class ClientReportSellingOrReturningDto {
+	@ApiProperty({ type: Number })
+	documentsCount: number
+
+	@ApiProperty({ type: ClientDebtByCurrencyDto, isArray: true })
+	productTotalsByCurrency: ClientDebtByCurrencyDto[]
+
+	@ApiProperty({ type: ClientReportPaymentRowDto, isArray: true })
+	paymentMethods: ClientReportPaymentRowDto[]
+
+	@ApiProperty({ type: ClientReportPaymentRowDto, isArray: true })
+	changeMethods: ClientReportPaymentRowDto[]
+}
+
+export class ClientReportStandalonePaymentsDto {
+	@ApiProperty({ type: ClientReportPaymentRowDto, isArray: true })
+	paymentMethods: ClientReportPaymentRowDto[]
+
+	@ApiProperty({ type: ClientReportPaymentRowDto, isArray: true })
+	changeMethods: ClientReportPaymentRowDto[]
+}
+
+export class ClientReportSummaryDto implements ClientReportSummary {
+	@ApiPropertyOptional({ type: Object, nullable: true })
+	period: ClientReportSummary['period']
+
+	@ApiProperty({ type: ClientReportSellingOrReturningDto })
+	selling: ClientReportSummary['selling']
+
+	@ApiProperty({ type: ClientReportSellingOrReturningDto })
+	returning: ClientReportSummary['returning']
+
+	@ApiProperty({ type: ClientReportStandalonePaymentsDto })
+	standalonePayments: ClientReportSummary['standalonePayments']
+}
+
 export class ClientFindOneDataDto extends PickType(ClientRequiredDto, ['id', 'fullname', 'createdAt', 'phone']) implements ClientFindOneData {
 	@ApiProperty({ type: ClientDebtByCurrencyDto, isArray: true })
 	debtByCurrency?: ClientDebtByCurrency[]
@@ -80,6 +130,9 @@ export class ClientFindOneDataDto extends PickType(ClientRequiredDto, ['id', 'fu
 
 	@ApiProperty({ type: ClientDeedInfoDto })
 	deedInfo?: ClientDeedInfo
+
+	@ApiPropertyOptional({ type: ClientReportSummaryDto })
+	report?: ClientReportSummary
 }
 
 export class ClientFindManyDataDto extends PaginationResponseDto implements ClientFindManyData {

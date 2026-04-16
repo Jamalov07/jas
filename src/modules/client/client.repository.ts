@@ -11,6 +11,74 @@ import {
 } from './interfaces'
 import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 
+/** `ClientService.calcDebtByCurrency` uchun — `findMany` bilan bir xil ma’lumot */
+const CLIENT_DEBT_SOURCE_SELECT = {
+	sellings: {
+		where: { status: SellingStatusEnum.accepted },
+		select: {
+			date: true,
+			products: {
+				select: {
+					prices: {
+						where: { type: PriceTypeEnum.selling },
+						select: { totalPrice: true, currencyId: true },
+					},
+				},
+			},
+			payment: {
+				select: {
+					createdAt: true,
+					paymentMethods: {
+						select: { type: true, amount: true, currencyId: true },
+					},
+					changeMethods: {
+						select: { type: true, amount: true, currencyId: true },
+					},
+				},
+			},
+		},
+		orderBy: { date: 'desc' as const },
+	},
+	returnings: {
+		where: { status: SellingStatusEnum.accepted },
+		select: {
+			date: true,
+			products: {
+				select: {
+					prices: {
+						where: { type: PriceTypeEnum.selling },
+						select: { totalPrice: true, currencyId: true },
+					},
+				},
+			},
+			payment: {
+				select: {
+					createdAt: true,
+					paymentMethods: {
+						select: { type: true, amount: true, currencyId: true },
+					},
+					changeMethods: {
+						select: { type: true, amount: true, currencyId: true },
+					},
+				},
+			},
+		},
+		orderBy: { date: 'desc' as const },
+	},
+	payments: {
+		where: { deletedAt: null },
+		select: {
+			createdAt: true,
+			paymentMethods: {
+				select: { type: true, amount: true, currencyId: true },
+			},
+			changeMethods: {
+				select: { type: true, amount: true, currencyId: true },
+			},
+		},
+	},
+} as const
+
 @Injectable()
 export class ClientRepository {
 	private readonly prisma: PrismaService
@@ -35,57 +103,7 @@ export class ClientRepository {
 				phone: true,
 				createdAt: true,
 				telegram: { select: { id: true, isActive: true } },
-				sellings: {
-					where: { status: SellingStatusEnum.accepted },
-					select: {
-						date: true,
-						products: {
-							select: {
-								prices: {
-									where: { type: PriceTypeEnum.selling },
-									select: { totalPrice: true, currencyId: true },
-								},
-							},
-						},
-						payment: {
-							select: {
-								methods: {
-									select: { type: true, amount: true, currencyId: true },
-								},
-							},
-						},
-					},
-					orderBy: { date: 'desc' },
-				},
-				returnings: {
-					where: { status: SellingStatusEnum.accepted },
-					select: {
-						products: {
-							select: {
-								prices: {
-									where: { type: PriceTypeEnum.selling },
-									select: { totalPrice: true, currencyId: true },
-								},
-							},
-						},
-						payment: {
-							select: {
-								methods: {
-									select: { type: true, amount: true, currencyId: true },
-								},
-							},
-						},
-					},
-					orderBy: { date: 'desc' },
-				},
-				payments: {
-					where: { deletedAt: null },
-					select: {
-						methods: {
-							select: { type: true, amount: true, currencyId: true },
-						},
-					},
-				},
+				...CLIENT_DEBT_SOURCE_SELECT,
 			},
 			...paginationOptions,
 		})
@@ -120,7 +138,10 @@ export class ClientRepository {
 							select: {
 								createdAt: true,
 								description: true,
-								methods: {
+								paymentMethods: {
+									select: { amount: true, currencyId: true, type: true },
+								},
+								changeMethods: {
 									select: { amount: true, currencyId: true, type: true },
 								},
 							},
@@ -144,7 +165,10 @@ export class ClientRepository {
 							select: {
 								createdAt: true,
 								description: true,
-								methods: {
+								paymentMethods: {
+									select: { amount: true, currencyId: true, type: true },
+								},
+								changeMethods: {
 									select: { amount: true, currencyId: true, type: true },
 								},
 							},
@@ -156,7 +180,10 @@ export class ClientRepository {
 					select: {
 						createdAt: true,
 						description: true,
-						methods: {
+						paymentMethods: {
+							select: { amount: true, currencyId: true, type: true },
+						},
+						changeMethods: {
 							select: { amount: true, currencyId: true, type: true },
 						},
 					},
@@ -165,6 +192,19 @@ export class ClientRepository {
 		})
 
 		return client
+	}
+
+	/** Bir nechta mijoz uchun joriy qarz hisoblash ma’lumoti (`ClientService.calcDebtByCurrency`) */
+	async findDebtSourcesByClientIds(clientIds: string[]) {
+		const unique = [...new Set(clientIds.filter(Boolean))]
+		if (unique.length === 0) return []
+		return this.prisma.clientModel.findMany({
+			where: { id: { in: unique } },
+			select: {
+				id: true,
+				...CLIENT_DEBT_SOURCE_SELECT,
+			},
+		})
 	}
 
 	async countFindMany(query: ClientFindManyRequest) {

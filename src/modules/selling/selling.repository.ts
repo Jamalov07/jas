@@ -12,7 +12,7 @@ import {
 import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
-const PRODUCT_MV_PRICE_SELECT = { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true } } }
+const PRODUCT_MV_PRICE_SELECT = { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } }
 const PRODUCT_MV_SELECT = {
 	id: true,
 	count: true,
@@ -20,11 +20,13 @@ const PRODUCT_MV_SELECT = {
 	prices: { select: PRODUCT_MV_PRICE_SELECT },
 	product: { select: { id: true, name: true, createdAt: true } },
 }
+const SELLING_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { symbol: true } } }
 const SELLING_PAYMENT_SELECT = {
 	id: true,
 	description: true,
 	createdAt: true,
-	methods: { select: { type: true, currencyId: true, amount: true, currency: { select: { symbol: true } } } },
+	paymentMethods: { select: SELLING_PAYMENT_LINE_SELECT },
+	changeMethods: { select: SELLING_PAYMENT_LINE_SELECT },
 }
 const SELLING_SELECT = {
 	id: true as const,
@@ -102,8 +104,17 @@ export class SellingRepository {
 						id: true,
 						count: true,
 						createdAt: true,
-						prices: { select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true } } } },
-						product: { select: { id: true, name: true, createdAt: true, prices: { select: { type: true, price: true, totalPrice: true, currencyId: true } } } },
+						prices: { select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true, name: true, exchangeRate: true } } } },
+						product: {
+							select: {
+								id: true,
+								name: true,
+								createdAt: true,
+								prices: {
+									select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } },
+								},
+							},
+						},
 					},
 				},
 			},
@@ -141,7 +152,7 @@ export class SellingRepository {
 						product: { select: { id: true, name: true, count: true } },
 					},
 				},
-				payment: { select: { id: true, methods: { select: { type: true, currencyId: true, amount: true } } } },
+				payment: { select: { id: true, paymentMethods: { select: { type: true, currencyId: true, amount: true } }, changeMethods: { select: { type: true, currencyId: true, amount: true } } } },
 			},
 		})
 	}
@@ -169,24 +180,38 @@ export class SellingRepository {
 				clientId: body.clientId,
 				date: body.date ? new Date(body.date) : undefined,
 				staffId: body.staffId,
-				...(body.payment?.paymentMethods?.length && {
-					payment: {
-						create: {
-							clientId: body.clientId,
-							staffId: body.staffId,
-							description: body.payment.description,
-							methods: {
-								createMany: {
-									data: body.payment.paymentMethods.map((m) => ({
-										type: m.type,
-										currencyId: m.currencyId,
-										amount: m.amount,
-									})),
-								},
+				...(body.payment &&
+					((body.payment.paymentMethods?.length ?? 0) > 0 || (body.payment.changeMethods?.length ?? 0) > 0) && {
+						payment: {
+							create: {
+								clientId: body.clientId,
+								staffId: body.staffId,
+								description: body.payment.description,
+								...(body.payment.paymentMethods?.length && {
+									paymentMethods: {
+										createMany: {
+											data: body.payment.paymentMethods.map((m) => ({
+												type: m.type,
+												currencyId: m.currencyId,
+												amount: m.amount,
+											})),
+										},
+									},
+								}),
+								...(body.payment.changeMethods?.length && {
+									changeMethods: {
+										createMany: {
+											data: body.payment.changeMethods.map((m) => ({
+												type: m.type,
+												currencyId: m.currencyId,
+												amount: m.amount,
+											})),
+										},
+									},
+								}),
 							},
 						},
-					},
-				}),
+					}),
 				products: {
 					create: (body.products ?? []).map((p) => ({
 						productId: p.productId,
@@ -230,33 +255,53 @@ export class SellingRepository {
 			},
 		})
 
-		if (body.payment?.paymentMethods) {
+		if (body.payment?.paymentMethods !== undefined || body.payment?.changeMethods !== undefined) {
 			const existingPayment = await this.prisma.clientSellingPaymentModel.findFirst({ where: { sellingId: query.id } })
+			const pm = body.payment?.paymentMethods
+			const cm = body.payment?.changeMethods
 			if (existingPayment) {
-				await this.prisma.clientSellingPaymentMethodModel.deleteMany({ where: { paymentId: existingPayment.id } })
-				if (body.payment.paymentMethods.length) {
-					await this.prisma.clientSellingPaymentMethodModel.createMany({
-						data: body.payment.paymentMethods.map((m) => ({
-							type: m.type,
-							currencyId: m.currencyId,
-							amount: m.amount,
-							paymentId: existingPayment.id,
-						})),
-					})
+				if (pm !== undefined) {
+					await this.prisma.clientSellingPaymentMethodModel.deleteMany({ where: { paymentId: existingPayment.id } })
+					if (pm.length) {
+						await this.prisma.clientSellingPaymentMethodModel.createMany({
+							data: pm.map((m) => ({
+								type: m.type,
+								currencyId: m.currencyId,
+								amount: m.amount,
+								paymentId: existingPayment.id,
+							})),
+						})
+					}
 				}
-				if (body.payment.description !== undefined) {
+				if (cm !== undefined) {
+					await this.prisma.clientSellingPaymentChangeMethodModel.deleteMany({ where: { paymentId: existingPayment.id } })
+					if (cm.length) {
+						await this.prisma.clientSellingPaymentChangeMethodModel.createMany({
+							data: cm.map((m) => ({
+								type: m.type,
+								currencyId: m.currencyId,
+								amount: m.amount,
+								paymentId: existingPayment.id,
+							})),
+						})
+					}
+				}
+				if (body.payment?.description !== undefined) {
 					await this.prisma.clientSellingPaymentModel.update({ where: { id: existingPayment.id }, data: { description: body.payment.description } })
 				}
-			} else if (body.payment.paymentMethods.length) {
+			} else if ((pm?.length ?? 0) > 0 || (cm?.length ?? 0) > 0) {
 				await this.prisma.clientSellingPaymentModel.create({
 					data: {
 						sellingId: query.id,
 						clientId: existing.clientId,
 						staffId: existing.staffId,
-						description: body.payment.description,
-						methods: {
-							createMany: { data: body.payment.paymentMethods.map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) },
-						},
+						description: body.payment?.description,
+						...((pm?.length ?? 0) > 0 && {
+							paymentMethods: { createMany: { data: (pm ?? []).map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) } },
+						}),
+						...((cm?.length ?? 0) > 0 && {
+							changeMethods: { createMany: { data: (cm ?? []).map((m) => ({ type: m.type, currencyId: m.currencyId, amount: m.amount })) } },
+						}),
 					},
 				})
 			}

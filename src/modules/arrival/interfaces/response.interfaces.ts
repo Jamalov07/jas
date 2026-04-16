@@ -1,10 +1,16 @@
 import { GlobalResponse, PaginationResponse } from '@common'
 import { ArrivalRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
-import { PaymentMethodEnum } from '@prisma/client'
+import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 
 export declare interface ArrivalPaymentMethodData {
 	type: PaymentMethodEnum
+	currencyId: string
+	amount: Decimal
+}
+
+export declare interface ArrivalChangeMethodData {
+	type: ChangeMethodEnum
 	currencyId: string
 	amount: Decimal
 }
@@ -13,6 +19,7 @@ export declare interface ArrivalPaymentData {
 	id: string
 	description?: string
 	paymentMethods: ArrivalPaymentMethodData[]
+	changeMethods: ArrivalChangeMethodData[]
 	createdAt: Date
 }
 
@@ -22,8 +29,15 @@ export declare interface ArrivalCalcEntry {
 	total: Decimal
 }
 
+export declare interface ArrivalChangeCalcEntry {
+	type: ChangeMethodEnum
+	currencyId: string
+	total: Decimal
+}
+
 export declare interface ArrivalFindManyData extends PaginationResponse<ArrivalFindOneData> {
 	calc?: ArrivalCalcEntry[]
+	changeCalc?: ArrivalChangeCalcEntry[]
 }
 
 export declare interface ArrivalFindOneData extends Pick<ArrivalRequired, 'id' | 'date' | 'createdAt'> {

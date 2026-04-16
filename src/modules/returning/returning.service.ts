@@ -1,14 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ReturningRepository } from './returning.repository'
-import {
-	createResponse,
-	CRequest,
-	currencyBriefMapFromRows,
-	DeleteMethodEnum,
-	ERROR_MSG,
-	fillPaymentMethodCurrencyTotalsByActiveIds,
-	withCurrencyBriefAmountMany,
-} from '@common'
+import { createResponse, CRequest, currencyBriefMapFromRows, DeleteMethodEnum, ERROR_MSG, fillChangeMethodCurrencyTotalsByActiveIds, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
 import {
 	ReturningGetOneRequest,
 	ReturningCreateOneRequest,
@@ -19,9 +11,11 @@ import {
 	ReturningDeleteOneRequest,
 	ReturningPaymentData,
 	ReturningCalcEntry,
+	ReturningChangeCalcEntry,
 } from './interfaces'
 import { SellingStatusEnum } from '@prisma/client'
 import { CommonService } from '../common'
+import { ClientService } from '../client'
 import { CurrencyRepository } from '../currency'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
@@ -34,6 +28,7 @@ export class ReturningService {
 		private readonly commonService: CommonService,
 		private readonly currencyRepository: CurrencyRepository,
 		private readonly excelService: ExcelService,
+		private readonly clientService: ClientService,
 	) {}
 
 	private calcTotalPricesFromProducts(products: { prices: { type: string; currencyId: string; totalPrice: Decimal; currency?: { symbol: string } }[] }[]) {
@@ -50,19 +45,28 @@ export class ReturningService {
 	}
 
 	private buildPaymentData(
-		csp: { id: string; description?: string | null; createdAt: Date; methods: { type: string; currencyId: string; amount: Decimal }[] } | null | undefined,
+		csp: {
+			id: string
+			description?: string | null
+			createdAt: Date
+			paymentMethods: { type: string; currencyId: string; amount: Decimal }[]
+			changeMethods: { type: string; currencyId: string; amount: Decimal }[]
+		} | null | undefined,
 	): ReturningPaymentData | undefined {
 		if (!csp) return undefined
 		return {
 			id: csp.id,
 			description: csp.description,
-			paymentMethods: csp.methods as any,
+			paymentMethods: csp.paymentMethods as ReturningPaymentData['paymentMethods'],
+			changeMethods: (csp.changeMethods ?? []) as ReturningPaymentData['changeMethods'],
 			createdAt: csp.createdAt,
 		}
 	}
 
-	private calcPaymentTotal(csp: { methods: { amount: Decimal }[] } | null | undefined): Decimal {
-		return csp?.methods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+	private calcPaymentTotal(csp: { paymentMethods?: { amount: Decimal }[]; changeMethods?: { amount: Decimal }[] } | null | undefined): Decimal {
+		const pm = csp?.paymentMethods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+		const cm = csp?.changeMethods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
+		return pm.plus(cm)
 	}
 
 	/** findOne response: prices as { selling: {...}, ... } instead of array */
@@ -91,11 +95,15 @@ export class ReturningService {
 			debtMap.set(tp.currencyId, { amount: tp.total, symbol: tp.currency?.symbol })
 		}
 
-		// All payment types (cash, fromCash, fromBalance) settle the returning obligation
-		for (const method of (payment?.paymentMethods as any[]) ?? []) {
+		for (const method of payment?.paymentMethods ?? []) {
 			const existing = debtMap.get(method.currencyId)
-			const symbol = existing?.symbol ?? method.currency?.symbol
+			const symbol = existing?.symbol ?? (method as { currency?: { symbol?: string } }).currency?.symbol
 			debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
+		}
+		for (const ch of payment?.changeMethods ?? []) {
+			const existing = debtMap.get(ch.currencyId)
+			const symbol = existing?.symbol ?? (ch as { currency?: { symbol?: string } }).currency?.symbol
+			debtMap.set(ch.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(ch.amount), symbol })
 		}
 
 		return Array.from(debtMap.entries()).map(([currencyId, { amount }]) => ({ currencyId, amount }))
@@ -108,9 +116,13 @@ export class ReturningService {
 
 		const calcMap = new Map<string, Decimal>()
 		const mappedReturnings = returnings.map((returning) => {
-			for (const method of returning.payment?.methods ?? []) {
+			for (const method of returning.payment?.paymentMethods ?? []) {
 				const key = `${method.type}_${method.currencyId}`
 				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(method.amount))
+			}
+			for (const ch of returning.payment?.changeMethods ?? []) {
+				const key = `change_${ch.type}_${ch.currencyId}`
+				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(ch.amount))
 			}
 
 			const totalPrices = this.calcTotalPricesFromProducts(returning.products)
@@ -121,6 +133,7 @@ export class ReturningService {
 		})
 
 		const calc: ReturningCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
+		const changeCalc: ReturningChangeCalcEntry[] = fillChangeMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
 
 		const debtCurrencyIds = new Set<string>()
 		for (const r of mappedReturnings) {
@@ -132,15 +145,25 @@ export class ReturningService {
 			debtByCurrency: withCurrencyBriefAmountMany(r.debtByCurrency, debtCurrencyMap),
 		}))
 
+		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds(returningsWithDebtCurrency.map((r) => r.client.id))
+		const dataWithClientDebt = returningsWithDebtCurrency.map((r) => ({
+			...r,
+			client: {
+				...r.client,
+				debtByCurrency: clientDebtMap.get(r.client.id) ?? [],
+			},
+		}))
+
 		const result = query.pagination
 			? {
 					totalCount: returningsCount,
 					pagesCount: Math.ceil(returningsCount / query.pageSize),
-					pageSize: returningsWithDebtCurrency.length,
-					data: returningsWithDebtCurrency,
+					pageSize: dataWithClientDebt.length,
+					data: dataWithClientDebt,
 					calc,
+					changeCalc,
 				}
-			: { data: returningsWithDebtCurrency, calc }
+			: { data: dataWithClientDebt, calc, changeCalc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -153,7 +176,17 @@ export class ReturningService {
 		}
 
 		const products = this.mapProductsPricesToByType(returning.products)
-		return createResponse({ data: { ...returning, products, payment: returning.payment }, success: { messages: ['find one success'] } })
+		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds([returning.client.id])
+		const clientDebt = clientDebtMap.get(returning.client.id) ?? []
+		return createResponse({
+			data: {
+				...returning,
+				products,
+				payment: this.buildPaymentData(returning.payment),
+				client: { ...returning.client, debtByCurrency: clientDebt },
+			},
+			success: { messages: ['find one success'] },
+		})
 	}
 
 	async getMany(query: ReturningGetManyRequest) {
@@ -176,7 +209,7 @@ export class ReturningService {
 	}
 
 	async createOne(request: CRequest, body: ReturningCreateOneRequest) {
-		if (body.payment?.paymentMethods?.length) {
+		if ((body.payment?.paymentMethods?.length ?? 0) > 0 || (body.payment?.changeMethods?.length ?? 0) > 0) {
 			body.status = SellingStatusEnum.accepted
 		}
 
@@ -199,7 +232,17 @@ export class ReturningService {
 
 		body.staffId = request.user.id
 		const returning = await this.returningRepository.createOne(body)
-		return createResponse({ data: returning, success: { messages: ['create one success'] } })
+		const products = this.mapProductsPricesToByType(returning.products)
+		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds([returning.client.id])
+		const clientDebt = clientDebtMap.get(returning.client.id) ?? []
+		return createResponse({
+			data: {
+				...returning,
+				products,
+				client: { ...returning.client, debtByCurrency: clientDebt },
+			},
+			success: { messages: ['create one success'] },
+		})
 	}
 
 	async updateOne(query: ReturningGetOneRequest, body: ReturningUpdateOneRequest) {

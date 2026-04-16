@@ -1,7 +1,8 @@
 import { GlobalResponse, PaginationResponse } from '@common'
+import { ClientDebtByCurrency } from '../../client/interfaces'
 import { ReturningRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
-import { PaymentMethodEnum } from '@prisma/client'
+import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 
 export declare interface ReturningCalcEntry {
 	type: PaymentMethodEnum
@@ -9,14 +10,22 @@ export declare interface ReturningCalcEntry {
 	total: Decimal
 }
 
+export declare interface ReturningChangeCalcEntry {
+	type: ChangeMethodEnum
+	currencyId: string
+	total: Decimal
+}
+
 export declare interface ReturningFindManyData extends PaginationResponse<ReturningFindOneData> {
 	calc: ReturningCalcEntry[]
+	changeCalc: ReturningChangeCalcEntry[]
 }
 
 export declare interface ReturningFindOneData extends Pick<ReturningRequired, 'id' | 'status' | 'date' | 'createdAt'> {
 	payment?: any
 	products?: any[]
-	client?: any
+	/** `findMany` / `findOne` da client `findMany` bilan bir xil joriy qarz */
+	client?: { id: string; fullname: string; phone: string; debtByCurrency: ClientDebtByCurrency[] }
 	staff?: any
 }
 
@@ -26,10 +35,17 @@ export declare interface ReturningPaymentMethodData {
 	amount: Decimal
 }
 
+export declare interface ReturningChangeMethodData {
+	type: ChangeMethodEnum
+	currencyId: string
+	amount: Decimal
+}
+
 export declare interface ReturningPaymentData {
 	id: string
 	description?: string
 	paymentMethods: ReturningPaymentMethodData[]
+	changeMethods: ReturningChangeMethodData[]
 	createdAt: Date
 }
 

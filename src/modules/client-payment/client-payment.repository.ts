@@ -16,7 +16,7 @@ export class ClientPaymentRepository {
 		this.prisma = prisma
 	}
 
-	private paymentMethodsSelect = {
+	private methodLineSelect = {
 		id: true,
 		type: true,
 		currencyId: true,
@@ -45,7 +45,8 @@ export class ClientPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: { select: this.paymentMethodsSelect },
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -64,7 +65,8 @@ export class ClientPaymentRepository {
 				staff: { select: { id: true, fullname: true, phone: true } },
 				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: { select: this.paymentMethodsSelect },
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -102,7 +104,8 @@ export class ClientPaymentRepository {
 				staffId: query.staffId,
 			},
 			include: {
-				methods: { select: this.paymentMethodsSelect },
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 			},
 			...paginationOptions,
 		})
@@ -117,7 +120,8 @@ export class ClientPaymentRepository {
 				id: true,
 				clientId: true,
 				client: true,
-				methods: { select: this.paymentMethodsSelect },
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 			},
 		})
 
@@ -153,20 +157,30 @@ export class ClientPaymentRepository {
 				staffId: body.staffId,
 				description: body.description,
 				createdAt: dayClose ? date : undefined,
-				methods: {
+				paymentMethods: {
 					create: body.paymentMethods.map((m) => ({
 						type: m.type as any,
 						currencyId: m.currencyId,
 						amount: m.amount,
 					})),
 				},
+				...(body.changeMethods?.length && {
+					changeMethods: {
+						create: body.changeMethods.map((m) => ({
+							type: m.type as any,
+							currencyId: m.currencyId,
+							amount: m.amount,
+						})),
+					},
+				}),
 			},
 			select: {
 				id: true,
 				staff: { select: { id: true, fullname: true, phone: true } },
 				client: { select: { id: true, fullname: true, phone: true } },
 				description: true,
-				methods: { select: this.paymentMethodsSelect },
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 				createdAt: true,
 				updatedAt: true,
 				deletedAt: true,
@@ -183,24 +197,33 @@ export class ClientPaymentRepository {
 				clientId: body.clientId,
 				description: body.description,
 				deletedAt: body.deletedAt,
-				...(body.paymentMethods
-					? {
-							methods: {
-								deleteMany: {},
-								create: body.paymentMethods.map((m) => ({
-									type: m.type as any,
-									currencyId: m.currencyId,
-									amount: m.amount,
-								})),
-							},
-						}
-					: {}),
+				...(body.paymentMethods !== undefined && {
+					paymentMethods: {
+						deleteMany: {},
+						create: body.paymentMethods.map((m) => ({
+							type: m.type as any,
+							currencyId: m.currencyId,
+							amount: m.amount,
+						})),
+					},
+				}),
+				...(body.changeMethods !== undefined && {
+					changeMethods: {
+						deleteMany: {},
+						create: body.changeMethods.map((m) => ({
+							type: m.type as any,
+							currencyId: m.currencyId,
+							amount: m.amount,
+						})),
+					},
+				}),
 			},
 			select: {
 				id: true,
 				clientId: true,
 				client: { select: { id: true, fullname: true, phone: true } },
-				methods: { select: this.paymentMethodsSelect },
+				paymentMethods: { select: this.methodLineSelect },
+				changeMethods: { select: this.methodLineSelect },
 				createdAt: true,
 			},
 		})
