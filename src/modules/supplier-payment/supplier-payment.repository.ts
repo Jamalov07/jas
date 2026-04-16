@@ -168,7 +168,7 @@ export class SupplierPaymentRepository {
 				...(body.changeMethods?.length && {
 					changeMethods: {
 						create: body.changeMethods.map((m) => ({
-							type: m.type as ChangeMethodEnum,
+							type: m.type,
 							currencyId: m.currencyId,
 							amount: m.amount,
 						})),
@@ -212,7 +212,7 @@ export class SupplierPaymentRepository {
 					changeMethods: {
 						deleteMany: {},
 						create: body.changeMethods.map((m) => ({
-							type: m.type as ChangeMethodEnum,
+							type: m.type,
 							currencyId: m.currencyId,
 							amount: m.amount,
 						})),

@@ -152,7 +152,13 @@ export class SellingRepository {
 						product: { select: { id: true, name: true, count: true } },
 					},
 				},
-				payment: { select: { id: true, paymentMethods: { select: { type: true, currencyId: true, amount: true } }, changeMethods: { select: { type: true, currencyId: true, amount: true } } } },
+				payment: {
+					select: {
+						id: true,
+						paymentMethods: { select: { type: true, currencyId: true, amount: true } },
+						changeMethods: { select: { type: true, currencyId: true, amount: true } },
+					},
+				},
 			},
 		})
 	}

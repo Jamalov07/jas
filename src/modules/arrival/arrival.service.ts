@@ -1,6 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ArrivalRepository } from './arrival.repository'
-import { createResponse, CRequest, currencyBriefMapFromRows, ERROR_MSG, fillChangeMethodCurrencyTotalsByActiveIds, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
+import {
+	createResponse,
+	CRequest,
+	currencyBriefMapFromRows,
+	ERROR_MSG,
+	fillChangeMethodCurrencyTotalsByActiveIds,
+	fillPaymentMethodCurrencyTotalsByActiveIds,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import {
 	ArrivalGetOneRequest,
 	ArrivalCreateOneRequest,
@@ -11,8 +19,15 @@ import {
 	ArrivalDeleteOneRequest,
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
+import { PriceTypeEnum } from '@prisma/client'
 
 type PriceEntry = { type: string; price: Decimal; totalPrice: Decimal; currencyId: string; currency: { symbol: string } }
+type ArrivalMvPriceRow = {
+	type: PriceTypeEnum
+	price: Decimal
+	totalPrice: Decimal
+	currency: { id: string; name: string; symbol: string; exchangeRate: Decimal }
+}
 type ProductEntry = { prices: PriceEntry[] }
 type PaymentMethodEntry = { type: string; currencyId: string; amount: Decimal; currency?: { symbol: string } | null }
 type ChangeMethodEntry = { type: string; currencyId: string; amount: Decimal; currency?: { symbol: string } | null }
@@ -50,23 +65,21 @@ export class ArrivalService {
 		return result
 	}
 
-	/** findOne response: prices as { cost: {...}, selling: {...} } instead of array */
-	private pricesArrayToByTypeRecord(prices: { type: string }[]): Record<string, unknown> {
-		const out: Record<string, unknown> = {}
-		for (const price of prices) {
-			const { type, ...rest } = price as { type: string } & Record<string, unknown>
-			if (!(type in out)) {
-				out[type] = rest
-			} else {
-				const ex = out[type]
-				out[type] = Array.isArray(ex) ? [...ex, rest] : [ex, rest]
-			}
+	/** MV qatorida `cost` va `selling` — har biri `{ price, totalPrice, currency }` */
+	private mapArrivalLinePricesToObject<T extends { prices: ArrivalMvPriceRow[] }>(line: T) {
+		const cost = line.prices.find((p) => p.type === PriceTypeEnum.cost)
+		const selling = line.prices.find((p) => p.type === PriceTypeEnum.selling)
+		return {
+			...line,
+			prices: {
+				cost: cost ? { price: cost.price, totalPrice: cost.totalPrice, currency: cost.currency } : null,
+				selling: selling ? { price: selling.price, totalPrice: selling.totalPrice, currency: selling.currency } : null,
+			},
 		}
-		return out
 	}
 
-	private mapProductsPricesToByType<T extends { prices: { type: string }[] }>(products: T[]) {
-		return products.map((p) => ({ ...p, prices: this.pricesArrayToByTypeRecord(p.prices) }))
+	private mapArrivalProductsPrices<T extends { prices: ArrivalMvPriceRow[] }>(products: T[]) {
+		return products.map((p) => this.mapArrivalLinePricesToObject(p))
 	}
 
 	private calcDebtByCurrency(
@@ -122,12 +135,9 @@ export class ArrivalService {
 					}
 				: undefined
 			const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
-			const debtByCurrency = this.calcDebtByCurrency(
-				totalPrices,
-				(payment?.paymentMethods ?? []) as PaymentMethodEntry[],
-				(payment?.changeMethods ?? []) as ChangeMethodEntry[],
-			)
-			return { ...arrival, payment, totalPrices, debtByCurrency }
+			const debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[], (payment?.changeMethods ?? []) as ChangeMethodEntry[])
+			const products = this.mapArrivalProductsPrices(arrival.products as { prices: ArrivalMvPriceRow[] }[])
+			return { ...arrival, products, payment, totalPrices, debtByCurrency }
 		})
 
 		const calc = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
@@ -175,12 +185,8 @@ export class ArrivalService {
 				}
 			: undefined
 		const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
-		let debtByCurrency = this.calcDebtByCurrency(
-			totalPrices,
-			(payment?.paymentMethods ?? []) as PaymentMethodEntry[],
-			(payment?.changeMethods ?? []) as ChangeMethodEntry[],
-		)
-		const products = this.mapProductsPricesToByType(arrival.products as ProductEntry[])
+		let debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[], (payment?.changeMethods ?? []) as ChangeMethodEntry[])
+		const products = this.mapArrivalProductsPrices(arrival.products as { prices: ArrivalMvPriceRow[] }[])
 		const debtCurrencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(debtByCurrency.map((d) => d.currencyId)))
 		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, debtCurrencyMap)
 		return createResponse({ data: { ...arrival, products, payment, totalPrices, debtByCurrency }, success: { messages: ['find one success'] } })
@@ -208,8 +214,10 @@ export class ArrivalService {
 	async createOne(request: CRequest, body: ArrivalCreateOneRequest) {
 		body.staffId = request.user.id
 		const arrival = await this.arrivalRepository.createOne(body)
+		const products = this.mapArrivalProductsPrices(arrival.products as { prices: ArrivalMvPriceRow[] }[])
 		const data = {
 			...arrival,
+			products,
 			payment: arrival.payment
 				? {
 						...arrival.payment,

@@ -1,6 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SellingRepository } from './selling.repository'
-import { createResponse, CRequest, currencyBriefMapFromRows, ERROR_MSG, fillChangeMethodCurrencyTotalsByActiveIds, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
+import {
+	createResponse,
+	CRequest,
+	currencyBriefMapFromRows,
+	ERROR_MSG,
+	fillChangeMethodCurrencyTotalsByActiveIds,
+	fillPaymentMethodCurrencyTotalsByActiveIds,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import {
 	SellingGetOneRequest,
@@ -47,13 +55,16 @@ export class SellingService {
 	}
 
 	private buildPaymentData(
-		csp: {
-			id: string
-			description?: string | null
-			createdAt: Date
-			paymentMethods: { type: string; currencyId: string; amount: Decimal }[]
-			changeMethods: { type: string; currencyId: string; amount: Decimal }[]
-		} | null | undefined,
+		csp:
+			| {
+					id: string
+					description?: string | null
+					createdAt: Date
+					paymentMethods: { type: string; currencyId: string; amount: Decimal }[]
+					changeMethods: { type: string; currencyId: string; amount: Decimal }[]
+			  }
+			| null
+			| undefined,
 	): SellingPaymentData | undefined {
 		if (!csp) return undefined
 		return {
@@ -65,9 +76,7 @@ export class SellingService {
 		}
 	}
 
-	private calcPaymentTotal(
-		csp: { paymentMethods?: { amount: Decimal }[]; changeMethods?: { amount: Decimal }[] } | null | undefined,
-	): Decimal {
+	private calcPaymentTotal(csp: { paymentMethods?: { amount: Decimal }[]; changeMethods?: { amount: Decimal }[] } | null | undefined): Decimal {
 		const pm = csp?.paymentMethods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
 		const cm = csp?.changeMethods?.reduce((acc, m) => acc.plus(m.amount), new Decimal(0)) ?? new Decimal(0)
 		return pm.plus(cm)

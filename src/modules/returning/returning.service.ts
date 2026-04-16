@@ -1,6 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ReturningRepository } from './returning.repository'
-import { createResponse, CRequest, currencyBriefMapFromRows, DeleteMethodEnum, ERROR_MSG, fillChangeMethodCurrencyTotalsByActiveIds, fillPaymentMethodCurrencyTotalsByActiveIds, withCurrencyBriefAmountMany } from '@common'
+import {
+	createResponse,
+	CRequest,
+	currencyBriefMapFromRows,
+	DeleteMethodEnum,
+	ERROR_MSG,
+	fillChangeMethodCurrencyTotalsByActiveIds,
+	fillPaymentMethodCurrencyTotalsByActiveIds,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import {
 	ReturningGetOneRequest,
 	ReturningCreateOneRequest,
@@ -13,7 +22,7 @@ import {
 	ReturningCalcEntry,
 	ReturningChangeCalcEntry,
 } from './interfaces'
-import { SellingStatusEnum } from '@prisma/client'
+import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import { CommonService } from '../common'
 import { ClientService } from '../client'
 import { CurrencyRepository } from '../currency'
@@ -31,27 +40,28 @@ export class ReturningService {
 		private readonly clientService: ClientService,
 	) {}
 
-	private calcTotalPricesFromProducts(products: { prices: { type: string; currencyId: string; totalPrice: Decimal; currency?: { symbol: string } }[] }[]) {
+	private calcTotalPricesFromProducts(products: { prices: { type: PriceTypeEnum; currencyId: string; totalPrice: Decimal; currency?: { symbol: string } }[] }[]) {
 		const map = new Map<string, { total: Decimal; currency?: { symbol: string } }>()
 		for (const product of products) {
-			for (const price of product.prices) {
-				if (price.type === 'selling') {
-					const existing = map.get(price.currencyId) ?? { total: new Decimal(0), currency: price.currency }
-					map.set(price.currencyId, { total: existing.total.plus(price.totalPrice), currency: existing.currency || price.currency })
-				}
-			}
+			const row = product.prices.find((p) => p.type === PriceTypeEnum.selling) ?? product.prices[0]
+			if (!row) continue
+			const existing = map.get(row.currencyId) ?? { total: new Decimal(0), currency: row.currency }
+			map.set(row.currencyId, { total: existing.total.plus(row.totalPrice), currency: existing.currency || row.currency })
 		}
 		return Array.from(map.entries()).map(([currencyId, { total, currency }]) => ({ currencyId, total, currency }))
 	}
 
 	private buildPaymentData(
-		csp: {
-			id: string
-			description?: string | null
-			createdAt: Date
-			paymentMethods: { type: string; currencyId: string; amount: Decimal }[]
-			changeMethods: { type: string; currencyId: string; amount: Decimal }[]
-		} | null | undefined,
+		csp:
+			| {
+					id: string
+					description?: string | null
+					createdAt: Date
+					paymentMethods: { type: string; currencyId: string; amount: Decimal }[]
+					changeMethods: { type: string; currencyId: string; amount: Decimal }[]
+			  }
+			| null
+			| undefined,
 	): ReturningPaymentData | undefined {
 		if (!csp) return undefined
 		return {
@@ -69,23 +79,21 @@ export class ReturningService {
 		return pm.plus(cm)
 	}
 
-	/** findOne response: prices as { selling: {...}, ... } instead of array */
-	private pricesArrayToByTypeRecord(prices: { type: string }[]): Record<string, unknown> {
-		const out: Record<string, unknown> = {}
-		for (const price of prices) {
-			const { type, ...rest } = price as { type: string } & Record<string, unknown>
-			if (!(type in out)) {
-				out[type] = rest
-			} else {
-				const ex = out[type]
-				out[type] = Array.isArray(ex) ? [...ex, rest] : [ex, rest]
-			}
+	/** MV qatorida faqat `selling` narxi — `SellingService` bilan bir xil: `{ selling: { price, totalPrice, currency } }` */
+	private mapReturningLinePricesToObject<
+		T extends { prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currency: { id: string; name: string; symbol: string } }[] },
+	>(line: T) {
+		const row = line.prices.find((p) => p.type === PriceTypeEnum.selling) ?? line.prices[0]
+		return {
+			...line,
+			prices: row ? { selling: { price: row.price, totalPrice: row.totalPrice, currency: row.currency } } : { selling: null },
 		}
-		return out
 	}
 
-	private mapProductsPricesToByType<T extends { prices: { type: string }[] }>(products: T[]) {
-		return products.map((p) => ({ ...p, prices: this.pricesArrayToByTypeRecord(p.prices) }))
+	private mapReturningProductsPrices<T extends { prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currency: { id: string; name: string; symbol: string } }[] }>(
+		products: T[],
+	) {
+		return products.map((p) => this.mapReturningLinePricesToObject(p))
 	}
 
 	private calcDebtByCurrency(totalPrices: { currencyId: string; total: Decimal; currency?: { symbol: string } }[], payment: ReturningPaymentData | undefined) {
@@ -128,8 +136,9 @@ export class ReturningService {
 			const totalPrices = this.calcTotalPricesFromProducts(returning.products)
 			const payment = this.buildPaymentData(returning.payment)
 			const debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
+			const products = this.mapReturningProductsPrices(returning.products)
 
-			return { ...returning, payment, totalPrices, debtByCurrency }
+			return { ...returning, products, payment, totalPrices, debtByCurrency }
 		})
 
 		const calc: ReturningCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
@@ -175,7 +184,7 @@ export class ReturningService {
 			throw new BadRequestException(ERROR_MSG.RETURNING.NOT_FOUND.UZ)
 		}
 
-		const products = this.mapProductsPricesToByType(returning.products)
+		const products = this.mapReturningProductsPrices(returning.products)
 		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds([returning.client.id])
 		const clientDebt = clientDebtMap.get(returning.client.id) ?? []
 		return createResponse({
@@ -232,7 +241,7 @@ export class ReturningService {
 
 		body.staffId = request.user.id
 		const returning = await this.returningRepository.createOne(body)
-		const products = this.mapProductsPricesToByType(returning.products)
+		const products = this.mapReturningProductsPrices(returning.products)
 		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds([returning.client.id])
 		const clientDebt = clientDebtMap.get(returning.client.id) ?? []
 		return createResponse({

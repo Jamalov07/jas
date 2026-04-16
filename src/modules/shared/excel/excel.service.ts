@@ -583,7 +583,7 @@ export class ExcelService {
 				description: true,
 				createdAt: true,
 				paymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
-						changeMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+				changeMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
 			},
 			orderBy: { createdAt: 'desc' },
 		})
@@ -640,7 +640,7 @@ export class ExcelService {
 				description: true,
 				createdAt: true,
 				paymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
-						changeMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+				changeMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
 			},
 			orderBy: { createdAt: 'desc' },
 		})

@@ -91,4 +91,3 @@ export declare interface ClientCreateOneResponse extends GlobalResponse {
 export declare interface ClientModifyResponse extends GlobalResponse {
 	data: null
 }
-
