@@ -104,6 +104,8 @@ export class ClientPaymentRepository {
 				staffId: query.staffId,
 			},
 			include: {
+				staff: { select: { id: true, fullname: true, phone: true } },
+				client: { select: { id: true, fullname: true, phone: true } },
 				paymentMethods: { select: this.methodLineSelect },
 				changeMethods: { select: this.methodLineSelect },
 			},

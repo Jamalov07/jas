@@ -105,6 +105,8 @@ export class SupplierPaymentRepository {
 				staffId: query.staffId,
 			},
 			include: {
+				staff: { select: { id: true, fullname: true, phone: true } },
+				supplier: { select: { id: true, fullname: true, phone: true } },
 				paymentMethods: { select: this.methodLineSelect },
 				changeMethods: { select: this.methodLineSelect },
 			},

@@ -85,6 +85,28 @@ export class SupplierService {
 		return debtMap
 	}
 
+	/** Bir yoki bir nechta ta'minotchi uchun joriy qarz (`findMany` bilan bir xil), valyuta obyekti bilan */
+	async getDebtSnapshotsBySupplierIds(supplierIds: string[]): Promise<Map<string, SupplierDebtByCurrency[]>> {
+		const rows = await this.supplierRepository.findDebtSourcesBySupplierIds(supplierIds)
+		const allCurrencyIds = new Set<string>()
+		const rawBySupplier = new Map<string, { currencyId: string; amount: Decimal }[]>()
+		for (const row of rows) {
+			const debtMap = this.calcDebtByCurrency(row.arrivals, row.payments)
+			for (const id of debtMap.keys()) allCurrencyIds.add(id)
+			rawBySupplier.set(
+				row.id,
+				Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
+			)
+		}
+		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...allCurrencyIds]))
+		const out = new Map<string, SupplierDebtByCurrency[]>()
+		for (const row of rows) {
+			const arr = rawBySupplier.get(row.id) ?? []
+			out.set(row.id, withCurrencyBriefAmountMany(arr, currencyMap))
+		}
+		return out
+	}
+
 	async findMany(query: SupplierFindManyRequest) {
 		const suppliers = await this.supplierRepository.findMany({ ...query, pagination: false })
 

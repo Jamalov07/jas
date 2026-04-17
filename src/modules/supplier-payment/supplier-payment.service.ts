@@ -1,6 +1,15 @@
 import { BadRequestException, forwardRef, Inject, Injectable } from '@nestjs/common'
 import { SupplierPaymentRepository } from './supplier-payment.repository'
-import { createResponse, CRequest, enrichedCalcByCurrencyForPayments, ERROR_MSG } from '@common'
+import {
+	createResponse,
+	CRequest,
+	currencyBriefMapFromRows,
+	enrichedCalcByCurrencyForPayments,
+	ERROR_MSG,
+	fillCurrencyTotalsByActiveIds,
+	type PaymentLikeForCalc,
+	withCurrencyBriefTotalMany,
+} from '@common'
 import {
 	SupplierPaymentGetOneRequest,
 	SupplierPaymentCreateOneRequest,
@@ -10,12 +19,14 @@ import {
 	SupplierPaymentFindOneRequest,
 	SupplierPaymentDeleteOneRequest,
 	SupplierPaymentCalcByCurrency,
+	SupplierPaymentFindOneData,
 } from './interfaces'
 import { SupplierService } from '../supplier'
 import { CurrencyRepository } from '../currency'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { BotService } from '../bot'
+import { Decimal } from '@prisma/client/runtime/library'
 
 @Injectable()
 export class SupplierPaymentService {
@@ -33,23 +44,70 @@ export class SupplierPaymentService {
 		this.supplierService = supplierService
 	}
 
-	async findMany(query: SupplierPaymentFindManyRequest) {
-		const payments = await this.supplierPaymentRepository.findMany(query)
-		const paymentsCount = await this.supplierPaymentRepository.countFindMany(query)
+	private netAmountsMapForPayment(p: PaymentLikeForCalc): Map<string, Decimal> {
+		const m = new Map<string, Decimal>()
+		for (const line of p.paymentMethods ?? p.methods ?? []) {
+			m.set(line.currencyId, (m.get(line.currencyId) ?? new Decimal(0)).plus(line.amount))
+		}
+		for (const line of p.changeMethods ?? []) {
+			m.set(line.currencyId, (m.get(line.currencyId) ?? new Decimal(0)).minus(line.amount))
+		}
+		return m
+	}
+
+	private mergeNetMapsForPayments(payments: PaymentLikeForCalc[]): Map<string, Decimal> {
+		const out = new Map<string, Decimal>()
+		for (const p of payments) {
+			for (const [currencyId, amt] of this.netAmountsMapForPayment(p)) {
+				out.set(currencyId, (out.get(currencyId) ?? new Decimal(0)).plus(amt))
+			}
+		}
+		return out
+	}
+
+	private async enrichSupplierPaymentsFindManyData(payments: PaymentLikeForCalc[]) {
+		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
+		const briefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(activeCurrencyIds))
+		const totalsByCurrency = withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(activeCurrencyIds, this.mergeNetMapsForPayments(payments)), briefMap)
 		const calcByCurrency: SupplierPaymentCalcByCurrency[] = await enrichedCalcByCurrencyForPayments(payments, {
 			findAllActiveIds: () => this.currencyRepository.findAllActiveIds(),
 			findBriefByIds: (ids) => this.currencyRepository.findBriefByIds(ids),
 		})
+
+		const supplierIds = [...new Set(payments.map((p) => (p as { supplier?: { id: string } }).supplier?.id).filter(Boolean))] as string[]
+		const debtMap = await this.supplierService.getDebtSnapshotsBySupplierIds(supplierIds)
+
+		const data = payments.map((p) => {
+			const row = p as typeof p & { supplier?: { id: string; fullname: string; phone: string }; staff?: { id: string; fullname: string; phone: string } }
+			return {
+				...row,
+				...(row.supplier
+					? {
+							supplier: { ...row.supplier, debtByCurrency: debtMap.get(row.supplier.id) ?? [] },
+						}
+					: {}),
+				totalsByCurrency: withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(activeCurrencyIds, this.netAmountsMapForPayment(p)), briefMap),
+			}
+		})
+
+		return { data: data as SupplierPaymentFindOneData[], calcByCurrency, totalsByCurrency }
+	}
+
+	async findMany(query: SupplierPaymentFindManyRequest) {
+		const payments = await this.supplierPaymentRepository.findMany(query)
+		const paymentsCount = await this.supplierPaymentRepository.countFindMany(query)
+		const { data, calcByCurrency, totalsByCurrency } = await this.enrichSupplierPaymentsFindManyData(payments)
 
 		const result = query.pagination
 			? {
 					totalCount: paymentsCount,
 					pagesCount: Math.ceil(paymentsCount / query.pageSize),
 					pageSize: payments.length,
-					data: payments,
+					data,
 					calcByCurrency,
+					totalsByCurrency,
 				}
-			: { data: payments, calcByCurrency }
+			: { data, calcByCurrency, totalsByCurrency }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -67,19 +125,17 @@ export class SupplierPaymentService {
 	async getMany(query: SupplierPaymentGetManyRequest) {
 		const payments = await this.supplierPaymentRepository.getMany(query)
 		const paymentsCount = await this.supplierPaymentRepository.countGetMany(query)
-		const calcByCurrency: SupplierPaymentCalcByCurrency[] = await enrichedCalcByCurrencyForPayments(payments, {
-			findAllActiveIds: () => this.currencyRepository.findAllActiveIds(),
-			findBriefByIds: (ids) => this.currencyRepository.findBriefByIds(ids),
-		})
+		const { data, calcByCurrency, totalsByCurrency } = await this.enrichSupplierPaymentsFindManyData(payments)
 
 		const result = query.pagination
 			? {
 					pagesCount: Math.ceil(paymentsCount / query.pageSize),
 					pageSize: payments.length,
-					data: payments,
+					data,
 					calcByCurrency,
+					totalsByCurrency,
 				}
-			: { data: payments, calcByCurrency }
+			: { data, calcByCurrency, totalsByCurrency }
 
 		return createResponse({ data: result, success: { messages: ['get many success'] } })
 	}

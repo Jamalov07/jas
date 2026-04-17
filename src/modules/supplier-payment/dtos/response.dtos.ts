@@ -12,6 +12,7 @@ import {
 } from '../interfaces'
 import { CurrencyBriefDto, GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
 import { SupplierPaymentRequiredDto } from './fields.dtos'
+import type { SupplierDebtByCurrency } from '../../supplier/interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
 export class SupplierPaymentMethodDataDto implements SupplierPaymentMethodData {
@@ -48,6 +49,15 @@ export class SupplierPaymentCalcByCurrencyDto implements SupplierPaymentCalcByCu
 }
 
 export class SupplierPaymentFindOneDataDto extends PickType(SupplierPaymentRequiredDto, ['id', 'createdAt']) implements SupplierPaymentFindOneData {
+	@ApiPropertyOptional()
+	staff?: { id: string; fullname: string; phone: string }
+
+	@ApiPropertyOptional()
+	supplier?: { id: string; fullname: string; phone: string; debtByCurrency?: SupplierDebtByCurrency[] }
+
+	@ApiPropertyOptional({ type: SupplierPaymentCalcByCurrencyDto, isArray: true })
+	totalsByCurrency?: SupplierPaymentCalcByCurrency[]
+
 	@ApiProperty({ type: SupplierPaymentMethodDataDto, isArray: true })
 	paymentMethods?: SupplierPaymentMethodData[]
 
@@ -61,6 +71,9 @@ export class SupplierPaymentFindManyDataDto extends PaginationResponseDto implem
 
 	@ApiProperty({ type: SupplierPaymentCalcByCurrencyDto, isArray: true })
 	calcByCurrency: SupplierPaymentCalcByCurrency[]
+
+	@ApiProperty({ type: SupplierPaymentCalcByCurrencyDto, isArray: true })
+	totalsByCurrency: SupplierPaymentCalcByCurrency[]
 }
 
 export class SupplierPaymentFindManyResponseDto extends GlobalResponseDto implements SupplierPaymentFindManyResponse {

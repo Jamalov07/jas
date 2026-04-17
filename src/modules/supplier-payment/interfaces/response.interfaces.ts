@@ -1,4 +1,5 @@
 import { CurrencyBrief, GlobalResponse, PaginationResponse } from '@common'
+import type { SupplierDebtByCurrency } from '../../supplier/interfaces'
 import { SupplierPaymentRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -22,10 +23,14 @@ export declare interface SupplierPaymentCalcByCurrency {
 
 export declare interface SupplierPaymentFindManyData extends PaginationResponse<SupplierPaymentFindOneData> {
 	calcByCurrency: SupplierPaymentCalcByCurrency[]
+	totalsByCurrency: SupplierPaymentCalcByCurrency[]
 }
 
 export declare interface SupplierPaymentFindOneData extends Pick<SupplierPaymentRequired, 'id'> {
 	description?: string | null
+	staff?: { id: string; fullname: string; phone: string }
+	supplier?: { id: string; fullname: string; phone: string; debtByCurrency?: SupplierDebtByCurrency[] }
+	totalsByCurrency?: SupplierPaymentCalcByCurrency[]
 	paymentMethods?: SupplierPaymentMethodData[]
 	changeMethods?: SupplierPaymentChangeMethodData[]
 }

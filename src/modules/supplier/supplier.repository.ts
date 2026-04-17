@@ -9,6 +9,39 @@ import {
 	SupplierGetOneRequest,
 	SupplierUpdateOneRequest,
 } from './interfaces'
+import { PriceTypeEnum } from '@prisma/client'
+
+/** `SupplierService.calcDebtByCurrency` uchun */
+const SUPPLIER_DEBT_SOURCE_SELECT = {
+	arrivals: {
+		select: {
+			date: true,
+			products: {
+				select: {
+					prices: {
+						where: { type: PriceTypeEnum.cost },
+						select: { totalPrice: true, currencyId: true },
+					},
+				},
+			},
+			payment: {
+				select: {
+					paymentMethods: { select: { type: true, amount: true, currencyId: true } },
+					changeMethods: { select: { type: true, amount: true, currencyId: true } },
+				},
+			},
+		},
+		orderBy: { date: 'desc' as const },
+	},
+	payments: {
+		where: { deletedAt: null },
+		select: {
+			paymentMethods: { select: { type: true, amount: true, currencyId: true } },
+			changeMethods: { select: { type: true, amount: true, currencyId: true } },
+		},
+	},
+} as const
+
 @Injectable()
 export class SupplierRepository {
 	private readonly prisma: PrismaService
@@ -31,46 +64,25 @@ export class SupplierRepository {
 				fullname: true,
 				phone: true,
 				createdAt: true,
-				arrivals: {
-					select: {
-						date: true,
-						products: {
-							select: {
-								prices: {
-									where: { type: 'cost' },
-									select: { totalPrice: true, currencyId: true },
-								},
-							},
-						},
-						payment: {
-							select: {
-								paymentMethods: {
-									select: { type: true, amount: true, currencyId: true },
-								},
-								changeMethods: {
-									select: { type: true, amount: true, currencyId: true },
-								},
-							},
-						},
-					},
-					orderBy: { date: 'desc' },
-				},
-				payments: {
-					where: { deletedAt: null },
-					select: {
-						paymentMethods: {
-							select: { type: true, amount: true, currencyId: true },
-						},
-						changeMethods: {
-							select: { type: true, amount: true, currencyId: true },
-						},
-					},
-				},
+				...SUPPLIER_DEBT_SOURCE_SELECT,
 			},
 			...paginationOptions,
 		})
 
 		return suppliers
+	}
+
+	/** Bir nechta ta'minotchi uchun joriy qarz (`SupplierService.calcDebtByCurrency`) */
+	async findDebtSourcesBySupplierIds(supplierIds: string[]) {
+		const unique = [...new Set(supplierIds.filter(Boolean))]
+		if (unique.length === 0) return []
+		return this.prisma.supplierModel.findMany({
+			where: { id: { in: unique } },
+			select: {
+				id: true,
+				...SUPPLIER_DEBT_SOURCE_SELECT,
+			},
+		})
 	}
 
 	async findOne(query: SupplierFindOneRequest) {

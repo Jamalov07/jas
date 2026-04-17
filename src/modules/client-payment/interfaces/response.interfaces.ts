@@ -1,4 +1,5 @@
 import { CurrencyBrief, GlobalResponse, PaginationResponse } from '@common'
+import type { ClientDebtByCurrency } from '../../client/interfaces'
 import { ClientPaymentRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -22,10 +23,16 @@ export declare interface ClientPaymentCalcByCurrency {
 
 export declare interface ClientPaymentFindManyData extends PaginationResponse<ClientPaymentFindOneData> {
 	calcByCurrency: ClientPaymentCalcByCurrency[]
+	/** Sahifa bo‘yicha: to‘lov − qaytim, valyuta bo‘yicha (aktiv valyutalar) */
+	totalsByCurrency: ClientPaymentCalcByCurrency[]
 }
 
 export declare interface ClientPaymentFindOneData extends Pick<ClientPaymentRequired, 'id'> {
 	description?: string | null
+	staff?: { id: string; fullname: string; phone: string }
+	client?: { id: string; fullname: string; phone: string; debtByCurrency?: ClientDebtByCurrency[] }
+	/** Shu to‘lov hujjati bo‘yicha: to‘lov − qaytim, valyuta bo‘yicha */
+	totalsByCurrency?: ClientPaymentCalcByCurrency[]
 	paymentMethods?: ClientPaymentMethodData[]
 	changeMethods?: ClientPaymentChangeMethodData[]
 }
