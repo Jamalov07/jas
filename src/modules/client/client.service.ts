@@ -284,6 +284,10 @@ export class ClientService {
 			this.addLinesToAgg(sellingLineAgg, 'pm', s.payment.paymentMethods)
 			this.addLinesToAgg(sellingLineAgg, 'ch', s.payment.changeMethods ?? [])
 		}
+		for (const p of payInPeriod) {
+			this.addLinesToAgg(sellingLineAgg, 'pm', p.paymentMethods)
+			this.addLinesToAgg(sellingLineAgg, 'ch', p.changeMethods ?? [])
+		}
 
 		const returningProductMap = new Map<string, Decimal>()
 		for (const r of retInPeriod) {
@@ -302,12 +306,6 @@ export class ClientService {
 			this.addLinesToAgg(returningLineAgg, 'ch', r.payment.changeMethods ?? [])
 		}
 
-		const standaloneLineAgg = new Map<string, Decimal>()
-		for (const p of payInPeriod) {
-			this.addLinesToAgg(standaloneLineAgg, 'pm', p.paymentMethods)
-			this.addLinesToAgg(standaloneLineAgg, 'ch', p.changeMethods ?? [])
-		}
-
 		const period = hasPeriod ? { startDate: periodStart, endDate: periodEnd } : null
 
 		return {
@@ -323,10 +321,6 @@ export class ClientService {
 				productTotalsByCurrency: this.currencyTotalsFromMap(returningProductMap, currencyMap),
 				paymentMethods: this.aggKindToReportRows(returningLineAgg, 'pm', currencyMap),
 				changeMethods: this.aggKindToReportRows(returningLineAgg, 'ch', currencyMap),
-			},
-			standalonePayments: {
-				paymentMethods: this.aggKindToReportRows(standaloneLineAgg, 'pm', currencyMap),
-				changeMethods: this.aggKindToReportRows(standaloneLineAgg, 'ch', currencyMap),
 			},
 		}
 	}

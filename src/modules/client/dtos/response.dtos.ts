@@ -99,14 +99,6 @@ export class ClientReportSellingOrReturningDto {
 	changeMethods: ClientReportPaymentRowDto[]
 }
 
-export class ClientReportStandalonePaymentsDto {
-	@ApiProperty({ type: ClientReportPaymentRowDto, isArray: true })
-	paymentMethods: ClientReportPaymentRowDto[]
-
-	@ApiProperty({ type: ClientReportPaymentRowDto, isArray: true })
-	changeMethods: ClientReportPaymentRowDto[]
-}
-
 export class ClientReportSummaryDto implements ClientReportSummary {
 	@ApiPropertyOptional({ type: Object, nullable: true })
 	period: ClientReportSummary['period']
@@ -116,9 +108,6 @@ export class ClientReportSummaryDto implements ClientReportSummary {
 
 	@ApiProperty({ type: ClientReportSellingOrReturningDto })
 	returning: ClientReportSummary['returning']
-
-	@ApiProperty({ type: ClientReportStandalonePaymentsDto })
-	standalonePayments: ClientReportSummary['standalonePayments']
 }
 
 export class ClientFindOneDataDto extends PickType(ClientRequiredDto, ['id', 'fullname', 'createdAt', 'phone']) implements ClientFindOneData {

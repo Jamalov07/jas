@@ -8,6 +8,7 @@ import {
 	ERROR_MSG,
 	fillCurrencyTotalsByActiveIds,
 	type PaymentLikeForCalc,
+	resolvePaymentColumnCurrencyIds,
 	withCurrencyBriefTotalMany,
 } from '@common'
 import {
@@ -67,8 +68,9 @@ export class SupplierPaymentService {
 
 	private async enrichSupplierPaymentsFindManyData(payments: PaymentLikeForCalc[]) {
 		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
-		const briefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(activeCurrencyIds))
-		const totalsByCurrency = withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(activeCurrencyIds, this.mergeNetMapsForPayments(payments)), briefMap)
+		const listColumnIds = resolvePaymentColumnCurrencyIds(activeCurrencyIds, payments)
+		const briefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(listColumnIds))
+		const totalsByCurrency = withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(listColumnIds, this.mergeNetMapsForPayments(payments)), briefMap)
 		const calcByCurrency: SupplierPaymentCalcByCurrency[] = await enrichedCalcByCurrencyForPayments(payments, {
 			findAllActiveIds: () => this.currencyRepository.findAllActiveIds(),
 			findBriefByIds: (ids) => this.currencyRepository.findBriefByIds(ids),
@@ -79,6 +81,7 @@ export class SupplierPaymentService {
 
 		const data = payments.map((p) => {
 			const row = p as typeof p & { supplier?: { id: string; fullname: string; phone: string }; staff?: { id: string; fullname: string; phone: string } }
+			const rowColumnIds = resolvePaymentColumnCurrencyIds(activeCurrencyIds, [p])
 			return {
 				...row,
 				...(row.supplier
@@ -86,7 +89,7 @@ export class SupplierPaymentService {
 							supplier: { ...row.supplier, debtByCurrency: debtMap.get(row.supplier.id) ?? [] },
 						}
 					: {}),
-				totalsByCurrency: withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(activeCurrencyIds, this.netAmountsMapForPayment(p)), briefMap),
+				totalsByCurrency: withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(rowColumnIds, this.netAmountsMapForPayment(p)), briefMap),
 			}
 		})
 

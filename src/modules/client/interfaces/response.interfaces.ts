@@ -46,7 +46,7 @@ export declare interface ClientReportPeriod {
 	endDate?: Date
 }
 
-/** `many/report` — sotuv / qaytish / alohida to‘lovlar: to‘lov usullari va qaytimlar alohida */
+/** `many/report` — sotuv (shu jumladan alohida client to‘lovlari yig‘indisi) / qaytish */
 export declare interface ClientReportSummary {
 	period: ClientReportPeriod | null
 	selling: {
@@ -58,10 +58,6 @@ export declare interface ClientReportSummary {
 	returning: {
 		documentsCount: number
 		productTotalsByCurrency: ClientReportCurrencyTotal[]
-		paymentMethods: ClientReportPaymentRow[]
-		changeMethods: ClientReportPaymentRow[]
-	}
-	standalonePayments: {
 		paymentMethods: ClientReportPaymentRow[]
 		changeMethods: ClientReportPaymentRow[]
 	}
