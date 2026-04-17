@@ -346,6 +346,30 @@ export class SellingService {
 			throw new BadRequestException(ERROR_MSG.SELLING.NOT_FOUND.UZ)
 		}
 
+		if ((body.payment?.paymentMethods?.length ?? 0) > 0 || (body.payment?.changeMethods?.length ?? 0) > 0) {
+			body.status = SellingStatusEnum.accepted
+		}
+
+		if (body.status === SellingStatusEnum.accepted) {
+			const wasNotAccepted = existingSelling.status !== SellingStatusEnum.accepted
+			if (wasNotAccepted) {
+				const dayClose = await this.commonService.getDayClose({})
+				if (dayClose.data.isClosed) {
+					const tomorrow = new Date()
+					tomorrow.setDate(tomorrow.getDate() + 1)
+					tomorrow.setHours(0, 0, 0, 0)
+					body.date = tomorrow
+				} else {
+					body.date = new Date()
+				}
+			}
+		} else if (body.date) {
+			const inputDate = new Date(body.date)
+			const now = new Date()
+			const isToday = inputDate.getFullYear() === now.getFullYear() && inputDate.getMonth() === now.getMonth() && inputDate.getDate() === now.getDate()
+			body.date = isToday ? now : new Date(inputDate.setHours(0, 0, 0, 0))
+		}
+
 		body.staffId = request.user.id
 
 		await this.sellingRepository.updateOne(query, body)
