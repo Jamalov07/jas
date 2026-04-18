@@ -144,6 +144,7 @@ export class BotService {
 	}
 
 	private buildSellingCaption(selling: BotSellingData): string {
+		console.log(selling.debtByCurrency)
 		const baseInfo =
 			`🧾 Продажа\n\n` +
 			`🆔 Заказ: ${selling.publicId ?? selling.id}\n` +
