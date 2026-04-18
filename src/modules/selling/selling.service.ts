@@ -452,6 +452,7 @@ export class SellingService {
 					title: isFirstAccept ? BotSellingTitleEnum.new : BotSellingTitleEnum.updated,
 					totalPrices,
 					payment,
+					debtByCurrency: this.calcDebtByCurrency2(totalPrices, payment),
 					products: updatedSelling.products.map((p) => ({ ...p, status: BotSellingProductTitleEnum.new })),
 				} as any
 
