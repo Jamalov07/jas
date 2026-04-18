@@ -14,7 +14,7 @@ import { CurrencyBrief } from '../../common'
 
 type BotSellingData = Omit<SellingFindOneData, 'products'> & {
 	title?: BotSellingTitleEnum
-	debtByCurrency?: { currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }[]
+	debtByCurrency?: { currencyId: string; total?: Decimal; amount?: Decimal; currency: { id: string; name: string; symbol: string } }[]
 	products?: Array<SellingProductData & { status?: BotSellingProductTitleEnum }>
 }
 
@@ -149,7 +149,7 @@ export class BotService {
 			`🧾 Продажа\n\n` +
 			`🆔 Заказ: ${selling.publicId ?? selling.id}\n` +
 			`💰 Сумма: ${this.formatTotalPrices(selling)}\n` +
-			`💸 Долг: ${(selling.debtByCurrency ?? []).map((debt) => `${debt.total.toNumber()} ${debt.currency.symbol}`).join(' + ') || 0}`
+			`💸 Долг: ${(selling.debtByCurrency ?? []).map((debt) => `${debt.amount.toNumber()} ${debt.currency.symbol}`).join(' + ') || 0}`
 
 		const clientInfo = `👤 Клиент: ${selling.client?.fullname ?? ''}\n` + `📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}\n`
 
