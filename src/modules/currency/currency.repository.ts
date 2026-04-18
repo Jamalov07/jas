@@ -174,8 +174,13 @@ export class CurrencyRepository {
 	}
 
 	async deleteOne(query: CurrencyDeleteOneRequest) {
-		const currency = await this.prisma.currencyModel.delete({
+		// const currency = await this.prisma.currencyModel.delete({
+		// 	where: { id: query.id },
+		// })
+
+		const currency = await this.prisma.currencyModel.update({
 			where: { id: query.id },
+			data: { deletedAt: new Date() },
 		})
 
 		return currency

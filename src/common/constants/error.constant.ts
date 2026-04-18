@@ -204,6 +204,12 @@ export const ERROR_MSG = {
 			RU: 'currency name already exists',
 			UZ: 'valyuta nomi allaqachon mavjud',
 		},
+
+		SYMBOL_EXISTS: {
+			EN: 'currency symbol already exists',
+			RU: 'currency symbol already exists',
+			UZ: 'valyuta belgisi allaqachon mavjud',
+		},
 	},
 	RETURNING: {
 		NOT_FOUND: {
