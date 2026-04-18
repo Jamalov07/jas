@@ -16,7 +16,7 @@ const SELLING_MV_SELECT = {
 	id: true,
 	count: true,
 	createdAt: true,
-	prices: { select: PRICES_SELECT },
+	prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRICES_SELECT },
 	product: { select: { id: true, name: true, createdAt: true } },
 	staff: { select: { id: true, fullname: true } },
 	selling: { select: { publicId: true, id: true, date: true, status: true, client: { select: { id: true, fullname: true, phone: true } } } },
@@ -80,16 +80,20 @@ export class SellingProductMVRepository {
 							select: {
 								id: true,
 								description: true,
-								paymentMethods: { select: { type: true, currencyId: true, amount: true } },
-								changeMethods: { select: { type: true, currencyId: true, amount: true } },
+								paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: { type: true, currencyId: true, amount: true } },
+								changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: { type: true, currencyId: true, amount: true } },
 							},
 						},
 						products: {
+							orderBy: [{ createdAt: 'desc' as const }],
 							select: {
 								id: true,
 								count: true,
 								createdAt: true,
-								prices: { select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true } } } },
+								prices: {
+									orderBy: [{ createdAt: 'desc' as const }],
+									select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true } } },
+								},
 								product: { select: { id: true, name: true } },
 							},
 						},

@@ -4,7 +4,7 @@ import { ClientOptional, ClientRequired } from './fields.interfaces'
 export declare interface ClientFindManyRequest
 	extends Pick<ClientOptional, 'fullname' | 'phone'>,
 		PaginationRequest,
-		Pick<RequestOtherFields, 'isDeleted' | 'search' | 'debtType' | 'debtValue' | 'startDate' | 'endDate'> {}
+		Pick<RequestOtherFields, 'isDeleted' | 'search' | 'debtType' | 'debtValue' | 'startDate' | 'endDate' | 'ids'> {}
 
 export declare interface ClientFindOneRequest extends Pick<ClientOptional, 'id'> {
 	deedStartDate?: Date

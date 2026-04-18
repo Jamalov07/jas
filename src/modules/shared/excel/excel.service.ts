@@ -190,7 +190,7 @@ export class ExcelService {
 						prices: { where: { type: 'selling' }, select: { price: true, totalPrice: true, currency: { select: { symbol: true } } } },
 						product: { select: { name: true } },
 					},
-					orderBy: { createdAt: 'asc' },
+					orderBy: { createdAt: 'desc' },
 				},
 			},
 		})
@@ -240,8 +240,28 @@ export class ExcelService {
 
 		worksheet.addRow([])
 
+		const totalsByCurrency: Record<string, number> = {}
+
+		selling.products.forEach((item) => {
+			const totalPrice = item.prices[0]?.totalPrice?.toNumber() ?? 0
+			const sym = item.prices[0]?.currency?.symbol ?? ''
+
+			if (!totalsByCurrency[sym]) {
+				totalsByCurrency[sym] = 0
+			}
+
+			totalsByCurrency[sym] += totalPrice
+		})
+
 		const paidStr = this.formatPaymentBlock(selling.payment?.paymentMethods ?? [], selling.payment?.changeMethods)
+
+		const totalStr = Object.entries(totalsByCurrency)
+			.map(([sym, value]) => `${value} ${sym}`)
+			.join(', ')
+
+		const totalRow = worksheet.addRow(['', '', '', '', 'Жами сумма:', totalStr])
 		const paidRow = worksheet.addRow(['', '', '', '', 'Тўлов қилинди:', paidStr])
+		this.styleHeaderRow(totalRow)
 		this.styleHeaderRow(paidRow)
 
 		worksheet.getColumn(2).width = Math.min(Math.max(maxNameLen + 5, 20), 60)

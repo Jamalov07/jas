@@ -170,6 +170,13 @@ export class SellingService {
 		const activeBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds(activeCurrencyIds))
 		const calcPage = this.buildFindManyCalcPage(sellings, activeCurrencyIds, activeBriefMap)
 
+		const clientsWithDebt = await this.clientService.findMany({ ids: sellings.map((s) => s.client.id) })
+
+		const clientsWithDebtObject: Record<string, any> = {}
+		for (const c of clientsWithDebt.data.data) {
+			clientsWithDebtObject[c.id] = c.debtByCurrency
+		}
+
 		const calcMap = new Map<string, Decimal>()
 		const mappedSellings = sellings.map((selling) => {
 			for (const method of selling.payment?.paymentMethods ?? []) {
@@ -188,7 +195,16 @@ export class SellingService {
 			const totalPayments = aggregateAmountsByCurrencyId(selling.payment?.paymentMethods)
 			const totalChanges = aggregateAmountsByCurrencyId(selling.payment?.changeMethods)
 
-			return { ...selling, products, payment, totalPrices, totalPayments, totalChanges, debtByCurrency }
+			return {
+				...selling,
+				products,
+				payment,
+				totalPrices,
+				totalPayments,
+				totalChanges,
+				debtByCurrency,
+				client: { ...selling.client, debtByCurrency: clientsWithDebtObject[selling.client.id] || [] },
+			}
 		})
 
 		const calc: SellingCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
@@ -237,6 +253,13 @@ export class SellingService {
 		const totalPayments = aggregateAmountsByCurrencyId(selling.payment?.paymentMethods)
 		const totalChanges = aggregateAmountsByCurrencyId(selling.payment?.changeMethods)
 
+		const clientsWithDebt = await this.clientService.findMany({ ids: [selling.client.id] })
+
+		const clientsWithDebtObject: Record<string, any> = {}
+		for (const c of clientsWithDebt.data.data) {
+			clientsWithDebtObject[c.id] = c.debtByCurrency
+		}
+
 		const currencyIdsForBrief = new Set<string>()
 		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)
 		for (const t of totalPayments) currencyIdsForBrief.add(t.currencyId)
@@ -253,6 +276,7 @@ export class SellingService {
 				totalPayments: withCurrencyBriefTotalMany(totalPayments, currencyBriefMap),
 				totalChanges: withCurrencyBriefTotalMany(totalChanges, currencyBriefMap),
 				debtByCurrency,
+				client: { ...selling.client, debtByCurrency: clientsWithDebtObject[selling.client.id] || [] },
 			},
 			success: { messages: ['find one success'] },
 		})

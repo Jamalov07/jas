@@ -62,7 +62,7 @@ export class ProductRepository {
 					take: 1,
 					select: {
 						count: true,
-						prices: { select: { price: true, type: true } },
+						prices: { orderBy: [{ createdAt: 'desc' as const }], select: { price: true, type: true } },
 						selling: { select: { date: true } },
 					},
 				},
@@ -83,13 +83,13 @@ export class ProductRepository {
 				description: true,
 				name: true,
 				minAmount: true,
-				prices: { select: PRICE_SELECT },
+				prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRICE_SELECT },
 				sellingMVs: {
 					orderBy: { selling: { date: 'desc' } },
 					take: 1,
 					select: {
 						count: true,
-						prices: { select: { price: true, type: true } },
+						prices: { orderBy: [{ createdAt: 'desc' as const }], select: { price: true, type: true } },
 						selling: { select: { date: true } },
 					},
 				},
@@ -113,7 +113,7 @@ export class ProductRepository {
 			where: { ...this.buildSearchFilter(query.search) },
 			select: {
 				count: true,
-				prices: { select: { type: true, totalPrice: true, currencyId: true } },
+				prices: { orderBy: [{ createdAt: 'desc' as const }], select: { type: true, totalPrice: true, currencyId: true } },
 			},
 		})
 	}
@@ -228,10 +228,7 @@ export class ProductRepository {
 		return new Map(rows.map((r) => [r.id, r.exchangeRate ?? new Decimal(0)]))
 	}
 
-	async updateProductPrice(
-		priceId: string,
-		data: { price: Decimal; totalPrice: Decimal; currencyId: string; exchangeRate: Decimal },
-	) {
+	async updateProductPrice(priceId: string, data: { price: Decimal; totalPrice: Decimal; currencyId: string; exchangeRate: Decimal }) {
 		return await this.prisma.productPriceModel.update({
 			where: { id: priceId },
 			data: {

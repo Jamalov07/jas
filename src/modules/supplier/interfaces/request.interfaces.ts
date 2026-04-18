@@ -4,7 +4,7 @@ import { SupplierOptional, SupplierRequired } from './fields.interfaces'
 export declare interface SupplierFindManyRequest
 	extends Pick<SupplierOptional, 'fullname' | 'phone'>,
 		PaginationRequest,
-		Pick<RequestOtherFields, 'isDeleted' | 'search' | 'debtType' | 'debtValue'> {}
+		Pick<RequestOtherFields, 'isDeleted' | 'search' | 'debtType' | 'debtValue' | 'ids'> {}
 
 export declare interface SupplierFindOneRequest extends Pick<SupplierOptional, 'id'> {
 	deedStartDate?: Date

@@ -17,16 +17,16 @@ const PRODUCT_MV_SELECT = {
 	id: true,
 	count: true,
 	createdAt: true,
-	prices: { select: PRODUCT_MV_PRICE_SELECT },
+	prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRODUCT_MV_PRICE_SELECT },
 	product: { select: { id: true, name: true, createdAt: true } },
 }
-const SELLING_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { symbol: true } } }
+const SELLING_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { id: true, name: true, symbol: true } } }
 const SELLING_PAYMENT_SELECT = {
 	id: true,
 	description: true,
 	createdAt: true,
-	paymentMethods: { select: SELLING_PAYMENT_LINE_SELECT },
-	changeMethods: { select: SELLING_PAYMENT_LINE_SELECT },
+	paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: SELLING_PAYMENT_LINE_SELECT },
+	changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: SELLING_PAYMENT_LINE_SELECT },
 }
 const SELLING_SELECT = {
 	id: true as const,
@@ -104,13 +104,17 @@ export class SellingRepository {
 						id: true,
 						count: true,
 						createdAt: true,
-						prices: { select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true, name: true, exchangeRate: true } } } },
+						prices: {
+							orderBy: [{ createdAt: 'desc' as const }],
+							select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true, name: true, exchangeRate: true } } },
+						},
 						product: {
 							select: {
 								id: true,
 								name: true,
 								createdAt: true,
 								prices: {
+									orderBy: [{ createdAt: 'desc' as const }],
 									select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } },
 								},
 							},
@@ -146,6 +150,7 @@ export class SellingRepository {
 				staffId: true,
 				createdAt: true,
 				products: {
+					orderBy: [{ createdAt: 'desc' as const }],
 					select: {
 						id: true,
 						count: true,
@@ -155,8 +160,8 @@ export class SellingRepository {
 				payment: {
 					select: {
 						id: true,
-						paymentMethods: { select: { type: true, currencyId: true, amount: true } },
-						changeMethods: { select: { type: true, currencyId: true, amount: true } },
+						paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: { type: true, currencyId: true, amount: true } },
+						changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: { type: true, currencyId: true, amount: true } },
 					},
 				},
 			},
@@ -234,7 +239,7 @@ export class SellingRepository {
 					})),
 				},
 			},
-			select: { id: true, status: true, products: { select: { count: true, product: { select: { id: true, count: true } } } } },
+			select: { id: true, status: true, products: { orderBy: [{ createdAt: 'desc' as const }], select: { count: true, product: { select: { id: true, count: true } } } } },
 		})
 
 		if (selling.status === SellingStatusEnum.accepted) {

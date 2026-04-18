@@ -36,12 +36,14 @@ type ChangeMethodEntry = { type: string; currencyId: string; amount: Decimal; cu
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { CurrencyRepository } from '../currency'
+import { SupplierService } from '../supplier'
 
 @Injectable()
 export class ArrivalService {
 	constructor(
 		private readonly arrivalRepository: ArrivalRepository,
 		private readonly excelService: ExcelService,
+		private readonly supplierService: SupplierService,
 		private readonly currencyRepository: CurrencyRepository,
 	) {}
 
@@ -116,6 +118,13 @@ export class ArrivalService {
 		const arrivalsCount = await this.arrivalRepository.countFindMany(query)
 		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
 
+		const suppliersWithDebt = await this.supplierService.findMany({ ids: arrivals.map((r) => r.supplier.id) })
+
+		const suppliersWithDebtObject: Record<string, any> = {}
+		for (const c of suppliersWithDebt.data.data) {
+			suppliersWithDebtObject[c.id] = c.debtByCurrency
+		}
+
 		const calcMap = new Map<string, Decimal>()
 		const mappedArrivals = arrivals.map((arrival) => {
 			for (const method of arrival.payment?.paymentMethods ?? []) {
@@ -141,7 +150,16 @@ export class ArrivalService {
 			const products = this.mapArrivalProductsPrices(arrival.products as { prices: ArrivalMvPriceRow[] }[])
 			const totalPayments = aggregateAmountsByCurrencyId(sap?.paymentMethods as { currencyId: string; amount: Decimal }[] | undefined)
 			const totalChanges = aggregateAmountsByCurrencyId(sap?.changeMethods as { currencyId: string; amount: Decimal }[] | undefined)
-			return { ...arrival, products, payment, totalPrices, totalPayments, totalChanges, debtByCurrency }
+			return {
+				...arrival,
+				products,
+				payment,
+				totalPrices,
+				totalPayments,
+				totalChanges,
+				debtByCurrency,
+				supplier: { ...arrival.supplier, debtByCurrency: suppliersWithDebtObject[arrival.supplier.id] || [] },
+			}
 		})
 
 		const calc = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
@@ -204,6 +222,14 @@ export class ArrivalService {
 		for (const t of totalChanges) currencyIdsForBrief.add(t.currencyId)
 		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
 		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, currencyBriefMap)
+
+		const suppliersWithDebt = await this.supplierService.findMany({ ids: [arrival.supplier.id] })
+
+		const suppliersWithDebtObject: Record<string, any> = {}
+		for (const c of suppliersWithDebt.data.data) {
+			suppliersWithDebtObject[c.id] = c.debtByCurrency
+		}
+
 		return createResponse({
 			data: {
 				...arrival,
@@ -213,6 +239,7 @@ export class ArrivalService {
 				totalPayments: withCurrencyBriefTotalMany(totalPayments, currencyBriefMap),
 				totalChanges: withCurrencyBriefTotalMany(totalChanges, currencyBriefMap),
 				debtByCurrency,
+				supplier: { ...arrival.supplier, debtByCurrency: suppliersWithDebtObject[arrival.supplier.id] || [] },
 			},
 			success: { messages: ['find one success'] },
 		})

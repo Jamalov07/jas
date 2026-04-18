@@ -124,6 +124,13 @@ export class ReturningService {
 		const returningsCount = await this.returningRepository.countFindMany(query)
 		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
 
+		const clientsWithDebt = await this.clientService.findMany({ ids: returnings.map((r) => r.client.id) })
+
+		const clientsWithDebtObject: Record<string, any> = {}
+		for (const c of clientsWithDebt.data.data) {
+			clientsWithDebtObject[c.id] = c.debtByCurrency
+		}
+
 		const calcMap = new Map<string, Decimal>()
 		const mappedReturnings = returnings.map((returning) => {
 			for (const method of returning.payment?.paymentMethods ?? []) {
@@ -142,7 +149,16 @@ export class ReturningService {
 			const totalPayments = aggregateAmountsByCurrencyId(returning.payment?.paymentMethods)
 			const totalChanges = aggregateAmountsByCurrencyId(returning.payment?.changeMethods)
 
-			return { ...returning, products, payment, totalPrices, totalPayments, totalChanges, debtByCurrency }
+			return {
+				...returning,
+				products,
+				payment,
+				totalPrices,
+				totalPayments,
+				totalChanges,
+				debtByCurrency,
+				client: { ...returning.client, debtByCurrency: clientsWithDebtObject[returning.client.id] || [] },
+			}
 		})
 
 		const calc: ReturningCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)

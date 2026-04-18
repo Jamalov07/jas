@@ -16,7 +16,7 @@ const ARRIVAL_MV_SELECT = {
 	id: true,
 	count: true,
 	createdAt: true,
-	prices: { select: PRICES_SELECT },
+	prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRICES_SELECT },
 	product: { select: { id: true, name: true, createdAt: true } },
 	staff: { select: { id: true, fullname: true } },
 	arrival: { select: { id: true, date: true, supplier: { select: { id: true, fullname: true, phone: true } } } },

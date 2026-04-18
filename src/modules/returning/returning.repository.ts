@@ -23,7 +23,7 @@ const RETURNING_PRODUCT_MV_SELECT = {
 	id: true,
 	count: true,
 	createdAt: true,
-	prices: { select: RETURNING_PRODUCT_MV_PRICE_SELECT },
+	prices: { orderBy: [{ createdAt: 'desc' as const }], select: RETURNING_PRODUCT_MV_PRICE_SELECT },
 	product: { select: { id: true, name: true, count: true } },
 }
 const RETURNING_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } }
@@ -31,8 +31,8 @@ const RETURNING_PAYMENT_SELECT = {
 	id: true,
 	description: true,
 	createdAt: true,
-	paymentMethods: { select: RETURNING_PAYMENT_LINE_SELECT },
-	changeMethods: { select: RETURNING_PAYMENT_LINE_SELECT },
+	paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: RETURNING_PAYMENT_LINE_SELECT },
+	changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: RETURNING_PAYMENT_LINE_SELECT },
 }
 const RETURNING_SELECT = {
 	id: true as const,
@@ -182,7 +182,7 @@ export class ReturningRepository {
 			select: {
 				id: true,
 				status: true,
-				products: { select: { count: true, product: { select: { id: true, count: true } } } },
+				products: { orderBy: [{ createdAt: 'desc' as const }], select: { count: true, product: { select: { id: true, count: true } } } },
 			},
 		})
 

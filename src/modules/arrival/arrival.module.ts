@@ -4,9 +4,10 @@ import { ArrivalController } from './arrival.controller'
 import { ArrivalService } from './arrival.service'
 import { ArrivalRepository } from './arrival.repository'
 import { CurrencyModule } from '../currency'
+import { SupplierModule } from '../supplier'
 
 @Module({
-	imports: [PrismaModule, ExcelModule, CurrencyModule],
+	imports: [PrismaModule, ExcelModule, CurrencyModule, SupplierModule],
 	controllers: [ArrivalController],
 	providers: [ArrivalService, ArrivalRepository],
 	exports: [ArrivalService, ArrivalRepository],

@@ -23,7 +23,7 @@ const ARRIVAL_PRODUCT_MV_SELECT = {
 	id: true,
 	count: true,
 	createdAt: true,
-	prices: { select: ARRIVAL_PRODUCT_MV_PRICE_SELECT },
+	prices: { orderBy: [{ createdAt: 'desc' as const }], select: ARRIVAL_PRODUCT_MV_PRICE_SELECT },
 	product: { select: { id: true, name: true } },
 }
 const ARRIVAL_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { symbol: true } } }
@@ -31,8 +31,8 @@ const ARRIVAL_PAYMENT_SELECT = {
 	id: true,
 	description: true,
 	createdAt: true,
-	paymentMethods: { select: ARRIVAL_PAYMENT_LINE_SELECT },
-	changeMethods: { select: ARRIVAL_PAYMENT_LINE_SELECT },
+	paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: ARRIVAL_PAYMENT_LINE_SELECT },
+	changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: ARRIVAL_PAYMENT_LINE_SELECT },
 }
 const ARRIVAL_SELECT = {
 	id: true as const,

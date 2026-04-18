@@ -55,8 +55,14 @@ export class SupplierRepository {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
+		let whereOptionsPart = {}
+		if (query.ids && query.ids.length) {
+			whereOptionsPart = { id: { in: query.ids } }
+		}
+
 		const suppliers = await this.prisma.supplierModel.findMany({
 			where: {
+				...whereOptionsPart,
 				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
 			},
 			select: {
@@ -99,39 +105,30 @@ export class SupplierRepository {
 					select: {
 						date: true,
 						products: {
+							orderBy: [{ createdAt: 'desc' }],
 							select: {
-								prices: {
-									where: { type: 'cost' },
-									select: { totalPrice: true, currencyId: true },
-								},
+								prices: { orderBy: [{ createdAt: 'desc' }], where: { type: 'cost' }, select: { totalPrice: true, currencyId: true, currency: true } },
 							},
 						},
 						payment: {
 							select: {
 								createdAt: true,
 								description: true,
-								paymentMethods: {
-									select: { amount: true, currencyId: true, type: true },
-								},
-								changeMethods: {
-									select: { amount: true, currencyId: true, type: true },
-								},
+								paymentMethods: { orderBy: [{ createdAt: 'desc' }], select: { amount: true, currencyId: true, type: true, currency: true } },
+								changeMethods: { orderBy: [{ createdAt: 'desc' }], select: { amount: true, currencyId: true, type: true, currency: true } },
 							},
 						},
 					},
 					orderBy: { date: 'desc' },
 				},
 				payments: {
+					orderBy: [{ createdAt: 'desc' }],
 					where: { deletedAt: null },
 					select: {
 						createdAt: true,
 						description: true,
-						paymentMethods: {
-							select: { amount: true, currencyId: true, type: true },
-						},
-						changeMethods: {
-							select: { amount: true, currencyId: true, type: true },
-						},
+						paymentMethods: { orderBy: [{ createdAt: 'desc' }], select: { amount: true, currencyId: true, type: true, currency: true } },
+						changeMethods: { orderBy: [{ createdAt: 'desc' }], select: { amount: true, currencyId: true, type: true, currency: true } },
 					},
 				},
 			},

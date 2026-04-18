@@ -92,8 +92,14 @@ export class ClientRepository {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
+		let whereOptionsPart = {}
+		if (query.ids && query.ids.length) {
+			whereOptionsPart = { id: { in: query.ids } }
+		}
+
 		const clients = await this.prisma.clientModel.findMany({
 			where: {
+				...whereOptionsPart,
 				fullname: query.fullname,
 				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
 			},
@@ -130,7 +136,7 @@ export class ClientRepository {
 							select: {
 								prices: {
 									where: { type: 'selling' },
-									select: { totalPrice: true, currencyId: true },
+									select: { totalPrice: true, currencyId: true, currency: true },
 								},
 							},
 						},
@@ -139,10 +145,10 @@ export class ClientRepository {
 								createdAt: true,
 								description: true,
 								paymentMethods: {
-									select: { amount: true, currencyId: true, type: true },
+									select: { amount: true, currencyId: true, type: true, currency: true },
 								},
 								changeMethods: {
-									select: { amount: true, currencyId: true, type: true },
+									select: { amount: true, currencyId: true, type: true, currency: true },
 								},
 							},
 						},
@@ -157,7 +163,7 @@ export class ClientRepository {
 							select: {
 								prices: {
 									where: { type: PriceTypeEnum.selling },
-									select: { totalPrice: true, currencyId: true },
+									select: { totalPrice: true, currencyId: true, currency: true },
 								},
 							},
 						},
@@ -166,10 +172,10 @@ export class ClientRepository {
 								createdAt: true,
 								description: true,
 								paymentMethods: {
-									select: { amount: true, currencyId: true, type: true },
+									select: { amount: true, currencyId: true, type: true, currency: true },
 								},
 								changeMethods: {
-									select: { amount: true, currencyId: true, type: true },
+									select: { amount: true, currencyId: true, type: true, currency: true },
 								},
 							},
 						},
@@ -181,10 +187,10 @@ export class ClientRepository {
 						createdAt: true,
 						description: true,
 						paymentMethods: {
-							select: { amount: true, currencyId: true, type: true },
+							select: { amount: true, currencyId: true, type: true, currency: true },
 						},
 						changeMethods: {
-							select: { amount: true, currencyId: true, type: true },
+							select: { amount: true, currencyId: true, type: true, currency: true },
 						},
 					},
 				},
