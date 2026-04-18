@@ -144,12 +144,14 @@ export class BotService {
 	}
 
 	private buildSellingCaption(selling: BotSellingData): string {
+		console.log(selling)
+		console.log(selling.debtByCurrency)
 		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId ?? selling.id}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n`
 
 		const clientInfo =
 			`👤 Клиент: ${selling.client?.fullname ?? ''}\n` +
 			`📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}\n` +
-			`💸 Долг: ${selling.debtByCurrency.map((debt) => `${debt.total.toNumber()} ${debt.currency.symbol}`).join(' + ')}`
+			`💸 Долг: ${(selling.debtByCurrency ?? []).map((debt) => `${debt.total.toNumber()} ${debt.currency.symbol}`).join(' + ') || 0}`
 
 		const findProductByStatus = (status: BotSellingProductTitleEnum) => selling.products?.find((p) => p.status === status)
 
