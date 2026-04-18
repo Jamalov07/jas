@@ -9,18 +9,18 @@ import { PdfModule, PrismaModule } from '../shared'
 @Module({
 	imports: [
 		ConfigModule.forRoot({ isGlobal: true }),
-		// TelegrafModule.forRootAsync({
-		// 	botName: MyBotName,
-		// 	inject: [ConfigService],
-		// 	useFactory: (configService: ConfigService) => {
-		// 		const token = configService.get<string>('bot.token')
-		// 		return {
-		// 			token,
-		// 			middlewares: [],
-		// 			include: [],
-		// 		}
-		// 	},
-		// }),
+		TelegrafModule.forRootAsync({
+			botName: MyBotName,
+			inject: [ConfigService],
+			useFactory: (configService: ConfigService) => {
+				const token = configService.get<string>('bot.token')
+				return {
+					token,
+					middlewares: [],
+					include: [],
+				}
+			},
+		}),
 		PrismaModule,
 		PdfModule,
 	],
