@@ -239,7 +239,14 @@ export class SellingRepository {
 					})),
 				},
 			},
-			select: { id: true, status: true, products: { orderBy: [{ createdAt: 'desc' as const }], select: { count: true, product: { select: { id: true, count: true } } } } },
+			select: {
+				id: true,
+				status: true,
+				products: {
+					orderBy: [{ createdAt: 'desc' as const }],
+					select: { count: true, product: { select: { id: true, count: true } } },
+				},
+			},
 		})
 
 		if (selling.status === SellingStatusEnum.accepted) {

@@ -10,14 +10,16 @@ import { SellingFindOneData, SellingPaymentData, SellingProductData } from '../s
 import { ClientFindOneData } from '../client'
 import { BotSellingProductTitleEnum, BotSellingTitleEnum } from '../selling/enums'
 import { Decimal } from '@prisma/client/runtime/library'
+import { CurrencyBrief } from '../../common'
 
 type BotSellingData = Omit<SellingFindOneData, 'products'> & {
 	title?: BotSellingTitleEnum
+	debtByCurrency?: { currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }[]
 	products?: Array<SellingProductData & { status?: BotSellingProductTitleEnum }>
 }
 
-type PaymentMethod = { type: string; amount: Decimal }
-type DebtEntry = { amount: Decimal }
+type PaymentMethod = { type: string; amount: Decimal; currency?: CurrencyBrief }
+type DebtEntry = { currencyId: string; amount: Decimal; currency: CurrencyBrief }
 
 @Injectable()
 export class BotService {
@@ -144,7 +146,10 @@ export class BotService {
 	private buildSellingCaption(selling: BotSellingData): string {
 		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId ?? selling.id}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n`
 
-		const clientInfo = `👤 Клиент: ${selling.client?.fullname ?? ''}\n` + `📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
+		const clientInfo =
+			`👤 Клиент: ${selling.client?.fullname ?? ''}\n` +
+			`📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}\n` +
+			`💸 Долг: ${selling.debtByCurrency.map((debt) => `${debt.total.toNumber()} ${debt.currency.symbol}`).join(' + ')}`
 
 		const findProductByStatus = (status: BotSellingProductTitleEnum) => selling.products?.find((p) => p.status === status)
 
@@ -191,7 +196,13 @@ export class BotService {
 		if (!chatInfo) return
 
 		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling as any)
-		await this.bot.telegram.sendDocument(channelId, { source: bufferPdf, filename: `${selling.client?.phone ?? 'chek'}.pdf` }, { caption: this.buildSellingCaption(selling) })
+		await this.bot.telegram.sendDocument(
+			channelId,
+			{ source: bufferPdf, filename: `${selling.client?.phone ?? 'chek'}.pdf` },
+			{
+				caption: this.buildSellingCaption(selling),
+			},
+		)
 	}
 
 	async sendDeletedSellingToChannel(selling: BotSellingData) {
@@ -210,7 +221,7 @@ export class BotService {
 
 	private formatDebt(debtByCurrency: DebtEntry[]): string {
 		if (!debtByCurrency.length) return '0'
-		return debtByCurrency.map((d) => d.amount.toNumber()).join(' + ')
+		return debtByCurrency.map((d) => `${d.amount.toNumber()} ${d.currency.symbol}`).join(' + ')
 	}
 
 	private buildPaymentMessage(params: {
@@ -224,19 +235,23 @@ export class BotService {
 	}): string {
 		const cm = params.changeMethods ?? []
 		const total = [...params.paymentMethods, ...cm].reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
+		const total2 = params.paymentMethods.map((payment) => `${payment.amount.toNumber()} ${payment.currency.symbol}`).join(' + ')
 		const byType = (type: string) => params.paymentMethods.filter((m) => m.type === type).reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
 		const changeTotal = cm.reduce((acc, m) => acc.plus(m.amount), new Decimal(0))
+		const change2 = params.changeMethods.map((change) => `${change.amount.toNumber()} ${change.currency.symbol}`).join(' + ')
 
 		return (
 			`${params.prefix}` +
 			`👤 Клиент: ${params.person.fullname}\n` +
-			`📞 Телефон: ${params.person.phone}\n` +
-			`💰 Сумма: ${total.toNumber()}\n\n` +
-			`💵 Наличными: ${byType('cash').toNumber()}\n` +
-			`💳 Картой: ${byType('card').toNumber()}\n` +
-			`🏦 Переводом: ${byType('transfer').toNumber()}\n` +
-			`📦 Другое: ${byType('other').toNumber()}\n` +
-			`🔁 Кайтим: ${changeTotal.toNumber()}\n` +
+			`📞 Телефон: ${params.person.phone}\n\n` +
+			// `💰 Сумма: ${total.toNumber()}\n\n` +
+			`💰 Сумма: ${total2 || 0}\n` +
+			// `💵 Наличными: ${byType('cash').toNumber()}\n` +
+			// `💳 Картой: ${byType('card').toNumber()}\n` +
+			// `🏦 Переводом: ${byType('transfer').toNumber()}\n` +
+			// `📦 Другое: ${byType('other').toNumber()}\n` +
+			// `🔁 Сдачa: ${changeTotal.toNumber()}\n` +
+			`🔁 Сдачa: ${change2 || 0}\n` +
 			`📅 Дата: ${this.formatDate(params.date)}\n` +
 			`📝 Описание: ${params.description ?? '-'}\n` +
 			`📊 Общий долг: ${this.formatDebt(params.debtByCurrency)}`

@@ -7,6 +7,7 @@ export declare interface SellingPaymentMethodData {
 	type: PaymentMethodEnum
 	currencyId: string
 	amount: Decimal
+	currency: { id: string; name: string; symbol: string }
 }
 
 export declare interface SellingChangeMethodData {

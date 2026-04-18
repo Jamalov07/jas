@@ -124,6 +124,42 @@ export class SellingService {
 		return Array.from(debtMap.entries()).map(([currencyId, { amount }]) => ({ currencyId, amount }))
 	}
 
+	private calcDebtByCurrency2(totalPrices: { currencyId: string; total: Decimal; currency?: { symbol: string } }[], payment: SellingPaymentData | undefined) {
+		const debtMap = new Map<string, { amount: Decimal; currency?: { symbol?: string } }>()
+
+		for (const tp of totalPrices) {
+			debtMap.set(tp.currencyId, { amount: tp.total, currency: tp.currency })
+		}
+
+		for (const method of payment?.paymentMethods ?? []) {
+			const existing = debtMap.get(method.currencyId)
+
+			const currency = existing?.currency ?? (method as { currency?: { symbol?: string } }).currency
+
+			debtMap.set(method.currencyId, {
+				amount: (existing?.amount ?? new Decimal(0)).minus(method.amount),
+				currency,
+			})
+		}
+
+		for (const ch of payment?.changeMethods ?? []) {
+			const existing = debtMap.get(ch.currencyId)
+
+			const currency = existing?.currency ?? (ch as { currency?: { symbol?: string } }).currency
+
+			debtMap.set(ch.currencyId, {
+				amount: (existing?.amount ?? new Decimal(0)).plus(ch.amount),
+				currency,
+			})
+		}
+
+		return Array.from(debtMap.entries()).map(([currencyId, { amount, currency }]) => ({
+			currencyId,
+			amount,
+			currency,
+		}))
+	}
+
 	/** Joriy `findMany` sahifasidagi barcha sellinglar bo‘yicha yig‘indilar */
 	private buildFindManyCalcPage(
 		sellings: Awaited<ReturnType<SellingRepository['findMany']>>,
@@ -339,6 +375,7 @@ export class SellingService {
 					title: BotSellingTitleEnum.new,
 					totalPrices,
 					payment,
+					debtByCurrency: this.calcDebtByCurrency2(totalPrices, payment),
 					products: selling.products.map((p) => ({ ...p, status: BotSellingProductTitleEnum.new })),
 				} as any
 
