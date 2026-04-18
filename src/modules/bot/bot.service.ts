@@ -149,7 +149,7 @@ export class BotService {
 			`🧾 Продажа\n\n` +
 			`🆔 Заказ: ${selling.publicId ?? selling.id}\n` +
 			`💰 Сумма: ${this.formatTotalPrices(selling)}\n` +
-			`💸 Долг: ${(selling.debtByCurrency ?? []).map((debt) => `${debt.amount.toNumber()} ${debt.currency.symbol}`).join(' + ') || 0}`
+			`💸 Долг: ${(selling.debtByCurrency ?? []).map((debt) => `${debt.amount.toNumber()} ${debt.currency.symbol}`).join(' + ') || 0}\n`
 
 		const clientInfo = `👤 Клиент: ${selling.client?.fullname ?? ''}\n` + `📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}\n`
 
