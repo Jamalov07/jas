@@ -41,6 +41,7 @@ export class CurrencyRepository {
 				...nameFilter,
 				symbol: query.symbol,
 				isActive: query.isActive,
+				deletedAt: null,
 			},
 			select: {
 				id: true,
