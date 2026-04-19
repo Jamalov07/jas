@@ -22,6 +22,7 @@ import {
 	StatisticsModule,
 	SupplierModule,
 	SupplierPaymentModule,
+	UploadModule,
 } from '@module'
 import { appConfig, botConfig, databaseConfig, jwtConfig, oldServiceConfig } from '@config'
 import { AuthGuard, CheckPermissionGuard } from '@common'
@@ -67,6 +68,7 @@ import { SupplierPaymentController } from './modules/supplier-payment/supplier-p
 		StatisticsModule,
 		SupplierModule,
 		SupplierPaymentModule,
+		UploadModule,
 	],
 	controllers: [],
 	providers: [AuthGuard, CheckPermissionGuard],

@@ -193,7 +193,15 @@ export class SupplierService {
 			for (const product of arr.products) {
 				for (const price of product.prices) {
 					if ((!deedStartDate || arr.date >= deedStartDate) && (!deedEndDate || arr.date <= deedEndDate)) {
-						deeds.push({ type: 'debit', action: 'arrival', value: price.totalPrice, date: arr.date, description: '', currencyId: price.currencyId })
+						deeds.push({
+							type: 'debit',
+							action: 'arrival',
+							value: price.totalPrice,
+							date: arr.date,
+							description: '',
+							currencyId: price.currencyId,
+							currency: price.currency,
+						})
 						addToMap(totalDebitMap, price.currencyId, price.totalPrice)
 					}
 				}
@@ -210,6 +218,7 @@ export class SupplierService {
 							date: payDate,
 							description: arr.payment.description ?? '',
 							currencyId: method.currencyId,
+							currency: method.currency,
 						})
 						addToMap(totalCreditMap, method.currencyId, method.amount)
 					}
@@ -222,6 +231,7 @@ export class SupplierService {
 						date: payDate,
 						description: arr.payment.description ?? '',
 						currencyId: ch.currencyId,
+						currency: ch.currency,
 					})
 					addToMap(totalDebitMap, ch.currencyId, ch.amount)
 				}
@@ -238,6 +248,7 @@ export class SupplierService {
 						date: payment.createdAt,
 						description: payment.description ?? '',
 						currencyId: method.currencyId,
+						currency: method.currency,
 					})
 					addToMap(totalCreditMap, method.currencyId, method.amount)
 				}
@@ -250,6 +261,7 @@ export class SupplierService {
 						date: payment.createdAt,
 						description: payment.description ?? '',
 						currencyId: ch.currencyId,
+						currency: ch.currency,
 					})
 					addToMap(totalCreditMap, ch.currencyId, ch.amount)
 				}

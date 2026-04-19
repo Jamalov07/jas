@@ -9,12 +9,12 @@
     "target": "esnext",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./src",
+    "baseUrl": "./",
     "paths": {
-      "@common": ["./common"],
-      "@config": ["./configs"],
-      "@module": ["./modules"],
-      "@shared": ["./modules/shared"]
+      "@common": ["./src/common"],
+      "@config": ["./src/configs"],
+      "@module": ["./src/modules"],
+      "@shared": ["./src/modules/shared"]
     },
     "incremental": true,
     "skipLibCheck": true,

@@ -15,6 +15,7 @@ export declare interface ClientDeed {
 	value: Decimal
 	description: string
 	currencyId?: string
+	currency: CurrencyBrief
 }
 
 export declare interface ClientDeedInfo {

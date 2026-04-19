@@ -418,7 +418,15 @@ export class ClientService {
 			for (const product of sel.products) {
 				for (const price of product.prices) {
 					if ((!deedStartDate || sel.date >= deedStartDate) && (!deedEndDate || sel.date <= deedEndDate)) {
-						deeds.push({ type: 'debit', action: 'selling', value: price.totalPrice, date: sel.date, description: '', currencyId: price.currencyId })
+						deeds.push({
+							type: 'debit',
+							action: 'selling',
+							value: price.totalPrice,
+							date: sel.date,
+							description: '',
+							currencyId: price.currencyId,
+							currency: price.currency,
+						})
 						addToMap(totalDebitMap, price.currencyId, price.totalPrice)
 					}
 				}
@@ -435,6 +443,7 @@ export class ClientService {
 							date: payDate,
 							description: sel.payment.description ?? '',
 							currencyId: method.currencyId,
+							currency: method.currency,
 						})
 						addToMap(totalCreditMap, method.currencyId, method.amount)
 					}
@@ -447,6 +456,7 @@ export class ClientService {
 						date: payDate,
 						description: sel.payment.description ?? '',
 						currencyId: ch.currencyId,
+						currency: ch.currency,
 					})
 					addToMap(totalDebitMap, ch.currencyId, ch.amount)
 				}
@@ -465,6 +475,7 @@ export class ClientService {
 							date: returning.date,
 							description: '',
 							currencyId: price.currencyId,
+							currency: price.currency,
 						})
 						addToMap(totalCreditMap, price.currencyId, price.totalPrice)
 					}
@@ -482,6 +493,7 @@ export class ClientService {
 							date: payDate,
 							description: returning.payment.description ?? '',
 							currencyId: method.currencyId,
+							currency: method.currency,
 						})
 						addToMap(totalDebitMap, method.currencyId, method.amount)
 					}
@@ -495,6 +507,7 @@ export class ClientService {
 							date: payDate,
 							description: returning.payment.description ?? '',
 							currencyId: ch.currencyId,
+							currency: ch.currency,
 						})
 						addToMap(totalDebitMap, ch.currencyId, ch.amount)
 					}
@@ -512,6 +525,7 @@ export class ClientService {
 						date: payment.createdAt,
 						description: payment.description ?? '',
 						currencyId: method.currencyId,
+						currency: method.currency,
 					})
 					addToMap(totalCreditMap, method.currencyId, method.amount)
 				}
@@ -524,6 +538,7 @@ export class ClientService {
 						date: payment.createdAt,
 						description: payment.description ?? '',
 						currencyId: ch.currencyId,
+						currency: ch.currency,
 					})
 					addToMap(totalCreditMap, ch.currencyId, ch.amount)
 				}
