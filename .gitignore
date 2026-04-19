@@ -13,6 +13,7 @@ yarn-error.log*
 lerna-debug.log*
 
 uploads/*
+!uploads/index.md
 ok.json
 
 # OS

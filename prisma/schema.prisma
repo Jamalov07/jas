@@ -287,6 +287,8 @@ model ProductModel {
   count       Int     @map("count")       @db.Integer   @default(0)
   minAmount   Int     @map("min_amount")  @db.Integer   @default(0)
 
+  image       String? @map("image")       @db.VarChar() @default("")
+
   prices       ProductPriceModel[]
   sellingMVs   SellingProductMVModel[]
   arrivalMVs   ArrivalProductMVModel[]

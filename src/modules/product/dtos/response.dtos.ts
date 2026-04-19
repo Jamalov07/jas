@@ -34,7 +34,7 @@ export class ProductPriceDataDto implements ProductPriceData {
 	exchangeRate: Decimal
 }
 
-export class ProductFindOneDataDto extends PickType(ProductRequiredDto, ['id', 'name', 'createdAt', 'description', 'count', 'minAmount']) implements ProductFindOneData {
+export class ProductFindOneDataDto extends PickType(ProductRequiredDto, ['id', 'name', 'createdAt', 'description', 'count', 'minAmount', 'image']) implements ProductFindOneData {
 	@ApiProperty({})
 	prices: Record<PriceTypeEnum, ProductPriceData>
 

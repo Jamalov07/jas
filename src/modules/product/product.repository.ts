@@ -54,6 +54,7 @@ export class ProductRepository {
 				description: true,
 				name: true,
 				minAmount: true,
+				image: true,
 				prices: {
 					select: { id: true, type: true, price: true, totalPrice: true, currencyId: true, currency: true, exchangeRate: true },
 				},
@@ -83,6 +84,7 @@ export class ProductRepository {
 				description: true,
 				name: true,
 				minAmount: true,
+				image: true,
 				prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRICE_SELECT },
 				sellingMVs: {
 					orderBy: { selling: { date: 'desc' } },
@@ -174,6 +176,7 @@ export class ProductRepository {
 				count: body.count,
 				minAmount: body.minAmount,
 				description: body.description,
+				image: body.image,
 				prices: {
 					create: [
 						{
@@ -213,6 +216,7 @@ export class ProductRepository {
 				count: body.count,
 				minAmount: body.minAmount,
 				description: body.description,
+				image: body.image,
 			},
 		})
 

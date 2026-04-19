@@ -40,6 +40,8 @@ import { StaffController } from './modules/staff/staff.controller'
 import { StaffPaymentController } from './modules/staff-payment/staff-payment.controller'
 import { SupplierController } from './modules/supplier/supplier.controller'
 import { SupplierPaymentController } from './modules/supplier-payment/supplier-payment.controller'
+import { ServeStaticModule } from '@nestjs/serve-static'
+import { join } from 'path'
 
 @Module({
 	imports: [
@@ -47,6 +49,7 @@ import { SupplierPaymentController } from './modules/supplier-payment/supplier-p
 			isGlobal: true,
 			load: [appConfig, databaseConfig, jwtConfig, botConfig, oldServiceConfig],
 		}),
+		ServeStaticModule.forRoot({ rootPath: join(process.cwd(), 'uploads'), serveRoot: '/uploads' }),
 		PrismaModule,
 		ActionModule,
 		ArrivalModule,

@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Patch, Post, Query, Res, UseGuards } from '@nestjs/common'
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Delete, Get, Patch, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { ApiConsumes, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { ProductService } from './product.service'
 import { AuthOptions, CheckPermissionGuard } from '@common'
-import { Response } from 'express'
+import { Response, Express } from 'express'
 import {
 	ProductFindManyRequestDto,
 	ProductCreateOneRequestDto,
@@ -11,7 +11,11 @@ import {
 	ProductFindManyResponseDto,
 	ProductFindOneResponseDto,
 	ProductModifyResponseDto,
+	ProductCreateOne2RequestDto,
+	ProductUpdateOne2RequestDto,
 } from './dtos'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { Decimal } from '@prisma/client/runtime/library'
 
 @ApiTags('Product')
 @UseGuards(CheckPermissionGuard)
@@ -35,17 +39,57 @@ export class ProductController {
 	}
 
 	@Post('one')
+	@ApiConsumes('multipart/form-data')
+	@UseInterceptors(FileInterceptor('image'))
 	@ApiOperation({ summary: 'add one product' })
 	@ApiOkResponse({ type: ProductModifyResponseDto })
-	async createOne(@Body() body: ProductCreateOneRequestDto): Promise<ProductModifyResponseDto> {
-		return this.productService.createOne(body)
+	async createOne(@Body() body: ProductCreateOne2RequestDto, @UploadedFile() image?: Express.Multer.File): Promise<ProductModifyResponseDto> {
+		console.log(body)
+
+		const prices = {
+			cost: {
+				price: new Decimal(Number(body.prices_cost_price)),
+				currencyId: body.prices_cost_currencyId,
+			},
+			selling: {
+				price: new Decimal(Number(body.prices_selling_price)),
+				currencyId: body.prices_selling_currencyId,
+			},
+			wholesale: body.prices_wholesale_price
+				? {
+						price: new Decimal(Number(body.prices_wholesale_price)),
+						currencyId: body.prices_wholesale_currencyId,
+					}
+				: undefined,
+		}
+		return this.productService.createOne({ ...body, prices, image: image?.filename })
 	}
 
 	@Patch('one')
+	@ApiConsumes('multipart/form-data')
+	@UseInterceptors(FileInterceptor('image'))
 	@ApiOperation({ summary: 'update one product' })
 	@ApiOkResponse({ type: ProductModifyResponseDto })
-	async updateOne(@Query() query: ProductFindOneRequestDto, @Body() body: ProductUpdateOneRequestDto): Promise<ProductModifyResponseDto> {
-		return this.productService.updateOne(query, body)
+	async updateOne(
+		@Query() query: ProductFindOneRequestDto,
+		@Body() body: ProductUpdateOne2RequestDto,
+		@UploadedFile() image?: Express.Multer.File,
+	): Promise<ProductModifyResponseDto> {
+		const prices: Record<string, { price: Decimal; currencyId: string }> = {}
+
+		if (body.prices_cost_price && body.prices_cost_currencyId) {
+			prices.cost = { price: new Decimal(Number(body.prices_cost_price)), currencyId: body.prices_cost_currencyId }
+		}
+
+		if (body.prices_selling_currencyId && !body.prices_selling_price) {
+			prices.selling = { price: new Decimal(0), currencyId: body.prices_selling_currencyId }
+		}
+
+		if (!body.prices_wholesale_currencyId && body.prices_wholesale_price) {
+			prices.wholesale = { price: new Decimal(Number(body.prices_wholesale_price)), currencyId: body.prices_wholesale_currencyId }
+		}
+
+		return this.productService.updateOne(query, { ...body, prices: prices ?? undefined, image: image?.filename })
 	}
 
 	@Delete('one')

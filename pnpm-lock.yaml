@@ -26,6 +26,9 @@ importers:
       '@nestjs/schedule':
         specifier: ^5.0.1
         version: 5.0.1(@nestjs/common@11.0.20(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.0.20)
+      '@nestjs/serve-static':
+        specifier: ^5.0.5
+        version: 5.0.5(@fastify/static@8.2.0)(@nestjs/common@11.0.20(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.0.20)(express@5.1.0)
       '@nestjs/swagger':
         specifier: ^11.1.0
         version: 11.1.3(@fastify/static@8.2.0)(@nestjs/common@11.0.20(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.0.20)(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)
@@ -95,6 +98,9 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
+      serve-static:
+        specifier: ^2.2.1
+        version: 2.2.1
       telegraf:
         specifier: ^4.16.3
         version: 4.16.3
@@ -1065,6 +1071,22 @@ packages:
     resolution: {integrity: sha512-T50SCNyqCZ/fDssaOD7meBKLZ87ebRLaJqZTJPvJKjlib1VYhMOCwXYsr7bjMPmuPgiQHOwvppz77xN/m6GM7A==}
     peerDependencies:
       typescript: '>=4.8.2'
+
+  '@nestjs/serve-static@5.0.5':
+    resolution: {integrity: sha512-AhYx3N9aMwR2cb0w5Nlb5nHNYiAcF74ea/D/xna+PxlXwjmwGN/PpC/5fuMtOwmPBMgOTxNPOnB8C9LDZBSgyw==}
+    peerDependencies:
+      '@fastify/static': ^8.0.4 || ^9.0.0
+      '@nestjs/common': ^11.0.2
+      '@nestjs/core': ^11.0.2
+      express: ^5.0.1
+      fastify: ^5.2.1
+    peerDependenciesMeta:
+      '@fastify/static':
+        optional: true
+      express:
+        optional: true
+      fastify:
+        optional: true
 
   '@nestjs/swagger@11.1.3':
     resolution: {integrity: sha512-vhbW/Xu05Diti/EwYQp3Ea7Hj2M++wiakCcxqUUDA2n7NvCZC8LKsrcGynw6/x/lugdXyklYS+s2FhdAfeAikg==}
@@ -3639,6 +3661,9 @@ packages:
     resolution: {integrity: sha512-TdrF7fW9Rphjq4RjrW0Kp2AW0Ahwu9sRGTkS6bvDi0SCwZlEZYmcfDbEsTz8RVk0EHIS/Vd1bv3JhG+1xZuAyQ==}
     engines: {node: '>=16'}
 
+  path-to-regexp@8.4.2:
+    resolution: {integrity: sha512-qRcuIdP69NPm4qbACK+aDogI5CBDMi1jKe0ry5rSQJz8JVLsC7jV8XpiJjGRLLol3N+R5ihGYcrPLTno6pAdBA==}
+
   path-type@4.0.0:
     resolution: {integrity: sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw==}
     engines: {node: '>=8'}
@@ -3952,8 +3977,8 @@ packages:
   serialize-javascript@6.0.2:
     resolution: {integrity: sha512-Saa1xPByTTq2gdeFZYLLo+RFE35NHZkAbqZeWNd3BpzppeVisAqpDjcp8dyf6uIvEqJRd46jemmyA4iFIeVk8g==}
 
-  serve-static@2.2.0:
-    resolution: {integrity: sha512-61g9pCh0Vnh7IutZjtLGGpTA355+OPn2TyDv/6ivP2h/AdAVX9azsoxmg2/M6nZeQZNYBEwIcsne1mJd9oQItQ==}
+  serve-static@2.2.1:
+    resolution: {integrity: sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw==}
     engines: {node: '>= 18'}
 
   set-function-length@1.2.2:
@@ -5527,6 +5552,15 @@ snapshots:
       typescript: 5.8.3
     transitivePeerDependencies:
       - chokidar
+
+  '@nestjs/serve-static@5.0.5(@fastify/static@8.2.0)(@nestjs/common@11.0.20(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.0.20)(express@5.1.0)':
+    dependencies:
+      '@nestjs/common': 11.0.20(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core': 11.0.20(@nestjs/common@11.0.20(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.0.20)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      path-to-regexp: 8.4.2
+    optionalDependencies:
+      '@fastify/static': 8.2.0
+      express: 5.1.0
 
   '@nestjs/swagger@11.1.3(@fastify/static@8.2.0)(@nestjs/common@11.0.20(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.0.20)(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)':
     dependencies:
@@ -7104,7 +7138,7 @@ snapshots:
       range-parser: 1.2.1
       router: 2.2.0
       send: 1.2.0
-      serve-static: 2.2.0
+      serve-static: 2.2.1
       statuses: 2.0.1
       type-is: 2.0.1
       vary: 1.1.2
@@ -8423,6 +8457,8 @@ snapshots:
 
   path-to-regexp@8.2.0: {}
 
+  path-to-regexp@8.4.2: {}
+
   path-type@4.0.0: {}
 
   pdfkit@0.17.1:
@@ -8755,7 +8791,7 @@ snapshots:
     dependencies:
       randombytes: 2.1.0
 
-  serve-static@2.2.0:
+  serve-static@2.2.1:
     dependencies:
       encodeurl: 2.0.0
       escape-html: 1.0.3
