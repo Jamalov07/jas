@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: jas_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-jas_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-jas_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-jas_user} -d ${DB_NAME:-jas_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jas_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: jas_app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      HOST: ${HOST:-0.0.0.0}
+      DATABASE_URL: postgresql://${DB_USER:-jas_user}:${DB_PASSWORD}@db:5432/${DB_NAME:-jas_db}
+      ACCESS_TOKEN_KEY: ${ACCESS_TOKEN_KEY}
+      ACCESS_TOKEN_TIME: ${ACCESS_TOKEN_TIME}
+      REFRESH_TOKEN_KEY: ${REFRESH_TOKEN_KEY}
+      REFRESH_TOKEN_TIME: ${REFRESH_TOKEN_TIME}
+      BOT_TOKEN: ${BOT_TOKEN}
+      SELLING_CHANNEL_ID: ${SELLING_CHANNEL_ID}
+      PAYMENT_CHANNEL_ID: ${PAYMENT_CHANNEL_ID}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - jas_network
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  jas_network:
+    driver: bridge

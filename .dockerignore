@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.github
+.env
+.env.*
+!.env.example
+coverage
+test
+*.md
+*.log
+npm-debug.log*
+pnpm-debug.log*
+uploads
+.editorconfig
