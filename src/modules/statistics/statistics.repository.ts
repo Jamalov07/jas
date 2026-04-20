@@ -246,80 +246,148 @@ export class StatisticsRepository {
 	}
 
 	async findManyProductStats(query: StatisticsGetAllProductMVRequest) {
+		const dateFilter =
+			query.startDate && query.endDate
+				? {
+						createdAt: {
+							gte: query.startDate,
+							lte: query.endDate,
+						},
+					}
+				: {}
+
 		const [sellingMVs, arrivalMVs, returningMVs] = await Promise.all([
 			this.prisma.sellingProductMVModel.findMany({
 				where: {
 					productId: query.productId,
 					staffId: query.staffId,
 					selling: { status: SellingStatusEnum.accepted },
+					...dateFilter,
 				},
-				select: { productId: true, count: true, product: { select: { id: true, name: true, count: true } } },
+				select: {
+					productId: true,
+					count: true,
+					createdAt: true,
+					product: { select: { id: true, name: true, count: true } },
+				},
 			}),
 			this.prisma.arrivalProductMVModel.findMany({
-				where: { productId: query.productId, staffId: query.staffId },
-				select: { productId: true, count: true, product: { select: { id: true, name: true, count: true } } },
+				where: {
+					productId: query.productId,
+					staffId: query.staffId,
+					...dateFilter,
+				},
+				select: {
+					productId: true,
+					count: true,
+					createdAt: true,
+					product: { select: { id: true, name: true, count: true } },
+				},
 			}),
 			this.prisma.returningProductMVModel.findMany({
 				where: {
 					productId: query.productId,
 					staffId: query.staffId,
 					returning: { status: SellingStatusEnum.accepted },
+					...dateFilter,
 				},
-				select: { productId: true, count: true, product: { select: { id: true, name: true, count: true } } },
+				select: {
+					productId: true,
+					count: true,
+					createdAt: true,
+					product: { select: { id: true, name: true, count: true } },
+				},
 			}),
 		])
 
+		//  1. Activities yig‘ish
+		const activities = [
+			...arrivalMVs.map((mv) => ({
+				type: 'arrival' as const,
+				productId: mv.productId,
+				count: mv.count,
+				createdAt: mv.createdAt,
+			})),
+			...returningMVs.map((mv) => ({
+				type: 'returning' as const,
+				productId: mv.productId,
+				count: mv.count,
+				createdAt: mv.createdAt,
+			})),
+			...sellingMVs.map((mv) => ({
+				type: 'selling' as const,
+				productId: mv.productId,
+				count: mv.count,
+				createdAt: mv.createdAt,
+			})),
+		]
+
+		//  2. Sort (latest first)
+		activities.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+
+		//  3. Activities group qilish (O(n))
+		const activityMap = new Map<string, typeof activities>()
+
+		for (const activity of activities) {
+			const list = activityMap.get(activity.productId) ?? []
+			list.push(activity)
+			activityMap.set(activity.productId, list)
+		}
+
+		//  4. Product aggregation
 		const productMap = new Map<
 			string,
-			{ id: string; name: string; count: number; totalSellingCount: Decimal; totalArrivalCount: Decimal; totalReturningCount: Decimal; actualCount: Decimal }
+			{
+				id: string
+				name: string
+				count: number
+				totalSellingCount: Decimal
+				totalArrivalCount: Decimal
+				totalReturningCount: Decimal
+				actualCount: Decimal
+			}
 		>()
 
-		for (const mv of arrivalMVs) {
-			const entry = productMap.get(mv.productId) ?? {
-				id: mv.productId,
-				name: mv.product.name,
-				count: mv.product.count,
-				totalSellingCount: new Decimal(0),
-				totalArrivalCount: new Decimal(0),
-				totalReturningCount: new Decimal(0),
-				actualCount: new Decimal(0),
+		function applyMV(mvs: typeof arrivalMVs, type: 'arrival' | 'selling' | 'returning') {
+			for (const mv of mvs) {
+				const entry = productMap.get(mv.productId) ?? {
+					id: mv.productId,
+					name: mv.product.name,
+					count: mv.product.count,
+					totalSellingCount: new Decimal(0),
+					totalArrivalCount: new Decimal(0),
+					totalReturningCount: new Decimal(0),
+					actualCount: new Decimal(0),
+				}
+
+				if (type === 'arrival') {
+					entry.totalArrivalCount = entry.totalArrivalCount.plus(mv.count)
+					entry.actualCount = entry.actualCount.plus(mv.count)
+				}
+
+				if (type === 'returning') {
+					entry.totalReturningCount = entry.totalReturningCount.plus(mv.count)
+					entry.actualCount = entry.actualCount.plus(mv.count)
+				}
+
+				if (type === 'selling') {
+					entry.totalSellingCount = entry.totalSellingCount.plus(mv.count)
+					entry.actualCount = entry.actualCount.minus(mv.count)
+				}
+
+				productMap.set(mv.productId, entry)
 			}
-			entry.totalArrivalCount = entry.totalArrivalCount.plus(mv.count)
-			entry.actualCount = entry.actualCount.plus(mv.count)
-			productMap.set(mv.productId, entry)
 		}
 
-		for (const mv of returningMVs) {
-			const entry = productMap.get(mv.productId) ?? {
-				id: mv.productId,
-				name: mv.product.name,
-				count: mv.product.count,
-				totalSellingCount: new Decimal(0),
-				totalArrivalCount: new Decimal(0),
-				totalReturningCount: new Decimal(0),
-				actualCount: new Decimal(0),
-			}
-			entry.totalReturningCount = entry.totalReturningCount.plus(mv.count)
-			entry.actualCount = entry.actualCount.plus(mv.count)
-			productMap.set(mv.productId, entry)
-		}
+		applyMV(arrivalMVs, 'arrival')
+		applyMV(returningMVs, 'returning')
+		applyMV(sellingMVs, 'selling')
 
-		for (const mv of sellingMVs) {
-			const entry = productMap.get(mv.productId) ?? {
-				id: mv.productId,
-				name: mv.product.name,
-				count: mv.product.count,
-				totalSellingCount: new Decimal(0),
-				totalArrivalCount: new Decimal(0),
-				totalReturningCount: new Decimal(0),
-				actualCount: new Decimal(0),
-			}
-			entry.totalSellingCount = entry.totalSellingCount.plus(mv.count)
-			entry.actualCount = entry.actualCount.minus(mv.count)
-			productMap.set(mv.productId, entry)
-		}
-
-		return Array.from(productMap.values())
+		//  5. Final response
+		return Array.from(productMap.values()).map((product) => ({
+			...product,
+			activities: activityMap.get(product.id) ?? [],
+		}))
 	}
 
 	async countFindManyAllProductMV(query: StatisticsGetAllProductMVRequest) {

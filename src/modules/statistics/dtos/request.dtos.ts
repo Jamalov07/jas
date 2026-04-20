@@ -13,7 +13,7 @@ export class StatisticsGetSellingPeriodStatsRequestDto {
 
 export class StatisticsGetSellingTotalStatsRequestDto {}
 
-export class StatisticsGetAllProductMVRequestDto extends IntersectionType(PaginationRequestDto, RequestOtherFieldsDto) {
+export class StatisticsGetAllProductMVRequestDto extends IntersectionType(PaginationRequestDto, PickType(RequestOtherFieldsDto, ['startDate', 'endDate'])) {
 	@ApiPropertyOptional({ enum: ProductMVStatsTypeEnum })
 	@IsOptional()
 	@IsEnum(ProductMVStatsTypeEnum)
