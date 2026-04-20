@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-misused-promises */
 /**
  * Har bir asosiy jadval uchun kamida 10 ta namuna.
  * `pnpm prisma db seed --schema prisma/schema.prisma` (jas papkasida).

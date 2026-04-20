@@ -1,10 +1,16 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../shared/prisma'
-import { StatisticsGetAllProductMVRequest, StatisticsGetSellingPeriodStatsRequest, ProductMVStatsTypeEnum, StatisticsClientReportRequest } from './interfaces'
-import { ClientReportByCurrency, ClientReportCalc, ClientReportRow } from './interfaces/response.interfaces'
+import {
+	StatisticsGetAllProductMVRequest,
+	StatisticsGetSellingPeriodStatsRequest,
+	ProductMVStatsTypeEnum,
+	StatisticsClientReportRequest,
+	StatisticsDashboardSummaryRequest,
+} from './interfaces'
+import { ClientReportByCurrency, ClientReportCalc, ClientReportRow, StatisticsDashboardSummaryData } from './interfaces/response.interfaces'
 import { StatsTypeEnum } from '../selling/enums'
 
-import { SellingStatusEnum } from '@prisma/client'
+import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import { convertUTCtoLocal, currencyBriefMapFromRows, extractDateParts, withCurrencyBriefAmountMany } from '@common'
 import { Decimal } from '@prisma/client/runtime/library'
 import { CurrencyRepository } from '../currency'
@@ -595,5 +601,134 @@ export class StatisticsRepository {
 		}
 
 		return { data: enrichedRows }
+	}
+
+	// ─── Dashboard summary (selling / returning / client payments) ─────────────
+
+	async getDashboardSummary(query: StatisticsDashboardSummaryRequest): Promise<StatisticsDashboardSummaryData> {
+		const dateFilter = query.startDate || query.endDate ? { gte: query.startDate, lte: query.endDate } : undefined
+
+		const sellingWhere = {
+			status: SellingStatusEnum.accepted,
+			deletedAt: null,
+			...(dateFilter && { date: dateFilter }),
+		}
+
+		const returningWhere = {
+			status: SellingStatusEnum.accepted,
+			deletedAt: null,
+			...(dateFilter && { date: dateFilter }),
+		}
+
+		const clientPaymentWhere = {
+			deletedAt: null,
+			...(dateFilter && { createdAt: dateFilter }),
+		}
+
+		const [sellingCount, returningCount, clientPaymentCount, sellingCostAndSellingRows, sellingTotalGroupBy, returningTotalGroupBy, clientPaymentGroupBy] = await Promise.all([
+			this.prisma.sellingModel.count({ where: sellingWhere }),
+			this.prisma.returningModel.count({ where: returningWhere }),
+			this.prisma.clientPaymentModel.count({ where: clientPaymentWhere }),
+			this.prisma.sellingProductMVPriceModel.findMany({
+				where: {
+					type: { in: [PriceTypeEnum.cost, PriceTypeEnum.selling] },
+					productMV: { selling: sellingWhere },
+				},
+				select: { type: true, totalPrice: true, currencyId: true, productMVId: true },
+			}),
+			this.prisma.sellingProductMVPriceModel.groupBy({
+				by: ['currencyId'],
+				where: {
+					type: PriceTypeEnum.selling,
+					productMV: { selling: sellingWhere },
+				},
+				_sum: { totalPrice: true },
+			}),
+			this.prisma.returningProductMVPriceModel.groupBy({
+				by: ['currencyId'],
+				where: {
+					type: PriceTypeEnum.selling,
+					productMV: { returning: returningWhere },
+				},
+				_sum: { totalPrice: true },
+			}),
+			this.prisma.clientPaymentMethodModel.groupBy({
+				by: ['currencyId'],
+				where: { deletedAt: null, payment: clientPaymentWhere },
+				_sum: { amount: true },
+			}),
+		])
+
+		const mvProfit = new Map<string, { cost: Decimal; selling: Decimal; currencyId: string }>()
+		for (const row of sellingCostAndSellingRows) {
+			let agg = mvProfit.get(row.productMVId)
+			if (!agg) {
+				agg = { cost: new Decimal(0), selling: new Decimal(0), currencyId: row.currencyId }
+				mvProfit.set(row.productMVId, agg)
+			}
+			if (row.type === PriceTypeEnum.cost) {
+				agg.cost = agg.cost.plus(row.totalPrice)
+				agg.currencyId = row.currencyId
+			}
+			if (row.type === PriceTypeEnum.selling) {
+				agg.selling = agg.selling.plus(row.totalPrice)
+				agg.currencyId = row.currencyId
+			}
+		}
+
+		const profitByCurrency = new Map<string, Decimal>()
+		for (const agg of mvProfit.values()) {
+			const profit = agg.selling.minus(agg.cost)
+			const cid = agg.currencyId
+			profitByCurrency.set(cid, (profitByCurrency.get(cid) ?? new Decimal(0)).plus(profit))
+		}
+
+		const profitRows: ClientReportByCurrency[] = Array.from(profitByCurrency.entries()).map(([currencyId, amount]) => ({
+			currencyId,
+			amount,
+			currency: { id: currencyId, name: '', symbol: '' },
+		}))
+
+		const totalSalesRows: ClientReportByCurrency[] = sellingTotalGroupBy.map((r) => ({
+			currencyId: r.currencyId,
+			amount: new Decimal(r._sum.totalPrice ?? 0),
+			currency: { id: r.currencyId, name: '', symbol: '' },
+		}))
+
+		const returningRows: ClientReportByCurrency[] = returningTotalGroupBy.map((r) => ({
+			currencyId: r.currencyId,
+			amount: new Decimal(r._sum.totalPrice ?? 0),
+			currency: { id: r.currencyId, name: '', symbol: '' },
+		}))
+
+		const clientPaymentRows: ClientReportByCurrency[] = clientPaymentGroupBy.map((r) => ({
+			currencyId: r.currencyId,
+			amount: new Decimal(r._sum.amount ?? 0),
+			currency: { id: r.currencyId, name: '', symbol: '' },
+		}))
+
+		const currencyIdSet = new Set<string>()
+		for (const r of profitRows) currencyIdSet.add(r.currencyId)
+		for (const r of totalSalesRows) currencyIdSet.add(r.currencyId)
+		for (const r of returningRows) currencyIdSet.add(r.currencyId)
+		for (const r of clientPaymentRows) currencyIdSet.add(r.currencyId)
+
+		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdSet]))
+
+		return {
+			selling: {
+				profitByCurrency: withCurrencyBriefAmountMany(profitRows, currencyMap),
+				totalSalesByCurrency: withCurrencyBriefAmountMany(totalSalesRows, currencyMap),
+				count: sellingCount,
+			},
+			returning: {
+				totalsByCurrency: withCurrencyBriefAmountMany(returningRows, currencyMap),
+				count: returningCount,
+			},
+			clientPayment: {
+				totalsByCurrency: withCurrencyBriefAmountMany(clientPaymentRows, currencyMap),
+				count: clientPaymentCount,
+			},
+		}
 	}
 }

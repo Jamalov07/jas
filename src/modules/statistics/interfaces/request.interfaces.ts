@@ -23,3 +23,5 @@ export declare interface StatisticsGetAllProductMVRequest extends PaginationRequ
 }
 
 export declare interface StatisticsClientReportRequest extends PaginationRequest, Pick<RequestOtherFields, 'startDate' | 'endDate' | 'search'> {}
+
+export declare interface StatisticsDashboardSummaryRequest extends Pick<RequestOtherFields, 'startDate' | 'endDate'> {}

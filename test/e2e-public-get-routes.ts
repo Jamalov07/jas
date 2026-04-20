@@ -25,6 +25,7 @@ export const E2E_PUBLIC_GET_JSON_ROUTES: { path: string; query?: Record<string, 
 	{ path: '/statistics/product-mv', query: LIST_QUERY },
 	{ path: '/statistics/many-product-stats', query: LIST_QUERY },
 	{ path: '/statistics/client-report', query: LIST_QUERY },
+	{ path: '/statistics/dashboard-summary', query: LIST_QUERY },
 	{ path: '/common/day-close', query: {} },
 ]
 

@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { StatisticsRepository } from './statistics.repository'
 import { createResponse } from '@common'
-import { StatisticsGetAllProductMVRequest, StatisticsGetSellingPeriodStatsRequest, StatisticsGetSellingTotalStatsRequest, StatisticsClientReportRequest } from './interfaces'
+import {
+	StatisticsGetAllProductMVRequest,
+	StatisticsGetSellingPeriodStatsRequest,
+	StatisticsGetSellingTotalStatsRequest,
+	StatisticsClientReportRequest,
+	StatisticsDashboardSummaryRequest,
+} from './interfaces'
 
 @Injectable()
 export class StatisticsService {
@@ -34,5 +40,10 @@ export class StatisticsService {
 	async findManyClientReport(query: StatisticsClientReportRequest) {
 		const result = await this.statisticsRepository.findManyClientReport(query)
 		return createResponse({ data: result, success: { messages: ['find many client report success'] } })
+	}
+
+	async getDashboardSummary(query: StatisticsDashboardSummaryRequest) {
+		const data = await this.statisticsRepository.getDashboardSummary(query)
+		return createResponse({ data, success: { messages: ['get dashboard summary success'] } })
 	}
 }

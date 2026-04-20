@@ -8,6 +8,8 @@ import {
 	StatisticsGetSellingTotalStatsResponseDto,
 	StatisticsGetAllProductMVResponseDto,
 	StatisticsClientReportRequestDto,
+	StatisticsDashboardSummaryRequestDto,
+	StatisticsDashboardSummaryResponseDto,
 } from './dtos'
 import { StatisticsService } from './statistics.service'
 import { AuthOptions, CheckPermissionGuard } from '../../common'
@@ -55,5 +57,13 @@ export class StatisticsController {
 	@AuthOptions(false, false)
 	async findManyClientReport(@Query() query: StatisticsClientReportRequestDto): Promise<any> {
 		return this.statisticsService.findManyClientReport(query)
+	}
+
+	@Get('dashboard-summary')
+	@ApiOkResponse({ type: StatisticsDashboardSummaryResponseDto })
+	@ApiOperation({ summary: 'Umumiy dashboard: sotuv (foyda, summa, son), mijozdan qaytarish, kirim to‘lovlar — startDate/endDate' })
+	@AuthOptions(false, false)
+	async getDashboardSummary(@Query() query: StatisticsDashboardSummaryRequestDto): Promise<StatisticsDashboardSummaryResponseDto> {
+		return this.statisticsService.getDashboardSummary(query)
 	}
 }

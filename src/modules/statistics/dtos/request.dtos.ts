@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator'
 import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { IntersectionType, PickType } from '@nestjs/swagger'
-import { ProductMVStatsTypeEnum, StatisticsClientReportRequest } from '../interfaces'
+import { ProductMVStatsTypeEnum, StatisticsClientReportRequest, StatisticsDashboardSummaryRequest } from '../interfaces'
 import { StatsTypeEnum } from '../../selling/enums'
 
 export class StatisticsGetSellingPeriodStatsRequestDto {
@@ -48,3 +48,5 @@ export class StatisticsGetAllProductMVRequestDto extends IntersectionType(Pagina
 export class StatisticsClientReportRequestDto
 	extends IntersectionType(PaginationRequestDto, PickType(RequestOtherFieldsDto, ['startDate', 'endDate', 'search']))
 	implements StatisticsClientReportRequest {}
+
+export class StatisticsDashboardSummaryRequestDto extends PickType(RequestOtherFieldsDto, ['startDate', 'endDate']) implements StatisticsDashboardSummaryRequest {}

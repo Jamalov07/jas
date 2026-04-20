@@ -65,3 +65,22 @@ export declare interface ClientReportRow {
 export declare interface StatisticsClientReportResponse extends GlobalResponse {
 	data: PaginationResponse<ClientReportRow> | { data: ClientReportRow[] }
 }
+
+export declare interface DashboardSummaryBlock<T = ClientReportByCurrency[]> {
+	totalsByCurrency: T
+	count: number
+}
+
+export declare interface StatisticsDashboardSummaryData {
+	selling: {
+		profitByCurrency: ClientReportByCurrency[]
+		totalSalesByCurrency: ClientReportByCurrency[]
+		count: number
+	}
+	returning: DashboardSummaryBlock
+	clientPayment: DashboardSummaryBlock
+}
+
+export declare interface StatisticsDashboardSummaryResponse extends GlobalResponse {
+	data: StatisticsDashboardSummaryData
+}
