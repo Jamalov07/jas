@@ -44,4 +44,4 @@ RUN mkdir -p uploads
 EXPOSE 3000
 
 # prisma migrate deploy — runs migration at startup (needs DATABASE_URL from env)
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "npx prisma db push && node dist/main"]
