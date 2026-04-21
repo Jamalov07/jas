@@ -402,7 +402,7 @@ export class UploadService {
 					createdCount++
 				}
 			},
-			{ timeout: 30000 },
+			{ timeout: 60000 },
 		) // Katta fayllar uchun timeoutni oshirdik
 
 		return {
