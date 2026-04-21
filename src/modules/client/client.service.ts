@@ -1,6 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { ClientRepository } from './client.repository'
-import { createResponse, currencyBriefMapFromRows, CurrencyBrief, DebtTypeEnum, DeleteMethodEnum, ERROR_MSG, withCurrencyBrief, withCurrencyBriefAmountMany } from '@common'
+import {
+	createResponse,
+	currencyBriefMapFromRows,
+	CurrencyBrief,
+	DebtTypeEnum,
+	DeleteMethodEnum,
+	ERROR_MSG,
+	netDebtCrossCurrencyRows,
+	withCurrencyBrief,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import {
 	ClientGetOneRequest,
 	ClientCreateOneRequest,
@@ -126,6 +136,10 @@ export class ClientService {
 				row.id,
 				Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
 			)
+		}
+		const { rates, symbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...allCurrencyIds])
+		for (const [id, arr] of rawByClient.entries()) {
+			rawByClient.set(id, netDebtCrossCurrencyRows(arr, rates, symbols))
 		}
 		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...allCurrencyIds]))
 		const out = new Map<string, ClientDebtByCurrency[]>()
@@ -329,14 +343,13 @@ export class ClientService {
 		const clients = await this.clientRepository.findMany({ ...query, pagination: false })
 
 		const currencyIdSet = new Set<string>()
-		const mappedClients = clients.map((c) => {
+		const mappedClientsPre = clients.map((c) => {
 			const debtMap = this.calcDebtByCurrency(c.sellings, c.payments, c.returnings)
 			for (const id of debtMap.keys()) currencyIdSet.add(id)
 			const debtByCurrency: Array<{ currencyId: string; amount: Decimal }> = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({
 				currencyId,
 				amount,
 			}))
-			const totalDebt = Array.from(debtMap.values()).reduce((a, b) => a.plus(b), new Decimal(0))
 
 			return {
 				id: c.id,
@@ -345,9 +358,20 @@ export class ClientService {
 				telegram: c.telegram,
 				createdAt: c.createdAt,
 				debtByCurrency,
-				_totalDebt: totalDebt,
 				lastSellingDate: c.sellings?.length ? c.sellings[0].date : null,
 			}
+		})
+
+		const debtOnlyIds = new Set<string>()
+		for (const m of mappedClientsPre) {
+			for (const d of m.debtByCurrency) debtOnlyIds.add(d.currencyId)
+		}
+		const { rates, symbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...debtOnlyIds])
+
+		const mappedClients = mappedClientsPre.map((m) => {
+			const debtByCurrency = netDebtCrossCurrencyRows(m.debtByCurrency, rates, symbols)
+			const totalDebt = debtByCurrency.reduce((a, b) => a.plus(b.amount), new Decimal(0))
+			return { ...m, debtByCurrency, _totalDebt: totalDebt }
 		})
 
 		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdSet]))
@@ -562,6 +586,10 @@ export class ClientService {
 
 		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...deedCurrencyIds]))
 
+		const fullDebtRaw = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+		const { rates: fullDebtRates, symbols: fullDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(fullDebtRaw.map((x) => x.currencyId))
+		const fullDebtNetted = netDebtCrossCurrencyRows(fullDebtRaw, fullDebtRates, fullDebtSymbols)
+
 		const totalCreditByCurrency: ClientDebtByCurrency[] = withCurrencyBriefAmountMany(
 			Array.from(totalCreditMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
 			currencyMap,
@@ -575,10 +603,7 @@ export class ClientService {
 			currencyMap,
 		)
 
-		const fullDebt: ClientDebtByCurrency[] = withCurrencyBriefAmountMany(
-			Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
-			currencyMap,
-		)
+		const fullDebt: ClientDebtByCurrency[] = withCurrencyBriefAmountMany(fullDebtNetted, currencyMap)
 
 		return createResponse({
 			data: {
@@ -678,10 +703,9 @@ export class ClientService {
 
 		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...allCurrencyIds]))
 
-		const mappedClients = clients.map((c) => {
+		const mappedClientsPre = clients.map((c) => {
 			const debtMap = this.calcDebtByCurrency(c.sellings, c.payments, c.returnings)
 			const debtByCurrency = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
-			const totalDebt = Array.from(debtMap.values()).reduce((a, b) => a.plus(b), new Decimal(0))
 			const report = this.buildClientReportSummary(c.sellings, c.returnings, c.payments, periodStart, periodEnd, currencyMap)
 
 			return {
@@ -691,10 +715,21 @@ export class ClientService {
 				telegram: c.telegram,
 				createdAt: c.createdAt,
 				debtByCurrency,
-				_totalDebt: totalDebt,
 				lastSellingDate: c.sellings?.length ? c.sellings[0].date : null,
 				report,
 			}
+		})
+
+		const reportDebtIds = new Set<string>()
+		for (const m of mappedClientsPre) {
+			for (const d of m.debtByCurrency) reportDebtIds.add(d.currencyId)
+		}
+		const { rates: reportRates, symbols: reportSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...reportDebtIds])
+
+		const mappedClients = mappedClientsPre.map((m) => {
+			const debtByCurrency = netDebtCrossCurrencyRows(m.debtByCurrency, reportRates, reportSymbols)
+			const totalDebt = debtByCurrency.reduce((a, b) => a.plus(b.amount), new Decimal(0))
+			return { ...m, debtByCurrency, _totalDebt: totalDebt }
 		})
 
 		const clientsWithDebtCurrency = mappedClients.map((row) => ({

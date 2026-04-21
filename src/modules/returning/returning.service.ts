@@ -9,6 +9,7 @@ import {
 	ERROR_MSG,
 	fillChangeMethodCurrencyTotalsByActiveIds,
 	fillPaymentMethodCurrencyTotalsByActiveIds,
+	netDebtCrossCurrencyRows,
 	withCurrencyBriefAmountMany,
 	withCurrencyBriefTotalMany,
 } from '@common'
@@ -131,6 +132,14 @@ export class ReturningService {
 			clientsWithDebtObject[c.id] = c.debtByCurrency
 		}
 
+		const returningDebtCurrIds = new Set<string>()
+		for (const returning of returnings) {
+			const tp = this.calcTotalPricesFromProducts(returning.products)
+			const pay = this.buildPaymentData(returning.payment)
+			for (const d of this.calcDebtByCurrency(tp, pay)) returningDebtCurrIds.add(d.currencyId)
+		}
+		const { rates: returningDebtRates, symbols: returningDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...returningDebtCurrIds])
+
 		const calcMap = new Map<string, Decimal>()
 		const mappedReturnings = returnings.map((returning) => {
 			for (const method of returning.payment?.paymentMethods ?? []) {
@@ -144,7 +153,7 @@ export class ReturningService {
 
 			const totalPrices = this.calcTotalPricesFromProducts(returning.products)
 			const payment = this.buildPaymentData(returning.payment)
-			const debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
+			const debtByCurrency = netDebtCrossCurrencyRows(this.calcDebtByCurrency(totalPrices, payment), returningDebtRates, returningDebtSymbols)
 			const products = this.mapReturningProductsPrices(returning.products)
 			const totalPayments = aggregateAmountsByCurrencyId(returning.payment?.paymentMethods)
 			const totalChanges = aggregateAmountsByCurrencyId(returning.payment?.changeMethods)
@@ -187,16 +196,37 @@ export class ReturningService {
 			},
 		}))
 
+		const briefAllIds = new Set<string>()
+		for (const r of dataWithClientDebt) {
+			for (const d of r.debtByCurrency) briefAllIds.add(d.currencyId)
+			for (const d of r.client.debtByCurrency) briefAllIds.add(d.currencyId)
+		}
+		const uniformBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...briefAllIds]))
+		const dataFinal = dataWithClientDebt.map((r) => ({
+			...r,
+			debtByCurrency: withCurrencyBriefAmountMany(
+				r.debtByCurrency.map((d) => ({ currencyId: d.currencyId, amount: d.amount })),
+				uniformBriefMap,
+			),
+			client: {
+				...r.client,
+				debtByCurrency: withCurrencyBriefAmountMany(
+					r.client.debtByCurrency.map((d) => ({ currencyId: d.currencyId, amount: d.amount })),
+					uniformBriefMap,
+				),
+			},
+		}))
+
 		const result = query.pagination
 			? {
 					totalCount: returningsCount,
 					pagesCount: Math.ceil(returningsCount / query.pageSize),
-					pageSize: dataWithClientDebt.length,
-					data: dataWithClientDebt,
+					pageSize: dataFinal.length,
+					data: dataFinal,
 					calc,
 					changeCalc,
 				}
-			: { data: dataWithClientDebt, calc, changeCalc }
+			: { data: dataFinal, calc, changeCalc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -210,20 +240,27 @@ export class ReturningService {
 
 		const totalPrices = this.calcTotalPricesFromProducts(returning.products)
 		const payment = this.buildPaymentData(returning.payment)
-		let debtByCurrency = this.calcDebtByCurrency(totalPrices, payment)
+		const debtRaw = this.calcDebtByCurrency(totalPrices, payment)
+		const { rates: oneReturningRates, symbols: oneReturningSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(debtRaw.map((d) => d.currencyId))
+		let debtByCurrency = netDebtCrossCurrencyRows(debtRaw, oneReturningRates, oneReturningSymbols)
 		const products = this.mapReturningProductsPrices(returning.products)
 		const totalPayments = aggregateAmountsByCurrencyId(returning.payment?.paymentMethods)
 		const totalChanges = aggregateAmountsByCurrencyId(returning.payment?.changeMethods)
+
+		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds([returning.client.id])
+		const clientDebt = clientDebtMap.get(returning.client.id) ?? []
 
 		const currencyIdsForBrief = new Set<string>()
 		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)
 		for (const t of totalPayments) currencyIdsForBrief.add(t.currencyId)
 		for (const t of totalChanges) currencyIdsForBrief.add(t.currencyId)
+		for (const d of clientDebt) currencyIdsForBrief.add(d.currencyId)
 		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
 		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, currencyBriefMap)
-
-		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds([returning.client.id])
-		const clientDebt = clientDebtMap.get(returning.client.id) ?? []
+		const clientDebtEnriched = withCurrencyBriefAmountMany(
+			clientDebt.map((d) => ({ currencyId: d.currencyId, amount: d.amount })),
+			currencyBriefMap,
+		)
 		return createResponse({
 			data: {
 				...returning,
@@ -233,7 +270,7 @@ export class ReturningService {
 				totalPayments: withCurrencyBriefTotalMany(totalPayments, currencyBriefMap),
 				totalChanges: withCurrencyBriefTotalMany(totalChanges, currencyBriefMap),
 				debtByCurrency,
-				client: { ...returning.client, debtByCurrency: clientDebt },
+				client: { ...returning.client, debtByCurrency: clientDebtEnriched },
 			},
 			success: { messages: ['find one success'] },
 		})

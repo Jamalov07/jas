@@ -32,6 +32,13 @@ export class StaffController {
 		return this.staffService.findMany({ ...query, isDeleted: false })
 	}
 
+	@Get('many/deleted')
+	@ApiOkResponse({ type: StaffFindManyResponseDto })
+	@ApiOperation({ summary: 'get all deletedstaffs' })
+	async findManyDeleted(@Query() query: StaffFindManyRequestDto): Promise<StaffFindManyResponseDto> {
+		return this.staffService.findMany({ ...query, isDeleted: true })
+	}
+
 	@Get('one')
 	@ApiOperation({ summary: 'find one staff' })
 	@ApiOkResponse({ type: StaffFindOneResponseDto })

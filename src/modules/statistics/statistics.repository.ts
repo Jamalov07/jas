@@ -11,7 +11,7 @@ import { ClientReportByCurrency, ClientReportCalc, ClientReportRow, StatisticsDa
 import { StatsTypeEnum } from '../selling/enums'
 
 import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
-import { convertUTCtoLocal, currencyBriefMapFromRows, extractDateParts, withCurrencyBriefAmountMany } from '@common'
+import { convertUTCtoLocal, currencyBriefMapFromRows, extractDateParts, netDebtCrossCurrencyRows, withCurrencyBriefAmountMany } from '@common'
 import { Decimal } from '@prisma/client/runtime/library'
 import { CurrencyRepository } from '../currency'
 
@@ -580,8 +580,28 @@ export class StatisticsRepository {
 			return { ...client, calc }
 		})
 
-		const currencyIdSet = new Set<string>()
+		const debtCurrencyIdsForRates = new Set<string>()
 		for (const row of rows) {
+			for (const x of row.calc.debtByCurrency) debtCurrencyIdsForRates.add(x.currencyId)
+		}
+		const { rates: reportDebtRates, symbols: reportDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...debtCurrencyIdsForRates])
+		const rowsNetDebt: ClientReportRow[] = rows.map((row) => ({
+			...row,
+			calc: {
+				...row.calc,
+				debtByCurrency: netDebtCrossCurrencyRows(
+					row.calc.debtByCurrency.map((d) => ({ currencyId: d.currencyId, amount: d.amount })),
+					reportDebtRates,
+					reportDebtSymbols,
+				).map((d) => ({
+					...d,
+					currency: { id: d.currencyId, name: '', symbol: '' },
+				})),
+			},
+		}))
+
+		const currencyIdSet = new Set<string>()
+		for (const row of rowsNetDebt) {
 			const c = row.calc
 			for (const x of c.selling.totalPriceByCurrency) currencyIdSet.add(x.currencyId)
 			for (const x of c.selling.paymentByCurrency) currencyIdSet.add(x.currencyId)
@@ -590,7 +610,7 @@ export class StatisticsRepository {
 			for (const x of c.debtByCurrency) currencyIdSet.add(x.currencyId)
 		}
 		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdSet]))
-		const enrichedRows = rows.map((row) => this.enrichClientReportRow(row, currencyMap))
+		const enrichedRows = rowsNetDebt.map((row) => this.enrichClientReportRow(row, currencyMap))
 
 		if (query.pagination) {
 			const totalCount = enrichedRows.length

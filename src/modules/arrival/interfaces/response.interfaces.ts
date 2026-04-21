@@ -47,7 +47,7 @@ export declare interface ArrivalFindOneData extends Pick<ArrivalRequired, 'id' |
 	totalPrices?: Record<string, { currencyId: string; total: Decimal; currency: { symbol: string } }[]>
 	totalPayments?: Array<{ currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }>
 	totalChanges?: Array<{ currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }>
-	debtByCurrency?: { currencyId: string; amount: Decimal; currency?: { id: string; name: string; symbol: string } }[]
+	debtByCurrency?: { currencyId: string; amount: Decimal; currency: { id: string; name: string; symbol: string } }[]
 	supplier?: any
 	staff?: any
 }

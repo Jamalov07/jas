@@ -8,6 +8,7 @@ import {
 	ERROR_MSG,
 	fillChangeMethodCurrencyTotalsByActiveIds,
 	fillPaymentMethodCurrencyTotalsByActiveIds,
+	netDebtCrossCurrencyRows,
 	withCurrencyBriefAmountMany,
 	withCurrencyBriefTotalMany,
 } from '@common'
@@ -125,6 +126,16 @@ export class ArrivalService {
 			suppliersWithDebtObject[c.id] = c.debtByCurrency
 		}
 
+		const arrivalDebtCurrIds = new Set<string>()
+		for (const arrival of arrivals) {
+			const tp = this.calcTotalPricesByType(arrival.products as ProductEntry[])
+			const sap = arrival.payment
+			const pm = (sap?.paymentMethods ?? []) as PaymentMethodEntry[]
+			const cm = (sap?.changeMethods ?? []) as ChangeMethodEntry[]
+			for (const d of this.calcDebtByCurrency(tp, pm, cm)) arrivalDebtCurrIds.add(d.currencyId)
+		}
+		const { rates: arrivalDebtRates, symbols: arrivalDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...arrivalDebtCurrIds])
+
 		const calcMap = new Map<string, Decimal>()
 		const mappedArrivals = arrivals.map((arrival) => {
 			for (const method of arrival.payment?.paymentMethods ?? []) {
@@ -146,7 +157,11 @@ export class ArrivalService {
 					}
 				: undefined
 			const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
-			const debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[], (payment?.changeMethods ?? []) as ChangeMethodEntry[])
+			const debtByCurrency = netDebtCrossCurrencyRows(
+				this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[], (payment?.changeMethods ?? []) as ChangeMethodEntry[]),
+				arrivalDebtRates,
+				arrivalDebtSymbols,
+			)
 			const products = this.mapArrivalProductsPrices(arrival.products as { prices: ArrivalMvPriceRow[] }[])
 			const totalPayments = aggregateAmountsByCurrencyId(sap?.paymentMethods as { currencyId: string; amount: Decimal }[] | undefined)
 			const totalChanges = aggregateAmountsByCurrencyId(sap?.changeMethods as { currencyId: string; amount: Decimal }[] | undefined)
@@ -170,6 +185,7 @@ export class ArrivalService {
 			for (const d of a.debtByCurrency) currencyIdsForBrief.add(d.currencyId)
 			for (const t of a.totalPayments) currencyIdsForBrief.add(t.currencyId)
 			for (const t of a.totalChanges) currencyIdsForBrief.add(t.currencyId)
+			for (const d of suppliersWithDebtObject[a.supplier.id] ?? []) currencyIdsForBrief.add(d.currencyId)
 		}
 		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
 		const arrivalsWithDebtCurrency = mappedArrivals.map((a) => ({
@@ -177,6 +193,10 @@ export class ArrivalService {
 			debtByCurrency: withCurrencyBriefAmountMany(a.debtByCurrency, currencyBriefMap),
 			totalPayments: withCurrencyBriefTotalMany(a.totalPayments, currencyBriefMap),
 			totalChanges: withCurrencyBriefTotalMany(a.totalChanges, currencyBriefMap),
+			supplier: {
+				...a.supplier,
+				debtByCurrency: withCurrencyBriefAmountMany(suppliersWithDebtObject[a.supplier.id] ?? [], currencyBriefMap),
+			},
 		}))
 
 		const result = query.pagination
@@ -211,17 +231,12 @@ export class ArrivalService {
 				}
 			: undefined
 		const totalPrices = this.calcTotalPricesByType(arrival.products as ProductEntry[])
-		let debtByCurrency = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[], (payment?.changeMethods ?? []) as ChangeMethodEntry[])
+		const debtRaw = this.calcDebtByCurrency(totalPrices, (payment?.paymentMethods ?? []) as PaymentMethodEntry[], (payment?.changeMethods ?? []) as ChangeMethodEntry[])
+		const { rates: oneArrivalRates, symbols: oneArrivalSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(debtRaw.map((d) => d.currencyId))
+		let debtByCurrency = netDebtCrossCurrencyRows(debtRaw, oneArrivalRates, oneArrivalSymbols)
 		const products = this.mapArrivalProductsPrices(arrival.products as { prices: ArrivalMvPriceRow[] }[])
 		const totalPayments = aggregateAmountsByCurrencyId(arrival.payment?.paymentMethods as { currencyId: string; amount: Decimal }[] | undefined)
 		const totalChanges = aggregateAmountsByCurrencyId(arrival.payment?.changeMethods as { currencyId: string; amount: Decimal }[] | undefined)
-
-		const currencyIdsForBrief = new Set<string>()
-		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)
-		for (const t of totalPayments) currencyIdsForBrief.add(t.currencyId)
-		for (const t of totalChanges) currencyIdsForBrief.add(t.currencyId)
-		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
-		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, currencyBriefMap)
 
 		const suppliersWithDebt = await this.supplierService.findMany({ ids: [arrival.supplier.id] })
 
@@ -229,6 +244,19 @@ export class ArrivalService {
 		for (const c of suppliersWithDebt.data.data) {
 			suppliersWithDebtObject[c.id] = c.debtByCurrency
 		}
+		const supplierDebtRows = suppliersWithDebtObject[arrival.supplier.id] ?? []
+
+		const currencyIdsForBrief = new Set<string>()
+		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)
+		for (const t of totalPayments) currencyIdsForBrief.add(t.currencyId)
+		for (const t of totalChanges) currencyIdsForBrief.add(t.currencyId)
+		for (const d of supplierDebtRows) currencyIdsForBrief.add(d.currencyId)
+		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
+		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, currencyBriefMap)
+		const supplierDebtEnriched = withCurrencyBriefAmountMany(
+			supplierDebtRows.map((d: { currencyId: string; amount: Decimal }) => ({ currencyId: d.currencyId, amount: d.amount })),
+			currencyBriefMap,
+		)
 
 		return createResponse({
 			data: {
@@ -239,7 +267,7 @@ export class ArrivalService {
 				totalPayments: withCurrencyBriefTotalMany(totalPayments, currencyBriefMap),
 				totalChanges: withCurrencyBriefTotalMany(totalChanges, currencyBriefMap),
 				debtByCurrency,
-				supplier: { ...arrival.supplier, debtByCurrency: suppliersWithDebtObject[arrival.supplier.id] || [] },
+				supplier: { ...arrival.supplier, debtByCurrency: supplierDebtEnriched },
 			},
 			success: { messages: ['find one success'] },
 		})

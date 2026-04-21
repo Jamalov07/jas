@@ -24,8 +24,14 @@ export class StaffRepository {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
+		let whereOptionsPart = {}
+		if (query.isDeleted) {
+			whereOptionsPart = { deletedAt: { not: null } }
+		}
+
 		const staffs = await this.prisma.staffModel.findMany({
 			where: {
+				...whereOptionsPart,
 				fullname: query.fullname,
 				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
 			},

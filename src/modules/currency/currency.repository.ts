@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { Decimal } from '@prisma/client/runtime/library'
 import { PrismaService } from '../shared'
 import {
 	CurrencyCreateOneRequest,
@@ -64,6 +65,22 @@ export class CurrencyRepository {
 			orderBy: { name: 'asc' },
 		})
 		return rows.map((r) => r.id)
+	}
+
+	async findExchangeRatesAndSymbolsByIds(ids: string[]): Promise<{ rates: Map<string, Decimal>; symbols: Map<string, string> }> {
+		const unique = [...new Set(ids.filter(Boolean))]
+		if (unique.length === 0) return { rates: new Map(), symbols: new Map() }
+		const rows = await this.prisma.currencyModel.findMany({
+			where: { id: { in: unique } },
+			select: { id: true, exchangeRate: true, symbol: true },
+		})
+		const rates = new Map<string, Decimal>()
+		const symbols = new Map<string, string>()
+		for (const r of rows) {
+			rates.set(r.id, r.exchangeRate ?? new Decimal(0))
+			symbols.set(r.id, r.symbol)
+		}
+		return { rates, symbols }
 	}
 
 	async findBriefByIds(ids: string[]): Promise<Array<{ id: string; name: string; symbol: string }>> {

@@ -1,4 +1,4 @@
-import { GlobalResponse, PaginationResponse } from '@common'
+import { CurrencyBrief, GlobalResponse, PaginationResponse } from '@common'
 import { SellingOptional, SellingRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 import { ChangeMethodEnum, PaymentMethodEnum, PriceTypeEnum } from '@prisma/client'
@@ -87,9 +87,18 @@ export declare interface SellingFindManyData extends PaginationResponse<SellingF
 	calcPage: SellingFindManyCalcPage
 }
 
+/** `findOne` / `findMany` data qatoridagi hujjat bo‘yicha qarz (valyuta obyekti bilan) */
+export declare interface SellingDebtByCurrencyRow {
+	currencyId: string
+	amount: Decimal
+	currency: CurrencyBrief
+}
+
 export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' | 'status' | 'createdAt' | 'date'>, Pick<SellingOptional, 'publicId'> {
 	client?: any
 	staff?: any
+	/** Hujjat bo‘yicha qoldiq qarz, valyuta bo‘yicha */
+	debtByCurrency?: SellingDebtByCurrencyRow[]
 	totalPrices?: SellingTotalByCurrency[]
 	/** Barcha to'lov usullari (turi farqi yo'q) valyuta bo'yicha yig'indisi */
 	totalPayments?: Array<{ currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }>
