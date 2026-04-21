@@ -60,6 +60,13 @@ export class StaffController {
 		return this.staffService.updateOne(query, body)
 	}
 
+	@Patch('one/restore')
+	@ApiOperation({ summary: 'restore one staff' })
+	@ApiOkResponse({ type: StaffModifyResponseDto })
+	async restoreOne(@Query() query: StaffFindOneRequestDto): Promise<StaffModifyResponseDto> {
+		return this.staffService.restoreOne(query)
+	}
+
 	@Delete('one')
 	@ApiOperation({ summary: 'delete one staff' })
 	@ApiOkResponse({ type: StaffModifyResponseDto })

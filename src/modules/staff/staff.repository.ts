@@ -98,8 +98,13 @@ export class StaffRepository {
 	}
 
 	async getOne(query: StaffGetOneRequest) {
+		let whereOptionsPart = {}
+		if (query.isDeleted) {
+			whereOptionsPart = { deletedAt: { not: null } }
+		}
+
 		const staff = await this.prisma.staffModel.findFirst({
-			where: { id: query.id, fullname: query.fullname, phone: query.phone },
+			where: { id: query.id, fullname: query.fullname, phone: query.phone, ...whereOptionsPart },
 			select: { id: true, fullname: true, phone: true, currency: true, createdAt: true, deletedAt: true, password: true, token: true, pages: true },
 		})
 

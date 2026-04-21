@@ -99,6 +99,12 @@ export class StaffService {
 		return createResponse({ data: null, success: { messages: ['update one success'] } })
 	}
 
+	async restoreOne(query: StaffGetOneRequest) {
+		await this.getOne({ ...query, isDeleted: true })
+		await this.staffRepository.updateOne({ ...query, isDeleted: true }, { deletedAt: null })
+		return createResponse({ data: null, success: { messages: ['restore one success'] } })
+	}
+
 	async deleteOne(query: StaffDeleteOneRequest) {
 		await this.getOne(query)
 		if (query.method === DeleteMethodEnum.hard) {
