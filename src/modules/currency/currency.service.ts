@@ -85,14 +85,18 @@ export class CurrencyService {
 	async updateOne(query: CurrencyGetOneRequest, body: CurrencyUpdateOneRequest) {
 		await this.getOne(query)
 
-		const candidate = await this.currencyRepository.getOne({ name: body.name })
-		if (candidate && candidate.id !== query.id) {
-			throw new BadRequestException(ERROR_MSG.CURRENCY.NAME_EXISTS.UZ)
+		if (body.name) {
+			const candidate = await this.currencyRepository.getOne({ name: body.name })
+			if (candidate && candidate.id !== query.id) {
+				throw new BadRequestException(ERROR_MSG.CURRENCY.NAME_EXISTS.UZ)
+			}
 		}
 
-		const candidate2 = await this.currencyRepository.getOne({ symbol: body.symbol })
-		if (candidate2 && candidate2.id !== query.id) {
-			throw new BadRequestException(ERROR_MSG.CURRENCY.SYMBOL_EXISTS.UZ)
+		if (body.symbol) {
+			const candidate2 = await this.currencyRepository.getOne({ symbol: body.symbol })
+			if (candidate2 && candidate2.id !== query.id) {
+				throw new BadRequestException(ERROR_MSG.CURRENCY.SYMBOL_EXISTS.UZ)
+			}
 		}
 
 		await this.currencyRepository.updateOne(query, body)
