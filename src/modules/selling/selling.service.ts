@@ -96,9 +96,7 @@ export class SellingService {
 		const row = line.prices.find((p) => p.type === PriceTypeEnum.selling) ?? line.prices[0]
 		return {
 			...line,
-			prices: row
-				? { selling: { price: row.price, discount: row.discount ?? new Decimal(0), totalPrice: row.totalPrice, currency: row.currency } }
-				: { selling: null },
+			prices: row ? { selling: { price: row.price, discount: row.discount ?? new Decimal(0), totalPrice: row.totalPrice, currency: row.currency } } : { selling: null },
 		}
 	}
 

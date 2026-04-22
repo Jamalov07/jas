@@ -114,7 +114,14 @@ export class SellingRepository {
 						createdAt: true,
 						prices: {
 							orderBy: [{ createdAt: 'desc' as const }],
-							select: { type: true, price: true, discount: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true, name: true, exchangeRate: true } } },
+							select: {
+								type: true,
+								price: true,
+								discount: true,
+								totalPrice: true,
+								currencyId: true,
+								currency: { select: { symbol: true, id: true, name: true, exchangeRate: true } },
+							},
 						},
 						product: {
 							select: {

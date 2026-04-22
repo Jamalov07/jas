@@ -99,7 +99,7 @@ export class ClientPaymentService {
 	async findMany(query: ClientPaymentFindManyRequest) {
 		const payments = await this.clientPaymentRepository.findMany(query)
 		const paymentsCount = await this.clientPaymentRepository.countFindMany(query)
-		const { data, calcByCurrency, totalsByCurrency } = await this.enrichClientPaymentsFindManyData(payments)
+		const { data, calcByCurrency, totalsByCurrency } = await this.enrichClientPaymentsFindManyData(payments as PaymentLikeForCalc[])
 
 		const result = query.pagination
 			? {

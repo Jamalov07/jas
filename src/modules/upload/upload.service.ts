@@ -9,6 +9,14 @@ import { Multer } from 'multer'
 import * as XLSX from 'xlsx'
 import { PriceTypeEnum } from '@prisma/client'
 
+/** Import orqali yaratilgan to‘lov yozuvlari uchun tavsif */
+const IMPORT_PAYMENT_DESCRIPTION = "import qilingan qiymat boshlang'ich qiymati"
+
+function currentYearStart(): Date {
+	const y = new Date().getFullYear()
+	return new Date(y, 0, 1, 0, 0, 0, 0)
+}
+
 @Injectable()
 export class UploadService {
 	constructor(private readonly prisma: PrismaService) {}
@@ -21,6 +29,7 @@ export class UploadService {
 		const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][]
 
 		const prisma = this.prisma
+		const yearStart = currentYearStart()
 
 		// --- OVERWRITE MODE ---
 		if (query.mode === UploadModeEnum.OVERWRITE) {
@@ -93,7 +102,7 @@ export class UploadService {
 
 			if (!supplier) {
 				supplier = await prisma.supplierModel.create({
-					data: { fullname, phone: phone || undefined },
+					data: { fullname, phone: phone || undefined, createdAt: yearStart },
 				})
 				createdSuppliers++
 			}
@@ -113,12 +122,15 @@ export class UploadService {
 						data: {
 							supplierId: supplier.id,
 							staffId: staff.id,
+							date: yearStart,
+							createdAt: yearStart,
 							products: {
 								create: [
 									{
 										count: 1,
 										staffId: staff.id,
 										productId: product.id,
+										createdAt: yearStart,
 										prices: {
 											create: [
 												{
@@ -126,6 +138,7 @@ export class UploadService {
 													price: new Decimal(Math.abs(trans.amount)),
 													totalPrice: new Decimal(Math.abs(trans.amount)),
 													currencyId: trans.curr.id,
+													createdAt: yearStart,
 												},
 											],
 										},
@@ -141,6 +154,8 @@ export class UploadService {
 						data: {
 							supplierId: supplier.id,
 							staffId: staff.id,
+							description: IMPORT_PAYMENT_DESCRIPTION,
+							createdAt: yearStart,
 							paymentMethods: {
 								create: [
 									{
@@ -172,6 +187,7 @@ export class UploadService {
 		const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][]
 
 		const prisma = this.prisma
+		const yearStart = currentYearStart()
 
 		// --- OVERWRITE MODE ---
 		if (query.mode === UploadModeEnum.OVERWRITE) {
@@ -242,7 +258,7 @@ export class UploadService {
 
 			if (!client) {
 				client = await prisma.clientModel.create({
-					data: { fullname, phone: phone || undefined },
+					data: { fullname, phone: phone || undefined, createdAt: yearStart },
 				})
 				createdClients++
 			}
@@ -263,12 +279,15 @@ export class UploadService {
 							clientId: client.id,
 							staffId: staff.id,
 							status: 'accepted',
+							date: yearStart,
+							createdAt: yearStart,
 							products: {
 								create: [
 									{
 										count: 1,
 										staffId: staff.id,
 										productId: product.id,
+										createdAt: yearStart,
 										prices: {
 											create: [
 												{
@@ -276,6 +295,7 @@ export class UploadService {
 													price: new Decimal(b.amount),
 													totalPrice: new Decimal(b.amount),
 													currencyId: b.curr.id,
+													createdAt: yearStart,
 												},
 											],
 										},
@@ -291,6 +311,8 @@ export class UploadService {
 						data: {
 							clientId: client.id,
 							staffId: staff.id,
+							description: IMPORT_PAYMENT_DESCRIPTION,
+							createdAt: yearStart,
 							paymentMethods: {
 								create: [
 									{

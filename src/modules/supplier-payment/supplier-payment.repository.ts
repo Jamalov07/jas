@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../shared/prisma'
 import {
 	SupplierPaymentCreateOneRequest,
@@ -22,40 +23,64 @@ export class SupplierPaymentRepository {
 		type: true,
 		currencyId: true,
 		amount: true,
-		currency: { select: { id: true, symbol: true } },
+		currency: { select: { id: true, name: true, symbol: true } },
+	}
+
+	private findManySharedWhere(query: SupplierPaymentFindManyRequest): Prisma.SupplierPaymentModelWhereInput {
+		return {
+			staffId: query.staffId,
+			supplierId: query.supplierId,
+			deletedAt: null,
+			OR: query.search
+				? [
+						{ supplier: { fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } } },
+						{ supplier: { phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } } },
+					]
+				: undefined,
+			createdAt: { gte: query.startDate, lte: query.endDate },
+		}
+	}
+
+	private findManyRowSelect = {
+		id: true,
+		staff: { select: { id: true, fullname: true, phone: true } },
+		supplier: { select: { id: true, fullname: true, phone: true } },
+		description: true,
+		paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: this.methodLineSelect },
+		changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: this.methodLineSelect },
+		updatedAt: true,
+		createdAt: true,
+		deletedAt: true,
 	}
 
 	async findMany(query: SupplierPaymentFindManyRequest) {
-		let paginationOptions = {}
+		const where = this.findManySharedWhere(query)
+		const arrivalWhere = where as Prisma.SupplierArrivalPaymentModelWhereInput
+
+		const [standalone, arrivalLinked] = await Promise.all([
+			this.prisma.supplierPaymentModel.findMany({
+				where,
+				select: this.findManyRowSelect,
+			}),
+			this.prisma.supplierArrivalPaymentModel.findMany({
+				where: arrivalWhere,
+				select: {
+					...this.findManyRowSelect,
+					arrivalId: true,
+				},
+			}),
+		])
+
+		const merged = [...standalone.map((p) => ({ ...p, paymentSource: 'standalone' as const })), ...arrivalLinked.map((p) => ({ ...p, paymentSource: 'arrival' as const }))].sort(
+			(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+		)
+
 		if (query.pagination) {
-			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
+			const skip = (query.pageNumber - 1) * query.pageSize
+			return merged.slice(skip, skip + query.pageSize)
 		}
 
-		const payments = await this.prisma.supplierPaymentModel.findMany({
-			where: {
-				staffId: query.staffId,
-				supplierId: query.supplierId,
-				deletedAt: null,
-				OR: query.search
-					? [{ supplier: { fullname: { contains: query.search, mode: 'insensitive' } } }, { supplier: { phone: { contains: query.search, mode: 'insensitive' } } }]
-					: undefined,
-				createdAt: { gte: query.startDate, lte: query.endDate },
-			},
-			select: {
-				id: true,
-				staff: { select: { id: true, fullname: true, phone: true } },
-				supplier: { select: { id: true, fullname: true, phone: true } },
-				description: true,
-				paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: this.methodLineSelect },
-				changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: this.methodLineSelect },
-				updatedAt: true,
-				createdAt: true,
-				deletedAt: true,
-			},
-			...paginationOptions,
-		})
-
-		return payments
+		return merged
 	}
 
 	async findOne(query: SupplierPaymentFindOneRequest) {
@@ -78,19 +103,10 @@ export class SupplierPaymentRepository {
 	}
 
 	async countFindMany(query: SupplierPaymentFindManyRequest) {
-		const count = await this.prisma.supplierPaymentModel.count({
-			where: {
-				staffId: query.staffId,
-				supplierId: query.supplierId,
-				deletedAt: null,
-				OR: query.search
-					? [{ supplier: { fullname: { contains: query.search, mode: 'insensitive' } } }, { supplier: { phone: { contains: query.search, mode: 'insensitive' } } }]
-					: undefined,
-				createdAt: { gte: query.startDate, lte: query.endDate },
-			},
-		})
-
-		return count
+		const where = this.findManySharedWhere(query)
+		const arrivalWhere = where as Prisma.SupplierArrivalPaymentModelWhereInput
+		const [cStandalone, cArrival] = await Promise.all([this.prisma.supplierPaymentModel.count({ where }), this.prisma.supplierArrivalPaymentModel.count({ where: arrivalWhere })])
+		return cStandalone + cArrival
 	}
 
 	async getMany(query: SupplierPaymentGetManyRequest) {

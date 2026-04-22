@@ -5,7 +5,7 @@ import { BotSellingProductTitleEnum } from '../../selling/enums'
 import * as pdfMake from 'pdfmake/build/pdfmake'
 import vfsFonts from 'pdfmake/build/vfs_fonts'
 import { TDocumentDefinitions } from 'pdfmake/interfaces'
-import { logoBase64 } from './constants'
+import { resolvePdfLogoBase64 } from './constants'
 ;(pdfMake as any).vfs = vfsFonts
 
 @Injectable()
@@ -95,7 +95,7 @@ export class PdfService {
 				},
 			],
 			images: {
-				logo: logoBase64,
+				logo: resolvePdfLogoBase64(),
 			},
 			defaultStyle: {
 				font: 'Roboto',
@@ -181,7 +181,7 @@ export class PdfService {
 				},
 			],
 			images: {
-				logo: logoBase64,
+				logo: resolvePdfLogoBase64(),
 			},
 			defaultStyle: {
 				font: 'Roboto',

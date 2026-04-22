@@ -11,7 +11,7 @@ import { ClientFindManyRequest, ClientFindOneRequest } from '../../client'
 import { StaffPaymentFindManyRequest } from '../../staff-payment'
 import { ProductFindManyRequest } from '../../product'
 import { SupplierFindManyRequest } from '../../supplier'
-import { ChangeMethodEnum, SellingStatusEnum } from '@prisma/client'
+import { ChangeMethodEnum, Prisma, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { SupplierFindOneRequest } from '../../supplier'
 
@@ -586,27 +586,35 @@ export class ExcelService {
 	// ─── Client Payment ────────────────────────────────────────────────────────
 
 	async clientPaymentDownloadMany(res: Response, query: ClientPaymentFindManyRequest) {
-		const startDate = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
-		const endDate = query.endDate ? new Date(new Date(query.endDate).setHours(23, 59, 59, 999)) : undefined
+		const where: Prisma.ClientPaymentModelWhereInput = {
+			clientId: query.clientId,
+			staffId: query.staffId,
+			deletedAt: null,
+			OR: query.search
+				? [
+						{ client: { fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } } },
+						{ client: { phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } } },
+					]
+				: undefined,
+			createdAt: { gte: query.startDate, lte: query.endDate },
+		}
 
-		const clientPayments = await this.prisma.clientPaymentModel.findMany({
-			where: {
-				clientId: query.clientId,
-				staffId: query.staffId,
-				deletedAt: null,
-				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				createdAt: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
-			},
-			select: {
-				client: { select: { fullname: true } },
-				staff: { select: { fullname: true } },
-				description: true,
-				createdAt: true,
-				paymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
-				changeMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
-			},
-			orderBy: { createdAt: 'desc' },
-		})
+		const select = {
+			client: { select: { fullname: true } },
+			staff: { select: { fullname: true } },
+			description: true,
+			createdAt: true,
+			paymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+			changeMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+		} as const
+
+		const sellingWhere = where as Prisma.ClientSellingPaymentModelWhereInput
+		const [standalone, sellingPayments] = await Promise.all([
+			this.prisma.clientPaymentModel.findMany({ where, select }),
+			this.prisma.clientSellingPaymentModel.findMany({ where: sellingWhere, select }),
+		])
+
+		const clientPayments = [...standalone, ...sellingPayments].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Клиент оплаты')
@@ -643,27 +651,35 @@ export class ExcelService {
 	// ─── Supplier Payment ──────────────────────────────────────────────────────
 
 	async supplierPaymentDownloadMany(res: Response, query: SupplierPaymentFindManyRequest) {
-		const startDate = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
-		const endDate = query.endDate ? new Date(new Date(query.endDate).setHours(23, 59, 59, 999)) : undefined
+		const where: Prisma.SupplierPaymentModelWhereInput = {
+			supplierId: query.supplierId,
+			staffId: query.staffId,
+			deletedAt: null,
+			OR: query.search
+				? [
+						{ supplier: { fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } } },
+						{ supplier: { phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } } },
+					]
+				: undefined,
+			createdAt: { gte: query.startDate, lte: query.endDate },
+		}
 
-		const supplierPayments = await this.prisma.supplierPaymentModel.findMany({
-			where: {
-				supplierId: query.supplierId,
-				staffId: query.staffId,
-				deletedAt: null,
-				OR: [{ supplier: { fullname: { contains: query.search, mode: 'insensitive' } } }, { supplier: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				createdAt: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
-			},
-			select: {
-				supplier: { select: { fullname: true } },
-				staff: { select: { fullname: true } },
-				description: true,
-				createdAt: true,
-				paymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
-				changeMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
-			},
-			orderBy: { createdAt: 'desc' },
-		})
+		const select = {
+			supplier: { select: { fullname: true } },
+			staff: { select: { fullname: true } },
+			description: true,
+			createdAt: true,
+			paymentMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+			changeMethods: { select: { amount: true, type: true, currency: { select: { symbol: true } } } },
+		} as const
+
+		const arrivalWhere = where as Prisma.SupplierArrivalPaymentModelWhereInput
+		const [standalone, arrivalPayments] = await Promise.all([
+			this.prisma.supplierPaymentModel.findMany({ where, select }),
+			this.prisma.supplierArrivalPaymentModel.findMany({ where: arrivalWhere, select }),
+		])
+
+		const supplierPayments = [...standalone, ...arrivalPayments].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 
 		const workbook = new ExcelJS.Workbook()
 		const worksheet = workbook.addWorksheet('Поставщик оплаты')

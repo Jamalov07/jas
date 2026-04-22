@@ -27,6 +27,9 @@ export declare interface SupplierPaymentFindManyData extends PaginationResponse<
 }
 
 export declare interface SupplierPaymentFindOneData extends Pick<SupplierPaymentRequired, 'id'> {
+	/** `standalone` — `SupplierPaymentModel`; `arrival` — `SupplierArrivalPaymentModel` */
+	paymentSource?: 'standalone' | 'arrival'
+	arrivalId?: string | null
 	description?: string | null
 	staff?: { id: string; fullname: string; phone: string }
 	supplier?: { id: string; fullname: string; phone: string; debtByCurrency?: SupplierDebtByCurrency[] }

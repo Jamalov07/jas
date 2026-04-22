@@ -27,6 +27,7 @@ services:
     environment:
       PORT: 3000
       HOST: ${HOST:-0.0.0.0}
+      PDF_LOGO_BRAND: ${PDF_LOGO_BRAND:-jas}
       DATABASE_URL: postgresql://${DB_USER:-jas_user}:${DB_PASSWORD}@db:5432/${DB_NAME:-jas_db}
       ACCESS_TOKEN_KEY: ${ACCESS_TOKEN_KEY}
       ACCESS_TOKEN_TIME: ${ACCESS_TOKEN_TIME}

@@ -28,6 +28,9 @@ export declare interface ClientPaymentFindManyData extends PaginationResponse<Cl
 }
 
 export declare interface ClientPaymentFindOneData extends Pick<ClientPaymentRequired, 'id'> {
+	/** `standalone` — `ClientPaymentModel`; `selling` — `ClientSellingPaymentModel` */
+	paymentSource?: 'standalone' | 'selling'
+	sellingId?: string | null
 	description?: string | null
 	staff?: { id: string; fullname: string; phone: string }
 	client?: { id: string; fullname: string; phone: string; debtByCurrency?: ClientDebtByCurrency[] }
