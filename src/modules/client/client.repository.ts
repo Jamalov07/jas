@@ -14,7 +14,7 @@ import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 /** `ClientService.calcDebtByCurrency` uchun — `findMany` bilan bir xil ma’lumot */
 const CLIENT_DEBT_SOURCE_SELECT = {
 	sellings: {
-		where: { status: SellingStatusEnum.accepted },
+		where: { status: SellingStatusEnum.accepted, deletedAt: null },
 		select: {
 			date: true,
 			products: {
@@ -40,7 +40,7 @@ const CLIENT_DEBT_SOURCE_SELECT = {
 		orderBy: { date: 'desc' as const },
 	},
 	returnings: {
-		where: { status: SellingStatusEnum.accepted },
+		where: { status: SellingStatusEnum.accepted, deletedAt: null },
 		select: {
 			date: true,
 			products: {
@@ -129,7 +129,7 @@ export class ClientRepository {
 				deletedAt: true,
 				telegram: { select: { id: true, isActive: true } },
 				sellings: {
-					where: { status: SellingStatusEnum.accepted },
+					where: { status: SellingStatusEnum.accepted, deletedAt: null },
 					select: {
 						date: true,
 						products: {
@@ -156,7 +156,7 @@ export class ClientRepository {
 					orderBy: { date: 'desc' },
 				},
 				returnings: {
-					where: { status: SellingStatusEnum.accepted },
+					where: { status: SellingStatusEnum.accepted, deletedAt: null },
 					select: {
 						date: true,
 						products: {

@@ -217,6 +217,8 @@ export class SellingService {
 
 		const clientsWithDebt = await this.clientService.findMany({ ids: sellings.map((s) => s.client.id) })
 
+		console.log('clientlar qarzlari bilan', clientsWithDebt)
+
 		const clientsWithDebtObject: Record<string, any> = {}
 		for (const c of clientsWithDebt.data.data) {
 			clientsWithDebtObject[c.id] = c.debtByCurrency

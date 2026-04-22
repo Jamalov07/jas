@@ -14,6 +14,7 @@ import { PriceTypeEnum } from '@prisma/client'
 /** `SupplierService.calcDebtByCurrency` uchun */
 const SUPPLIER_DEBT_SOURCE_SELECT = {
 	arrivals: {
+		where: { deletedAt: null },
 		select: {
 			date: true,
 			products: {
@@ -102,6 +103,7 @@ export class SupplierRepository {
 				updatedAt: true,
 				deletedAt: true,
 				arrivals: {
+					where: { deletedAt: null },
 					select: {
 						date: true,
 						products: {
