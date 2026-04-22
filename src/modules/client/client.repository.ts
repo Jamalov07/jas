@@ -9,7 +9,7 @@ import {
 	ClientGetOneRequest,
 	ClientUpdateOneRequest,
 } from './interfaces'
-import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
+import { PriceTypeEnum, Prisma, SellingStatusEnum } from '@prisma/client'
 
 /** `ClientService.calcDebtByCurrency` uchun — `findMany` bilan bir xil ma’lumot */
 const CLIENT_DEBT_SOURCE_SELECT = {
@@ -86,23 +86,31 @@ export class ClientRepository {
 		this.prisma = prisma
 	}
 
+	/** `search` bo‘lmasa `OR` + `contains: undefined` Prisma hech nima qaytarmasligi mumkin (masalan selling `findMany` dan `ids` bilan chaqiriq). */
+	private clientFindManyWhere(query: ClientFindManyRequest): Prisma.ClientModelWhereInput {
+		let idPart: Prisma.ClientModelWhereInput = {}
+		if (query.ids?.length) {
+			idPart = { id: { in: query.ids } }
+		}
+		return {
+			...idPart,
+			...(query.fullname ? { fullname: query.fullname } : {}),
+			...(query.search
+				? {
+						OR: [{ fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } }, { phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } }],
+					}
+				: {}),
+		}
+	}
+
 	async findMany(query: ClientFindManyRequest) {
 		let paginationOptions = {}
 		if (query.pagination) {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		let whereOptionsPart = {}
-		if (query.ids && query.ids.length) {
-			whereOptionsPart = { id: { in: query.ids } }
-		}
-
 		const clients = await this.prisma.clientModel.findMany({
-			where: {
-				...whereOptionsPart,
-				fullname: query.fullname,
-				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
-			},
+			where: this.clientFindManyWhere(query),
 			select: {
 				id: true,
 				fullname: true,
@@ -215,10 +223,7 @@ export class ClientRepository {
 
 	async countFindMany(query: ClientFindManyRequest) {
 		const count = await this.prisma.clientModel.count({
-			where: {
-				fullname: query.fullname,
-				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
-			},
+			where: this.clientFindManyWhere(query),
 		})
 
 		return count

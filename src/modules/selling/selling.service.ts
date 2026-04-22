@@ -215,9 +215,8 @@ export class SellingService {
 		const { rates: activeDebtRates, symbols: activeDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(activeCurrencyIds)
 		const calcPage = this.buildFindManyCalcPage(sellings, activeCurrencyIds, activeBriefMap, activeDebtRates, activeDebtSymbols)
 
-		const clientsWithDebt = await this.clientService.findMany({ ids: sellings.map((s) => s.client.id) })
-
-		console.log('clientlar qarzlari bilan', clientsWithDebt)
+		const clientIds = [...new Set(sellings.map((s) => s.client.id))]
+		const clientsWithDebt = clientIds.length ? await this.clientService.findMany({ ids: clientIds }) : createResponse({ data: { data: [] } })
 
 		const clientsWithDebtObject: Record<string, any> = {}
 		for (const c of clientsWithDebt.data.data) {

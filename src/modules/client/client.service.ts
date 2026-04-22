@@ -341,7 +341,6 @@ export class ClientService {
 	}
 
 	async findMany(query: ClientFindManyRequest) {
-		console.log('client find many query', query)
 		const clients = await this.clientRepository.findMany({ ...query, pagination: false })
 
 		const currencyIdSet = new Set<string>()
