@@ -192,7 +192,7 @@ export class ProductCreateOne2RequestDto {
 	@IsUUID('4')
 	prices_wholesale_currencyId?: string
 
-	@ApiProperty({ type: 'string', format: 'binary', description: 'image file' })
+	@ApiPropertyOptional({ type: 'string', format: 'binary', description: 'image file' })
 	image?: any
 }
 

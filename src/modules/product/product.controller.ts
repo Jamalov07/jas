@@ -44,23 +44,25 @@ export class ProductController {
 	@ApiOperation({ summary: 'add one product' })
 	@ApiOkResponse({ type: ProductModifyResponseDto })
 	async createOne(@Body() body: ProductCreateOne2RequestDto, @UploadedFile() image?: Express.Multer.File): Promise<ProductModifyResponseDto> {
-		console.log(body)
-
 		const prices = {
 			cost: {
-				price: new Decimal(Number(body.prices_cost_price)),
+				price: new Decimal(Number(body.prices_cost_price ?? 0)),
 				currencyId: body.prices_cost_currencyId,
 			},
 			selling: {
-				price: new Decimal(Number(body.prices_selling_price)),
+				price: new Decimal(Number(body.prices_selling_price ?? 0)),
 				currencyId: body.prices_selling_currencyId,
 			},
-			wholesale: body.prices_wholesale_price
+			// Optom narx 0 bo‘lishi mumkin — shart faqat valyuta ID (0 truthy emas, eski kod wholesale ni tashlab yuborardi)
+			wholesale: body.prices_wholesale_currencyId
 				? {
-						price: new Decimal(Number(body.prices_wholesale_price)),
+						price: new Decimal(Number(body.prices_wholesale_price ?? 0)),
 						currencyId: body.prices_wholesale_currencyId,
 					}
-				: undefined,
+				: {
+						price: new Decimal(0),
+						currencyId: body.prices_selling_currencyId ?? body.prices_cost_currencyId,
+					},
 		}
 		return this.productService.createOne({ ...body, prices, image: image?.filename })
 	}
