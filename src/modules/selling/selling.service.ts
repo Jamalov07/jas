@@ -216,11 +216,10 @@ export class SellingService {
 		const calcPage = this.buildFindManyCalcPage(sellings, activeCurrencyIds, activeBriefMap, activeDebtRates, activeDebtSymbols)
 
 		const clientIds = [...new Set(sellings.map((s) => s.client.id))]
-		const clientsWithDebt = clientIds.length ? await this.clientService.findMany({ ids: clientIds }) : createResponse({ data: { data: [] } })
-
+		const clientDebtMap = clientIds.length ? await this.clientService.getDebtSnapshotsByClientIds(clientIds) : new Map()
 		const clientsWithDebtObject: Record<string, any> = {}
-		for (const c of clientsWithDebt.data.data) {
-			clientsWithDebtObject[c.id] = c.debtByCurrency
+		for (const id of clientIds) {
+			clientsWithDebtObject[id] = clientDebtMap.get(id) ?? []
 		}
 
 		const sellingDebtCurrIds = new Set<string>()
@@ -314,18 +313,14 @@ export class SellingService {
 		const totalPayments = aggregateAmountsByCurrencyId(selling.payment?.paymentMethods)
 		const totalChanges = aggregateAmountsByCurrencyId(selling.payment?.changeMethods)
 
-		const clientsWithDebt = await this.clientService.findMany({ ids: [selling.client.id] })
-
-		const clientsWithDebtObject: Record<string, any> = {}
-		for (const c of clientsWithDebt.data.data) {
-			clientsWithDebtObject[c.id] = c.debtByCurrency
-		}
+		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds([selling.client.id])
+		const clientDebtRows = clientDebtMap.get(selling.client.id) ?? []
 
 		const currencyIdsForBrief = new Set<string>()
 		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)
 		for (const t of totalPayments) currencyIdsForBrief.add(t.currencyId)
 		for (const t of totalChanges) currencyIdsForBrief.add(t.currencyId)
-		for (const d of clientsWithDebtObject[selling.client.id] ?? []) currencyIdsForBrief.add(d.currencyId)
+		for (const d of clientDebtRows) currencyIdsForBrief.add(d.currencyId)
 		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
 		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, currencyBriefMap)
 
@@ -340,7 +335,7 @@ export class SellingService {
 				debtByCurrency,
 				client: {
 					...selling.client,
-					debtByCurrency: withCurrencyBriefAmountMany(clientsWithDebtObject[selling.client.id] ?? [], currencyBriefMap),
+					debtByCurrency: withCurrencyBriefAmountMany(clientDebtRows, currencyBriefMap),
 				},
 			},
 			success: { messages: ['find one success'] },

@@ -9,7 +9,7 @@ import {
 	SupplierGetOneRequest,
 	SupplierUpdateOneRequest,
 } from './interfaces'
-import { PriceTypeEnum } from '@prisma/client'
+import { PriceTypeEnum, Prisma } from '@prisma/client'
 
 /** `SupplierService.calcDebtByCurrency` uchun */
 const SUPPLIER_DEBT_SOURCE_SELECT = {
@@ -50,22 +50,31 @@ export class SupplierRepository {
 		this.prisma = prisma
 	}
 
+	/** `search` bo‘lmasa `contains: undefined` bilan bo‘sh natija (client.repository bilan bir xil). */
+	private supplierFindManyWhere(query: SupplierFindManyRequest): Prisma.SupplierModelWhereInput {
+		let idPart: Prisma.SupplierModelWhereInput = {}
+		if (query.ids?.length) {
+			idPart = { id: { in: query.ids } }
+		}
+		return {
+			...idPart,
+			...(query.fullname ? { fullname: query.fullname } : {}),
+			...(query.search
+				? {
+						OR: [{ fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } }, { phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } }],
+					}
+				: {}),
+		}
+	}
+
 	async findMany(query: SupplierFindManyRequest) {
 		let paginationOptions = {}
 		if (query.pagination) {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 
-		let whereOptionsPart = {}
-		if (query.ids && query.ids.length) {
-			whereOptionsPart = { id: { in: query.ids } }
-		}
-
 		const suppliers = await this.prisma.supplierModel.findMany({
-			where: {
-				...whereOptionsPart,
-				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
-			},
+			where: this.supplierFindManyWhere(query),
 			select: {
 				id: true,
 				fullname: true,
@@ -141,9 +150,7 @@ export class SupplierRepository {
 
 	async countFindMany(query: SupplierFindManyRequest) {
 		const count = await this.prisma.supplierModel.count({
-			where: {
-				OR: [{ fullname: { contains: query.search, mode: 'insensitive' } }, { phone: { contains: query.search, mode: 'insensitive' } }],
-			},
+			where: this.supplierFindManyWhere(query),
 		})
 
 		return count

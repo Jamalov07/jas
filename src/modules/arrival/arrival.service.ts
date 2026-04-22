@@ -119,11 +119,11 @@ export class ArrivalService {
 		const arrivalsCount = await this.arrivalRepository.countFindMany(query)
 		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
 
-		const suppliersWithDebt = await this.supplierService.findMany({ ids: arrivals.map((r) => r.supplier.id) })
-
+		const supplierIds = [...new Set(arrivals.map((r) => r.supplier.id))]
+		const supplierDebtMap = supplierIds.length ? await this.supplierService.getDebtSnapshotsBySupplierIds(supplierIds) : new Map()
 		const suppliersWithDebtObject: Record<string, any> = {}
-		for (const c of suppliersWithDebt.data.data) {
-			suppliersWithDebtObject[c.id] = c.debtByCurrency
+		for (const id of supplierIds) {
+			suppliersWithDebtObject[id] = supplierDebtMap.get(id) ?? []
 		}
 
 		const arrivalDebtCurrIds = new Set<string>()
@@ -238,13 +238,8 @@ export class ArrivalService {
 		const totalPayments = aggregateAmountsByCurrencyId(arrival.payment?.paymentMethods as { currencyId: string; amount: Decimal }[] | undefined)
 		const totalChanges = aggregateAmountsByCurrencyId(arrival.payment?.changeMethods as { currencyId: string; amount: Decimal }[] | undefined)
 
-		const suppliersWithDebt = await this.supplierService.findMany({ ids: [arrival.supplier.id] })
-
-		const suppliersWithDebtObject: Record<string, any> = {}
-		for (const c of suppliersWithDebt.data.data) {
-			suppliersWithDebtObject[c.id] = c.debtByCurrency
-		}
-		const supplierDebtRows = suppliersWithDebtObject[arrival.supplier.id] ?? []
+		const supplierDebtMap = await this.supplierService.getDebtSnapshotsBySupplierIds([arrival.supplier.id])
+		const supplierDebtRows = supplierDebtMap.get(arrival.supplier.id) ?? []
 
 		const currencyIdsForBrief = new Set<string>()
 		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)

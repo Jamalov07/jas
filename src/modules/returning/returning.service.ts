@@ -125,11 +125,11 @@ export class ReturningService {
 		const returningsCount = await this.returningRepository.countFindMany(query)
 		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
 
-		const clientsWithDebt = await this.clientService.findMany({ ids: returnings.map((r) => r.client.id) })
-
+		const clientIds = [...new Set(returnings.map((r) => r.client.id))]
+		const clientDebtMap = clientIds.length ? await this.clientService.getDebtSnapshotsByClientIds(clientIds) : new Map()
 		const clientsWithDebtObject: Record<string, any> = {}
-		for (const c of clientsWithDebt.data.data) {
-			clientsWithDebtObject[c.id] = c.debtByCurrency
+		for (const id of clientIds) {
+			clientsWithDebtObject[id] = clientDebtMap.get(id) ?? []
 		}
 
 		const returningDebtCurrIds = new Set<string>()
@@ -187,7 +187,6 @@ export class ReturningService {
 			totalChanges: withCurrencyBriefTotalMany(r.totalChanges, currencyBriefMap),
 		}))
 
-		const clientDebtMap = await this.clientService.getDebtSnapshotsByClientIds(returningsWithDebtCurrency.map((r) => r.client.id))
 		const dataWithClientDebt = returningsWithDebtCurrency.map((r) => ({
 			...r,
 			client: {
