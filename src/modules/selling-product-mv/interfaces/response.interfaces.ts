@@ -6,6 +6,7 @@ export declare interface SellingProductMVPriceData {
 	id?: string
 	type: PriceTypeEnum
 	price: Decimal
+	discount: Decimal
 	totalPrice: Decimal
 	currencyId: string
 	currency?: { symbol: string; id: string }

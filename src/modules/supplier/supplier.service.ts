@@ -1,6 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { SupplierRepository } from './supplier.repository'
-import { createResponse, currencyBriefMapFromRows, DebtTypeEnum, DeleteMethodEnum, ERROR_MSG, netDebtCrossCurrencyRows, withCurrencyBriefAmountMany } from '@common'
+import {
+	createResponse,
+	currencyBriefMapFromRows,
+	DebtTypeEnum,
+	DeleteMethodEnum,
+	ERROR_MSG,
+	netDebtCrossCurrencyRows,
+	roundDebtDecimal,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import {
 	SupplierGetOneRequest,
 	SupplierCreateOneRequest,
@@ -298,22 +307,26 @@ export class SupplierService {
 
 		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...deedCurrencyIds]))
 
+		const deedDebtRaw = Array.from(debtByCurrencyMap.entries())
+			.filter(([, amount]) => !amount.isZero())
+			.map(([currencyId, amount]) => ({ currencyId, amount }))
 		const fullDebtRaw = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
-		const { rates: supFullRates, symbols: supFullSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(fullDebtRaw.map((x) => x.currencyId))
+		const allNetCurrencyIds = new Set<string>()
+		for (const x of fullDebtRaw) allNetCurrencyIds.add(x.currencyId)
+		for (const x of deedDebtRaw) allNetCurrencyIds.add(x.currencyId)
+		const { rates: supFullRates, symbols: supFullSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...allNetCurrencyIds])
 		const fullDebtNetted = netDebtCrossCurrencyRows(fullDebtRaw, supFullRates, supFullSymbols)
+		const deedDebtNetted = netDebtCrossCurrencyRows(deedDebtRaw, supFullRates, supFullSymbols)
 
 		const totalCreditByCurrency: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(
 			Array.from(totalCreditMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
 			currencyMap,
-		)
+		).map((r) => ({ ...r, amount: roundDebtDecimal(r.amount) }))
 		const totalDebitByCurrency: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(
 			Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
 			currencyMap,
-		)
-		const deedDebtByCurrency: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(
-			Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
-			currencyMap,
-		)
+		).map((r) => ({ ...r, amount: roundDebtDecimal(r.amount) }))
+		const deedDebtByCurrency: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(deedDebtNetted, currencyMap)
 
 		const fullDebt: SupplierDebtByCurrency[] = withCurrencyBriefAmountMany(fullDebtNetted, currencyMap)
 

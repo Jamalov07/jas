@@ -12,7 +12,7 @@ import {
 } from '../interfaces'
 import { IsDecimalIntOrBigInt, PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { SellingOptionalDto, SellingRequiredDto } from './fields.dtos'
-import { ArrayNotEmpty, IsArray, IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsUUID, ValidateNested } from 'class-validator'
+import { ArrayNotEmpty, IsArray, IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, Max, Min, IsUUID, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { Decimal } from '@prisma/client/runtime/library'
 import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
@@ -86,6 +86,13 @@ export class SellingProductDto implements SellingProduct {
 	@IsNotEmpty()
 	@IsDecimalIntOrBigInt()
 	price: Decimal
+
+	@ApiPropertyOptional({ type: Number, description: 'Chegirma foizi 0–100' })
+	@IsOptional()
+	@IsNumber()
+	@Min(0)
+	@Max(100)
+	discount?: number
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()

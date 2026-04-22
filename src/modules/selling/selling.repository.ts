@@ -11,8 +11,16 @@ import {
 } from './interfaces'
 import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
+import { calcSellingLineTotalPrice } from '@common'
 
-const PRODUCT_MV_PRICE_SELECT = { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } }
+const PRODUCT_MV_PRICE_SELECT = {
+	type: true,
+	price: true,
+	discount: true,
+	totalPrice: true,
+	currencyId: true,
+	currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } },
+}
 const PRODUCT_MV_SELECT = {
 	id: true,
 	count: true,
@@ -106,7 +114,7 @@ export class SellingRepository {
 						createdAt: true,
 						prices: {
 							orderBy: [{ createdAt: 'desc' as const }],
-							select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true, name: true, exchangeRate: true } } },
+							select: { type: true, price: true, discount: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true, name: true, exchangeRate: true } } },
 						},
 						product: {
 							select: {
@@ -232,7 +240,8 @@ export class SellingRepository {
 							create: {
 								type: PriceTypeEnum.selling,
 								price: p.price,
-								totalPrice: new Decimal(p.price).mul(p.count),
+								discount: new Decimal(p.discount ?? 0),
+								totalPrice: calcSellingLineTotalPrice(p.price, p.count, p.discount ?? 0),
 								currencyId: p.currencyId,
 							},
 						},

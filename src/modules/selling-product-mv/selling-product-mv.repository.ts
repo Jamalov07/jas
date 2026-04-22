@@ -9,8 +9,9 @@ import {
 } from './interfaces'
 import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
+import { calcSellingLineTotalPrice } from '@common'
 
-const PRICES_SELECT = { id: true, type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true } } }
+const PRICES_SELECT = { id: true, type: true, price: true, discount: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true } } }
 
 const SELLING_MV_SELECT = {
 	id: true,
@@ -92,7 +93,7 @@ export class SellingProductMVRepository {
 								createdAt: true,
 								prices: {
 									orderBy: [{ createdAt: 'desc' as const }],
-									select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true } } },
+									select: { type: true, price: true, discount: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true } } },
 								},
 								product: { select: { id: true, name: true } },
 							},
@@ -104,7 +105,8 @@ export class SellingProductMVRepository {
 	}
 
 	async createOne(body: SellingProductMVCreateOneRequest) {
-		const totalPrice = new Decimal(body.price).mul(body.count)
+		const discount = new Decimal(body.discount ?? 0)
+		const totalPrice = calcSellingLineTotalPrice(body.price, body.count, discount)
 
 		const productMV = await this.prisma.sellingProductMVModel.create({
 			data: {
@@ -112,7 +114,15 @@ export class SellingProductMVRepository {
 				sellingId: body.sellingId,
 				productId: body.productId,
 				staffId: body.staffId,
-				prices: { create: { type: PriceTypeEnum.selling, price: new Decimal(body.price), totalPrice, currencyId: body.currencyId } },
+				prices: {
+					create: {
+						type: PriceTypeEnum.selling,
+						price: new Decimal(body.price),
+						discount,
+						totalPrice,
+						currencyId: body.currencyId,
+					},
+				},
 			},
 			select: { id: true, count: true, productId: true, sellingId: true },
 		})
@@ -132,7 +142,8 @@ export class SellingProductMVRepository {
 		const oldPrice = existing?.prices?.find((p) => p.type === PriceTypeEnum.selling)
 		const newPrice = body.price ?? oldPrice?.price ?? new Decimal(0)
 		const newCount = body.count ?? existing?.count ?? 0
-		const newTotalPrice = new Decimal(newPrice).mul(newCount)
+		const newDiscount = body.discount !== undefined ? new Decimal(body.discount) : (oldPrice?.discount ?? new Decimal(0))
+		const newTotalPrice = calcSellingLineTotalPrice(newPrice, newCount, newDiscount)
 
 		await this.prisma.sellingProductMVModel.update({
 			where: { id: query.id },
@@ -142,7 +153,12 @@ export class SellingProductMVRepository {
 		if (oldPrice) {
 			await this.prisma.sellingProductMVPriceModel.update({
 				where: { id: oldPrice.id },
-				data: { price: new Decimal(newPrice), totalPrice: newTotalPrice, currencyId: body.currencyId ?? oldPrice.currency?.id },
+				data: {
+					price: new Decimal(newPrice),
+					discount: newDiscount,
+					totalPrice: newTotalPrice,
+					currencyId: body.currencyId ?? oldPrice.currency?.id,
+				},
 			})
 		}
 

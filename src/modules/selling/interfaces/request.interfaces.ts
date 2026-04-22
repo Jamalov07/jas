@@ -25,6 +25,8 @@ export declare interface SellingProduct {
 	productId: string
 	count: number
 	price: Decimal
+	/** Chegirma foizi (0–100), ixtiyoriy */
+	discount?: Decimal
 	currencyId: string
 }
 

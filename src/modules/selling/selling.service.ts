@@ -89,17 +89,24 @@ export class SellingService {
 	}
 
 	private mapSellingLinePricesToObject<
-		T extends { prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currency: { id: string; name: string; symbol: string } }[] },
+		T extends {
+			prices: { type: PriceTypeEnum; price: Decimal; discount?: Decimal; totalPrice: Decimal; currency: { id: string; name: string; symbol: string } }[]
+		},
 	>(line: T) {
 		const row = line.prices.find((p) => p.type === PriceTypeEnum.selling) ?? line.prices[0]
 		return {
 			...line,
-			prices: row ? { selling: { price: row.price, totalPrice: row.totalPrice, currency: row.currency } } : { selling: null },
+			prices: row
+				? { selling: { price: row.price, discount: row.discount ?? new Decimal(0), totalPrice: row.totalPrice, currency: row.currency } }
+				: { selling: null },
 		}
 	}
 
 	private mapSellingProductsPrices<
-		T extends { count: number; prices: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currency: { id: string; name: string; symbol: string } }[] },
+		T extends {
+			count: number
+			prices: { type: PriceTypeEnum; price: Decimal; discount?: Decimal; totalPrice: Decimal; currency: { id: string; name: string; symbol: string } }[]
+		},
 	>(products: T[]) {
 		return products.map((p) => this.mapSellingLinePricesToObject(p))
 	}

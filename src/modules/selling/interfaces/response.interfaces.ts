@@ -27,6 +27,8 @@ export declare interface SellingPaymentData {
 /** Selling qatorida MV narxlari faqat `selling` turi — javobda obyekt ko‘rinishi */
 export declare interface SellingProductSellingPrice {
 	price: Decimal
+	/** Foiz (0–100), 0 = chegirmasiz */
+	discount: Decimal
 	totalPrice: Decimal
 }
 

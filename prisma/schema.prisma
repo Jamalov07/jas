@@ -388,6 +388,8 @@ model SellingProductMVPriceModel {
   id          String        @map("id")                    @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
   type        PriceTypeEnum @map("type")
   price       Decimal       @map("price")                 @db.Decimal(18, 3) @default(0)
+  /// Chegirma foizi (0–100), masalan 10 = 10%
+  discount    Decimal?      @map("discount")              @db.Decimal(6, 3)  @default(0)
   totalPrice  Decimal       @map("total_price")           @db.Decimal(18, 3) @default(0)
   currencyId  String        @map("currency_id")           @db.Uuid
   productMVId String        @map("product_mv_id") @db.Uuid

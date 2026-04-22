@@ -8,6 +8,7 @@ import {
 	DeleteMethodEnum,
 	ERROR_MSG,
 	netDebtCrossCurrencyRows,
+	roundDebtDecimal,
 	withCurrencyBrief,
 	withCurrencyBriefAmountMany,
 } from '@common'
@@ -586,22 +587,26 @@ export class ClientService {
 
 		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...deedCurrencyIds]))
 
+		const deedDebtRaw = Array.from(debtByCurrencyMap.entries())
+			.filter(([, amount]) => !amount.isZero())
+			.map(([currencyId, amount]) => ({ currencyId, amount }))
 		const fullDebtRaw = Array.from(fullDebtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
-		const { rates: fullDebtRates, symbols: fullDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(fullDebtRaw.map((x) => x.currencyId))
+		const allNetCurrencyIds = new Set<string>()
+		for (const x of fullDebtRaw) allNetCurrencyIds.add(x.currencyId)
+		for (const x of deedDebtRaw) allNetCurrencyIds.add(x.currencyId)
+		const { rates: fullDebtRates, symbols: fullDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...allNetCurrencyIds])
 		const fullDebtNetted = netDebtCrossCurrencyRows(fullDebtRaw, fullDebtRates, fullDebtSymbols)
+		const deedDebtNetted = netDebtCrossCurrencyRows(deedDebtRaw, fullDebtRates, fullDebtSymbols)
 
 		const totalCreditByCurrency: ClientDebtByCurrency[] = withCurrencyBriefAmountMany(
 			Array.from(totalCreditMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
 			currencyMap,
-		)
+		).map((r) => ({ ...r, amount: roundDebtDecimal(r.amount) }))
 		const totalDebitByCurrency: ClientDebtByCurrency[] = withCurrencyBriefAmountMany(
 			Array.from(totalDebitMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
 			currencyMap,
-		)
-		const deedDebtByCurrency: ClientDebtByCurrency[] = withCurrencyBriefAmountMany(
-			Array.from(debtByCurrencyMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
-			currencyMap,
-		)
+		).map((r) => ({ ...r, amount: roundDebtDecimal(r.amount) }))
+		const deedDebtByCurrency: ClientDebtByCurrency[] = withCurrencyBriefAmountMany(deedDebtNetted, currencyMap)
 
 		const fullDebt: ClientDebtByCurrency[] = withCurrencyBriefAmountMany(fullDebtNetted, currencyMap)
 

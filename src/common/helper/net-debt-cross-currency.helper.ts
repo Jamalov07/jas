@@ -1,5 +1,12 @@
 import { Decimal } from '@prisma/client/runtime/library'
 
+/** API javoblarida qarz summalari uchun nuqtadan keyin ko‘rsatiladigan xonalar soni */
+export const DEBT_DISPLAY_DECIMAL_PLACES = 3
+
+export function roundDebtDecimal(amount: Decimal): Decimal {
+	return new Decimal(amount.toDecimalPlaces(DEBT_DISPLAY_DECIMAL_PLACES))
+}
+
 /**
  * Bir nechta valyutadagi qarz qatorlarini `currency.exchange_rate` bo‘yicha bir-biriga qarama qarama (+ / −) bo‘lsa qisqartirish.
  * `exchangeRate` — bazaviy ekvivalent bir birlik valyuta uchun (masalan: 1 USD = 12 000 UZS bo‘lsa USD uchun 12 000, UZS uchun 1).
@@ -30,13 +37,13 @@ export function netDebtCrossCurrencyRows(
 
 	if (activeKeys.length === 1) {
 		const k = activeKeys[0]
-		return [{ currencyId: k, amount: amountOf(k) }]
+		return [{ currencyId: k, amount: roundDebtDecimal(amountOf(k)) }]
 	}
 
 	for (const k of activeKeys) {
 		const r = rateByCurrencyId.get(k) ?? new Decimal(0)
 		if (r.lte(0)) {
-			return activeKeys.map((cid) => ({ currencyId: cid, amount: amountOf(cid) }))
+			return activeKeys.map((cid) => ({ currencyId: cid, amount: roundDebtDecimal(amountOf(cid)) }))
 		}
 	}
 
@@ -44,7 +51,7 @@ export function netDebtCrossCurrencyRows(
 	const hasNegative = activeKeys.some((k) => amountOf(k).lt(0))
 
 	if (!hasPositive || !hasNegative) {
-		return activeKeys.map((cid) => ({ currencyId: cid, amount: amountOf(cid) }))
+		return activeKeys.map((cid) => ({ currencyId: cid, amount: roundDebtDecimal(amountOf(cid)) }))
 	}
 
 	const refAbsOf = (cid: string): Decimal => {
@@ -77,14 +84,14 @@ export function netDebtCrossCurrencyRows(
 
 	const rTarget = rateByCurrencyId.get(targetId) ?? new Decimal(0)
 	if (rTarget.lte(0)) {
-		return activeKeys.map((cid) => ({ currencyId: cid, amount: amountOf(cid) }))
+		return activeKeys.map((cid) => ({ currencyId: cid, amount: roundDebtDecimal(amountOf(cid)) }))
 	}
 	let sumRef = new Decimal(0)
 	for (const k of activeKeys) {
 		const rk = rateByCurrencyId.get(k) ?? new Decimal(0)
 		sumRef = sumRef.plus(amountOf(k).mul(rk))
 	}
-	const net = sumRef.div(rTarget)
+	const net = roundDebtDecimal(sumRef.div(rTarget))
 
 	return activeKeys.map((cid) => ({
 		currencyId: cid,

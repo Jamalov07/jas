@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsNumber, IsOptional, IsString, IsUUID } from 'class-validator'
+import { IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 import { PaginationRequestDto, RequestOtherFieldsDto } from '@common'
 import { IntersectionType } from '@nestjs/swagger'
@@ -46,6 +46,14 @@ export class SellingProductMVCreateOneRequestDto {
 	@Type(() => Number)
 	price: number
 
+	@ApiPropertyOptional({ description: 'Chegirma foizi 0–100' })
+	@IsOptional()
+	@IsNumber()
+	@Type(() => Number)
+	@Min(0)
+	@Max(100)
+	discount?: number
+
 	@ApiProperty()
 	@IsUUID()
 	currencyId: string
@@ -61,6 +69,14 @@ export class SellingProductMVUpdateOneRequestDto {
 	@ApiPropertyOptional()
 	@IsOptional()
 	price?: any
+
+	@ApiPropertyOptional({ description: 'Chegirma foizi 0–100' })
+	@IsOptional()
+	@IsNumber()
+	@Type(() => Number)
+	@Min(0)
+	@Max(100)
+	discount?: number
 
 	@ApiPropertyOptional()
 	@IsOptional()

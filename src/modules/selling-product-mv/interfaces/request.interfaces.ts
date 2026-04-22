@@ -16,6 +16,8 @@ export declare interface SellingProductMVCreateOneRequest {
 	productId: string
 	count: number
 	price: number
+	/** Chegirma foizi (0–100) */
+	discount?: number
 	currencyId: string
 	staffId?: string
 }
@@ -23,6 +25,7 @@ export declare interface SellingProductMVCreateOneRequest {
 export declare interface SellingProductMVUpdateOneRequest {
 	count?: number
 	price?: number
+	discount?: number
 	currencyId?: string
 	productId?: string
 	sellingId?: string
