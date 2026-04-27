@@ -61,7 +61,11 @@ export class SupplierRepository {
 			...(query.fullname ? { fullname: query.fullname } : {}),
 			...(query.search
 				? {
-						OR: [{ fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } }, { phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } }],
+						OR: [
+							{ fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
+							{ phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
+							{ description: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
+						],
 					}
 				: {}),
 		}
@@ -79,6 +83,7 @@ export class SupplierRepository {
 				id: true,
 				fullname: true,
 				phone: true,
+				description: true,
 				createdAt: true,
 				...SUPPLIER_DEBT_SOURCE_SELECT,
 			},
@@ -108,6 +113,7 @@ export class SupplierRepository {
 				id: true,
 				fullname: true,
 				phone: true,
+				description: true,
 				createdAt: true,
 				updatedAt: true,
 				deletedAt: true,
@@ -198,11 +204,13 @@ export class SupplierRepository {
 			data: {
 				fullname: body.fullname,
 				phone: body.phone,
+				description: body.description,
 			},
 			select: {
 				id: true,
 				fullname: true,
 				phone: true,
+				description: true,
 				createdAt: true,
 			},
 		})
@@ -215,6 +223,7 @@ export class SupplierRepository {
 			data: {
 				fullname: body.fullname,
 				phone: body.phone,
+				description: body.description,
 				deletedAt: body.deletedAt,
 			},
 		})

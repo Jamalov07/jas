@@ -24,9 +24,11 @@ export class ClientFindOneRequestDto extends IntersectionType(PickType(ClientReq
 	deedEndDate?: Date
 }
 
-export class ClientCreateOneRequestDto extends IntersectionType(PickType(ClientRequiredDto, ['fullname', 'phone'])) implements ClientCreateOneRequest {}
+export class ClientCreateOneRequestDto
+	extends IntersectionType(PickType(ClientRequiredDto, ['fullname', 'phone']), PickType(ClientOptionalDto, ['description']))
+	implements ClientCreateOneRequest {}
 
-export class ClientUpdateOneRequestDto extends IntersectionType(PickType(ClientOptionalDto, ['deletedAt', 'fullname', 'phone'])) implements ClientUpdateOneRequest {}
+export class ClientUpdateOneRequestDto extends IntersectionType(PickType(ClientOptionalDto, ['deletedAt', 'fullname', 'phone', 'description'])) implements ClientUpdateOneRequest {}
 
 export class ClientDeleteOneRequestDto
 	extends IntersectionType(PickType(ClientRequiredDto, ['id']), PickType(RequestOtherFieldsDto, ['method']))

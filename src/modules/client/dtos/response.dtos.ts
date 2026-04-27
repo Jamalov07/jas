@@ -111,6 +111,9 @@ export class ClientReportSummaryDto implements ClientReportSummary {
 }
 
 export class ClientFindOneDataDto extends PickType(ClientRequiredDto, ['id', 'fullname', 'createdAt', 'phone']) implements ClientFindOneData {
+	@ApiPropertyOptional({ type: String })
+	description?: string | null
+
 	@ApiProperty({ type: ClientDebtByCurrencyDto, isArray: true })
 	debtByCurrency?: ClientDebtByCurrency[]
 

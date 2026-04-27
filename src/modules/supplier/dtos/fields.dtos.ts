@@ -13,6 +13,8 @@ export class SupplierRequiredDto extends DefaultRequiredFieldsDto implements Sup
 	@IsNotEmpty()
 	@IsPhoneNumber('UZ')
 	phone: string
+
+	description: string | null
 }
 
 export class SupplierOptionalDto extends DefaultOptionalFieldsDto implements SupplierOptional {
@@ -25,4 +27,9 @@ export class SupplierOptionalDto extends DefaultOptionalFieldsDto implements Sup
 	@IsOptional()
 	@IsPhoneNumber('UZ')
 	phone?: string
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsString()
+	description?: string
 }

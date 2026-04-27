@@ -15,8 +15,8 @@ export declare interface ClientGetManyRequest extends ClientOptional, Pagination
 
 export declare interface ClientGetOneRequest extends ClientOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 
-export declare interface ClientCreateOneRequest extends Pick<ClientRequired, 'fullname' | 'phone'> {}
+export declare interface ClientCreateOneRequest extends Pick<ClientRequired, 'fullname' | 'phone'>, Pick<ClientOptional, 'description'> {}
 
-export declare interface ClientUpdateOneRequest extends Pick<ClientOptional, 'fullname' | 'phone' | 'deletedAt'> {}
+export declare interface ClientUpdateOneRequest extends Pick<ClientOptional, 'fullname' | 'phone' | 'deletedAt' | 'description'> {}
 
 export declare interface ClientDeleteOneRequest extends Pick<ClientOptional, 'id'>, Pick<RequestOtherFields, 'method'> {}

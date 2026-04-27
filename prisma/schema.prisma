@@ -182,9 +182,10 @@ model CurrencyModel {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model ClientModel {
-  id       String  @map("id")       @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
-  fullname String  @map("fullname") @db.VarChar()
-  phone    String? @map("phone")    @db.VarChar()      @unique
+  id          String  @map("id")          @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  fullname    String  @map("fullname")    @db.VarChar()
+  phone       String? @map("phone")       @db.VarChar()      @unique
+  description String? @map("description") @db.VarChar()      @default("")
 
   telegram  BotUserModel?
 
@@ -210,9 +211,10 @@ model ClientModel {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model SupplierModel {
-  id       String  @map("id")       @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
-  fullname String  @map("fullname") @db.VarChar()
-  phone    String? @map("phone")    @db.VarChar()      @unique
+  id          String  @map("id")          @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  fullname    String  @map("fullname")    @db.VarChar()
+  phone       String? @map("phone")       @db.VarChar()      @unique
+  description String? @map("description") @db.VarChar()      @default("")
 
   arrivals ArrivalModel[]
   payments SupplierPaymentModel[]

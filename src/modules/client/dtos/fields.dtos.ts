@@ -13,6 +13,8 @@ export class ClientRequiredDto extends DefaultRequiredFieldsDto implements Clien
 	@IsNotEmpty()
 	@IsPhoneNumber('UZ')
 	phone: string
+
+	description: string | null
 }
 
 export class ClientOptionalDto extends DefaultOptionalFieldsDto implements ClientOptional {
@@ -25,4 +27,9 @@ export class ClientOptionalDto extends DefaultOptionalFieldsDto implements Clien
 	@IsOptional()
 	@IsPhoneNumber('UZ')
 	phone?: string
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsString()
+	description?: string
 }

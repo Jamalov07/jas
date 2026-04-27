@@ -1,5 +1,5 @@
 import { Decimal } from '@prisma/client/runtime/library'
-import { ApiProperty, IntersectionType, PickType } from '@nestjs/swagger'
+import { ApiProperty, ApiPropertyOptional, IntersectionType, PickType } from '@nestjs/swagger'
 import {
 	SupplierCreateOneResponse,
 	SupplierDebtByCurrency,
@@ -71,6 +71,9 @@ export class SupplierDeedInfoDto implements SupplierDeedInfo {
 }
 
 export class SupplierFindOneDataDto extends PickType(SupplierRequiredDto, ['id', 'fullname', 'createdAt', 'phone']) implements SupplierFindOneData {
+	@ApiPropertyOptional({ type: String })
+	description?: string | null
+
 	@ApiProperty({ type: SupplierDebtByCurrencyDto, isArray: true })
 	debtByCurrency?: SupplierDebtByCurrency[]
 

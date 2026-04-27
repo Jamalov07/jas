@@ -69,6 +69,7 @@ export declare interface ClientReportSummary {
 }
 
 export declare interface ClientFindOneData extends Pick<ClientRequired, 'id' | 'fullname' | 'createdAt' | 'phone'> {
+	description?: string | null
 	debtByCurrency?: ClientDebtByCurrency[]
 	lastSellingDate?: Date
 	deedInfo?: ClientDeedInfo

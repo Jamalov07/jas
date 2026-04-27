@@ -20,9 +20,11 @@ export class SupplierFindOneRequestDto extends IntersectionType(PickType(Supplie
 	deedEndDate?: Date
 }
 
-export class SupplierCreateOneRequestDto extends IntersectionType(PickType(SupplierRequiredDto, ['fullname', 'phone'])) implements SupplierCreateOneRequest {}
+export class SupplierCreateOneRequestDto
+	extends IntersectionType(PickType(SupplierRequiredDto, ['fullname', 'phone']), PickType(SupplierOptionalDto, ['description']))
+	implements SupplierCreateOneRequest {}
 
-export class SupplierUpdateOneRequestDto extends IntersectionType(PickType(SupplierOptionalDto, ['deletedAt', 'fullname', 'phone'])) implements SupplierUpdateOneRequest {}
+export class SupplierUpdateOneRequestDto extends IntersectionType(PickType(SupplierOptionalDto, ['deletedAt', 'fullname', 'phone', 'description'])) implements SupplierUpdateOneRequest {}
 
 export class SupplierDeleteOneRequestDto
 	extends IntersectionType(PickType(SupplierRequiredDto, ['id']), PickType(RequestOtherFieldsDto, ['method']))

@@ -32,6 +32,7 @@ export declare interface SupplierDeedInfo {
 export declare interface SupplierFindManyData extends PaginationResponse<SupplierFindOneData> {}
 
 export declare interface SupplierFindOneData extends Pick<SupplierRequired, 'id' | 'fullname' | 'createdAt' | 'phone'> {
+	description?: string | null
 	lastArrivalDate?: Date
 	debtByCurrency?: SupplierDebtByCurrency[]
 	deedInfo?: SupplierDeedInfo

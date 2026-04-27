@@ -44,7 +44,7 @@ const RETURNING_SELECT = {
 	createdAt: true as const,
 	updatedAt: true as const,
 	deletedAt: true as const,
-	client: { select: { id: true, fullname: true, phone: true } },
+	client: { select: { id: true, fullname: true, phone: true, description: true } },
 	staff: { select: { id: true, fullname: true, phone: true } },
 	payment: { select: RETURNING_PAYMENT_SELECT },
 	products: {
