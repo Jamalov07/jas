@@ -351,7 +351,7 @@ export class UploadService {
 
 		if (!uzsCurrency) {
 			uzsCurrency = await prisma.currencyModel.create({
-				data: { name: "So'm", symbol: 'UZS', exchangeRate: 1 },
+				data: { name: "so'm", symbol: 'UZS', exchangeRate: 1 },
 			})
 		}
 		if (!usdCurrency) {
@@ -379,6 +379,7 @@ export class UploadService {
 					if (productName.toLowerCase().includes('сумма') || productName.toLowerCase().includes('итого')) continue
 
 					const productCount = Math.round(Number(row[3] || 0))
+					const productDescription = String(row[13] || '').trim()
 
 					// Price Mapping
 					const pricesConfig = [
@@ -417,6 +418,7 @@ export class UploadService {
 						data: {
 							name: productName,
 							count: productCount,
+							description: productDescription,
 							prices: finalPrices.length ? { create: finalPrices } : undefined,
 						},
 					})

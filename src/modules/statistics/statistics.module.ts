@@ -4,9 +4,11 @@ import { StatisticsController } from './statistics.controller'
 import { StatisticsService } from './statistics.service'
 import { StatisticsRepository } from './statistics.repository'
 import { CurrencyModule } from '../currency'
+import { ClientModule } from '../client'
+import { SupplierModule } from '../supplier'
 
 @Module({
-	imports: [PrismaModule, CurrencyModule],
+	imports: [PrismaModule, CurrencyModule, ClientModule, SupplierModule],
 	controllers: [StatisticsController],
 	providers: [StatisticsService, StatisticsRepository],
 	exports: [StatisticsService, StatisticsRepository],

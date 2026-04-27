@@ -3,13 +3,35 @@ import { Decimal } from '@prisma/client/runtime/library'
 
 export declare interface StatsCurrencyEntry {
 	currencyId: string
-	symbol: string
 	total: Decimal
+	/** Valyuta qisqacha (nom, belgi) */
+	currency: CurrencyBrief
 }
 
 export declare interface StatsPeriodEntry {
 	date: string
-	sums: StatsCurrencyEntry[]
+	/** Shu davr uchun sotuv summasi valyuta bo‘yicha */
+	byCurrency: StatsCurrencyEntry[]
+}
+
+/** Joriy holat: mijozlar bo‘yicha valyutada debitor/kreditor yig‘indisi */
+export declare interface StatisticsTotalStatsClientDebtRow {
+	currencyId: string
+	/** Mijoz bizga qarzdor (musbat qarz) */
+	theirDebt: Decimal
+	/** Biz mijozga qarzdor (manfiy qarzning moduli) */
+	ourDebt: Decimal
+	currency: CurrencyBrief
+}
+
+/** Joriy holat: ta’minotchilar bo‘yicha */
+export declare interface StatisticsTotalStatsSupplierDebtRow {
+	currencyId: string
+	/** Biz ta’minotchiga qarzdor (musbat balans) */
+	ourDebt: Decimal
+	/** Ta’minotchi bizga qarzdor */
+	theirDebt: Decimal
+	currency: CurrencyBrief
 }
 
 export declare interface StatisticsGetSellingPeriodStatsResponse extends GlobalResponse {
@@ -22,6 +44,8 @@ export declare interface StatisticsGetSellingTotalStatsResponse extends GlobalRe
 		weekly: StatsPeriodEntry[]
 		monthly: StatsPeriodEntry[]
 		yearly: StatsPeriodEntry[]
+		clientDebtByCurrency: StatisticsTotalStatsClientDebtRow[]
+		supplierDebtByCurrency: StatisticsTotalStatsSupplierDebtRow[]
 	}
 }
 

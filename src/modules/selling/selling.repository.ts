@@ -26,7 +26,7 @@ const PRODUCT_MV_SELECT = {
 	count: true,
 	createdAt: true,
 	prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRODUCT_MV_PRICE_SELECT },
-	product: { select: { id: true, name: true, createdAt: true } },
+	product: { select: { id: true, name: true, createdAt: true, image: true, description: true } },
 }
 const SELLING_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { id: true, name: true, symbol: true } } }
 const SELLING_PAYMENT_SELECT = {
@@ -128,6 +128,8 @@ export class SellingRepository {
 								id: true,
 								name: true,
 								createdAt: true,
+								image: true,
+								description: true,
 								prices: {
 									orderBy: [{ createdAt: 'desc' as const }],
 									select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } },

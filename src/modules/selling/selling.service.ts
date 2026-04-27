@@ -27,6 +27,7 @@ import {
 	SellingChangeCalcEntry,
 	SellingFindManyCalcPage,
 	SellingPaymentData,
+	SellingDebtByCurrencyRow,
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 import { CommonService } from '../common'
@@ -308,7 +309,7 @@ export class SellingService {
 		const payment = this.buildPaymentData(selling.payment)
 		const debtRaw = this.calcDebtByCurrency(totalPrices, payment)
 		const { rates: oneSellingRates, symbols: oneSellingSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(debtRaw.map((d) => d.currencyId))
-		let debtByCurrency = netDebtCrossCurrencyRows(debtRaw, oneSellingRates, oneSellingSymbols)
+		const debtByCurrencyNet = netDebtCrossCurrencyRows(debtRaw, oneSellingRates, oneSellingSymbols)
 		const products = this.mapSellingProductsPrices(selling.products)
 		const totalPayments = aggregateAmountsByCurrencyId(selling.payment?.paymentMethods)
 		const totalChanges = aggregateAmountsByCurrencyId(selling.payment?.changeMethods)
@@ -317,12 +318,12 @@ export class SellingService {
 		const clientDebtRows = clientDebtMap.get(selling.client.id) ?? []
 
 		const currencyIdsForBrief = new Set<string>()
-		for (const d of debtByCurrency) currencyIdsForBrief.add(d.currencyId)
+		for (const d of debtByCurrencyNet) currencyIdsForBrief.add(d.currencyId)
 		for (const t of totalPayments) currencyIdsForBrief.add(t.currencyId)
 		for (const t of totalChanges) currencyIdsForBrief.add(t.currencyId)
 		for (const d of clientDebtRows) currencyIdsForBrief.add(d.currencyId)
 		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
-		debtByCurrency = withCurrencyBriefAmountMany(debtByCurrency, currencyBriefMap)
+		const debtByCurrency: SellingDebtByCurrencyRow[] = withCurrencyBriefAmountMany(debtByCurrencyNet, currencyBriefMap)
 
 		return createResponse({
 			data: {

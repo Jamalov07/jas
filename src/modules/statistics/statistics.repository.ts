@@ -97,14 +97,24 @@ export class StatisticsRepository {
 				map.set(t.currency.id, { currencyId: t.currency.id, symbol: t.currency.symbol, total: new Decimal(t.total) })
 			}
 		}
-		return Array.from(map.values())
+		return Array.from(map.values()).map((v) => ({
+			currencyId: v.currencyId,
+			total: v.total,
+			currency: { id: v.currencyId, name: '', symbol: v.symbol },
+		}))
 	}
 
+	/** Qabul qilingan sotuvlar: `selling.date` oralig‘i, faqat `selling` narxi, o‘chirilmagan hujjatlar */
 	private async getTotalsByCurrencyForPeriod(start: Date, end: Date) {
 		const prices = await this.prisma.sellingProductMVPriceModel.findMany({
 			where: {
+				type: PriceTypeEnum.selling,
 				productMV: {
-					selling: { status: SellingStatusEnum.accepted, createdAt: { gte: start, lte: end } },
+					selling: {
+						status: SellingStatusEnum.accepted,
+						deletedAt: null,
+						date: { gte: start, lte: end },
+					},
 				},
 			},
 			select: { totalPrice: true, currency: { select: { id: true, symbol: true } } },
@@ -119,9 +129,9 @@ export class StatisticsRepository {
 		for (let hour = 0; hour <= now.getHours(); hour++) {
 			const start = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day, hour, 0, 0, 0))
 			const end = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day, hour, 59, 59, 999))
-			const sums = await this.getTotalsByCurrencyForPeriod(start, end)
+			const byCurrency = await this.getTotalsByCurrencyForPeriod(start, end)
 			const s = extractDateParts(start)
-			result.push({ date: `${String(s.hour).padStart(2, '0')}:${String(s.minute).padStart(2, '0')}`, sums })
+			result.push({ date: `${String(s.hour).padStart(2, '0')}:${String(s.minute).padStart(2, '0')}`, byCurrency })
 		}
 		return result
 	}
@@ -133,8 +143,8 @@ export class StatisticsRepository {
 		for (let d = 6; d >= 0; d--) {
 			const dayStart = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day - d, 0, 0, 0, 0))
 			const dayEnd = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day - d, 23, 59, 59, 999))
-			const sums = await this.getTotalsByCurrencyForPeriod(dayStart, dayEnd)
-			result.push({ date: `${dayStart.getFullYear()}-${String(dayStart.getMonth() + 1).padStart(2, '0')}-${String(dayStart.getDate()).padStart(2, '0')}`, sums })
+			const byCurrency = await this.getTotalsByCurrencyForPeriod(dayStart, dayEnd)
+			result.push({ date: `${dayStart.getFullYear()}-${String(dayStart.getMonth() + 1).padStart(2, '0')}-${String(dayStart.getDate()).padStart(2, '0')}`, byCurrency })
 		}
 		return result
 	}
@@ -145,8 +155,8 @@ export class StatisticsRepository {
 		for (let day = 1; day <= now.getDate(); day++) {
 			const dayStart = new Date(now.getFullYear(), now.getMonth(), day, 0, 0, 0, 0)
 			const dayEnd = new Date(now.getFullYear(), now.getMonth(), day, 23, 59, 59, 999)
-			const sums = await this.getTotalsByCurrencyForPeriod(dayStart, dayEnd)
-			result.push({ date: dayStart.toISOString().split('T')[0], sums })
+			const byCurrency = await this.getTotalsByCurrencyForPeriod(dayStart, dayEnd)
+			result.push({ date: dayStart.toISOString().split('T')[0], byCurrency })
 		}
 		return result
 	}
@@ -157,8 +167,8 @@ export class StatisticsRepository {
 		for (let month = 0; month < 12; month++) {
 			const monthStart = new Date(now.getFullYear(), month, 1, 0, 0, 0, 0)
 			const monthEnd = new Date(now.getFullYear(), month + 1, 0, 23, 59, 59, 999)
-			const sums = await this.getTotalsByCurrencyForPeriod(monthStart, monthEnd)
-			result.push({ date: monthStart.toISOString().split('T')[0].slice(0, 7), sums })
+			const byCurrency = await this.getTotalsByCurrencyForPeriod(monthStart, monthEnd)
+			result.push({ date: monthStart.toISOString().split('T')[0].slice(0, 7), byCurrency })
 		}
 		return result
 	}
