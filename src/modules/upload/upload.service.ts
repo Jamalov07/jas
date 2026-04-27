@@ -363,74 +363,77 @@ export class UploadService {
 			await prisma.$transaction([prisma.productPriceModel.deleteMany({}), prisma.productModel.deleteMany({})])
 		}
 
-		let createdCount = 0
+		// --- PARSE ALL ROWS (sync, no DB calls) ---
+		const pricesConfig = [
+			{ type: PriceTypeEnum.selling, priceIdx: 4, currIdx: 5, totalIdx: 6 },
+			{ type: PriceTypeEnum.wholesale, priceIdx: 7, currIdx: 8, totalIdx: 9 },
+			{ type: PriceTypeEnum.cost, priceIdx: 10, currIdx: 11, totalIdx: 12 },
+		]
 
-		// --- BATCH PROCESS ---
-		// Transaction ichida ishlash tezlikni oshiradi
+		type PriceRow = { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currencyId: string; exchangeRate: Decimal }
+
+		const productRows: { name: string; count: number; description: string }[] = []
+		const pricesByProductIdx: PriceRow[][] = []
+
+		for (let i = 0; i < rows.length; i++) {
+			if (i < 2) continue
+
+			const row = rows[i]
+			if (!row || row.length === 0 || !row[1]) continue
+
+			const productName = String(row[1] || '').trim()
+			if (productName.toLowerCase().includes('сумма') || productName.toLowerCase().includes('итого')) continue
+
+			const finalPrices: PriceRow[] = []
+			for (const p of pricesConfig) {
+				const price = Number(row[p.priceIdx] || 0)
+				const currencyStr = String(row[p.currIdx] || 'USD')
+					.trim()
+					.toUpperCase()
+				const total = Number(row[p.totalIdx] || 0)
+
+				if (price > 0) {
+					const currencyId = currencyStr === 'UZS' ? uzsCurrency.id : usdCurrency.id
+					const rate = price !== 0 ? total / price : 0
+					finalPrices.push({
+						type: p.type,
+						price: new Decimal(price),
+						totalPrice: new Decimal(total),
+						currencyId,
+						exchangeRate: new Decimal(rate),
+					})
+				}
+			}
+
+			productRows.push({ name: productName, count: Math.round(Number(row[3] || 0)), description: String(row[13] || '').trim() })
+			pricesByProductIdx.push(finalPrices)
+		}
+
+		if (productRows.length === 0) {
+			return { importedProducts: 0, status: 'success' }
+		}
+
+		// --- 2 DB CALLS INSTEAD OF N ---
+		// 1. Barcha mahsulotlarni bir so'rovda yaratamiz va ID larini olamiz
+		// 2. Barcha narxlarni bitta createMany bilan kiritamiz
 		await prisma.$transaction(
 			async (tx) => {
-				for (let i = 0; i < rows.length; i++) {
-					if (i < 2) continue // Sarlavhalarni tashlab o'tamiz
+				const created = await tx.productModel.createManyAndReturn({
+					data: productRows,
+					select: { id: true },
+				})
 
-					const row = rows[i]
-					if (!row || row.length === 0 || !row[1]) continue
+				const allPrices = created.flatMap((product, idx) => pricesByProductIdx[idx].map((price) => ({ ...price, productId: product.id })))
 
-					const productName = String(row[1] || '').trim()
-					if (productName.toLowerCase().includes('сумма') || productName.toLowerCase().includes('итого')) continue
-
-					const productCount = Math.round(Number(row[3] || 0))
-					const productDescription = String(row[13] || '').trim()
-
-					// Price Mapping
-					const pricesConfig = [
-						{ type: PriceTypeEnum.selling, priceIdx: 4, currIdx: 5, totalIdx: 6 },
-						{ type: PriceTypeEnum.wholesale, priceIdx: 7, currIdx: 8, totalIdx: 9 },
-						{ type: PriceTypeEnum.cost, priceIdx: 10, currIdx: 11, totalIdx: 12 },
-					]
-
-					const finalPrices = []
-
-					for (const p of pricesConfig) {
-						const price = Number(row[p.priceIdx] || 0)
-						const currencyStr = String(row[p.currIdx] || 'USD')
-							.trim()
-							.toUpperCase()
-						const total = Number(row[p.totalIdx] || 0)
-
-						if (price > 0) {
-							const currencyId = currencyStr === 'UZS' ? uzsCurrency.id : usdCurrency.id
-
-							// Infinity oldini olish uchun exchange rate hisobi
-							const rate = price !== 0 ? total / price : 0
-
-							finalPrices.push({
-								type: p.type,
-								price: new Decimal(price),
-								totalPrice: new Decimal(total),
-								currencyId: currencyId,
-								exchangeRate: new Decimal(rate),
-							})
-						}
-					}
-
-					// Create Product
-					await tx.productModel.create({
-						data: {
-							name: productName,
-							count: productCount,
-							description: productDescription,
-							prices: finalPrices.length ? { create: finalPrices } : undefined,
-						},
-					})
-
-					createdCount++
+				if (allPrices.length > 0) {
+					await tx.productPriceModel.createMany({ data: allPrices })
 				}
 			},
 			{ timeout: 60000 },
-		) // Katta fayllar uchun timeoutni oshirdik
+		)
 
 		return {
-			importedProducts: createdCount,
+			importedProducts: productRows.length,
 			status: 'success',
 		}
 	}

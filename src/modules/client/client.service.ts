@@ -439,138 +439,99 @@ export class ClientService {
 			map.set(currencyId, curr.plus(amount))
 		}
 
+		const buildDeedValues = (items: Array<{ amount: Decimal; currencyId: string; currency: unknown }>) => {
+			const map = new Map<string, { amount: Decimal; currency: unknown }>()
+			for (const item of items) {
+				const existing = map.get(item.currencyId)
+				if (existing) {
+					map.set(item.currencyId, { amount: existing.amount.plus(item.amount), currency: existing.currency })
+				} else {
+					map.set(item.currencyId, { amount: item.amount, currency: item.currency })
+				}
+			}
+			return Array.from(map.entries()).map(([currencyId, { amount, currency }]) => ({ currencyId, amount, currency })) as ClientDeed['values']
+		}
+
 		for (const sel of client.sellings) {
-			for (const product of sel.products) {
-				for (const price of product.prices) {
-					if ((!deedStartDate || sel.date >= deedStartDate) && (!deedEndDate || sel.date <= deedEndDate)) {
-						deeds.push({
-							type: 'debit',
-							action: 'selling',
-							value: price.totalPrice,
-							date: sel.date,
-							description: '',
-							currencyId: price.currencyId,
-							currency: price.currency,
-						})
-						addToMap(totalDebitMap, price.currencyId, price.totalPrice)
-					}
+			const selInPeriod = (!deedStartDate || sel.date >= deedStartDate) && (!deedEndDate || sel.date <= deedEndDate)
+			if (selInPeriod) {
+				const values = buildDeedValues(sel.products.flatMap((p) => p.prices.map((pr) => ({ amount: pr.totalPrice, currencyId: pr.currencyId, currency: pr.currency }))))
+				if (values.length > 0) {
+					deeds.push({ type: 'debit', action: 'selling', date: sel.date, description: '', values })
+					for (const v of values) addToMap(totalDebitMap, v.currencyId, v.amount)
 				}
 			}
 
 			if (sel.payment) {
 				const payDate = sel.payment.createdAt
-				for (const method of sel.payment.paymentMethods) {
-					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
-						deeds.push({
-							type: 'credit',
-							action: 'payment',
-							value: method.amount,
-							date: payDate,
-							description: sel.payment.description ?? '',
-							currencyId: method.currencyId,
-							currency: method.currency,
-						})
-						addToMap(totalCreditMap, method.currencyId, method.amount)
+				const payInPeriod = (!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)
+				if (payInPeriod) {
+					const pmValues = buildDeedValues(sel.payment.paymentMethods.map((m) => ({ amount: m.amount, currencyId: m.currencyId, currency: m.currency })))
+					if (pmValues.length > 0) {
+						deeds.push({ type: 'credit', action: 'payment', date: payDate, description: sel.payment.description ?? '', values: pmValues })
+						for (const v of pmValues) addToMap(totalCreditMap, v.currencyId, v.amount)
 					}
-				}
-				for (const ch of sel.payment.changeMethods ?? []) {
-					deeds.push({
-						type: 'debit',
-						action: 'change',
-						value: ch.amount,
-						date: payDate,
-						description: sel.payment.description ?? '',
-						currencyId: ch.currencyId,
-						currency: ch.currency,
-					})
-					addToMap(totalDebitMap, ch.currencyId, ch.amount)
+					const chValues = buildDeedValues((sel.payment.changeMethods ?? []).map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })))
+					if (chValues.length > 0) {
+						deeds.push({ type: 'debit', action: 'change', date: payDate, description: sel.payment.description ?? '', values: chValues })
+						for (const v of chValues) addToMap(totalDebitMap, v.currencyId, v.amount)
+					}
 				}
 			}
 		}
 
 		for (const returning of client.returnings) {
-			// Returning product: credit (reduces what client owes)
-			for (const product of returning.products) {
-				for (const price of product.prices) {
-					if ((!deedStartDate || returning.date >= deedStartDate) && (!deedEndDate || returning.date <= deedEndDate)) {
-						deeds.push({
-							type: 'credit',
-							action: 'returning',
-							value: price.totalPrice,
-							date: returning.date,
-							description: '',
-							currencyId: price.currencyId,
-							currency: price.currency,
-						})
-						addToMap(totalCreditMap, price.currencyId, price.totalPrice)
-					}
+			const retInPeriod = (!deedStartDate || returning.date >= deedStartDate) && (!deedEndDate || returning.date <= deedEndDate)
+			if (retInPeriod) {
+				const values = buildDeedValues(returning.products.flatMap((p) => p.prices.map((pr) => ({ amount: pr.totalPrice, currencyId: pr.currencyId, currency: pr.currency }))))
+				if (values.length > 0) {
+					deeds.push({ type: 'credit', action: 'returning', date: returning.date, description: '', values })
+					for (const v of values) addToMap(totalCreditMap, v.currencyId, v.amount)
 				}
 			}
-			// Returning payment methods: debit (business settled, reverses the credit)
+
 			if (returning.payment) {
 				const payDate = returning.payment.createdAt
-				for (const method of returning.payment.paymentMethods) {
-					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
-						deeds.push({
-							type: 'debit',
-							action: 'returning',
-							value: method.amount,
-							date: payDate,
-							description: returning.payment.description ?? '',
-							currencyId: method.currencyId,
-							currency: method.currency,
-						})
-						addToMap(totalDebitMap, method.currencyId, method.amount)
+				const payInPeriod = (!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)
+				if (payInPeriod) {
+					const pmValues = buildDeedValues(returning.payment.paymentMethods.map((m) => ({ amount: m.amount, currencyId: m.currencyId, currency: m.currency })))
+					if (pmValues.length > 0) {
+						deeds.push({ type: 'debit', action: 'returning', date: payDate, description: returning.payment.description ?? '', values: pmValues })
+						for (const v of pmValues) addToMap(totalDebitMap, v.currencyId, v.amount)
 					}
-				}
-				for (const ch of returning.payment.changeMethods ?? []) {
-					if ((!deedStartDate || payDate >= deedStartDate) && (!deedEndDate || payDate <= deedEndDate)) {
-						deeds.push({
-							type: 'debit',
-							action: 'returning',
-							value: ch.amount,
-							date: payDate,
-							description: returning.payment.description ?? '',
-							currencyId: ch.currencyId,
-							currency: ch.currency,
-						})
-						addToMap(totalDebitMap, ch.currencyId, ch.amount)
+					const chValues = buildDeedValues((returning.payment.changeMethods ?? []).map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })))
+					if (chValues.length > 0) {
+						deeds.push({ type: 'debit', action: 'returning', date: payDate, description: returning.payment.description ?? '', values: chValues })
+						for (const v of chValues) addToMap(totalDebitMap, v.currencyId, v.amount)
 					}
 				}
 			}
 		}
 
 		for (const payment of client.payments) {
-			if ((!deedStartDate || payment.createdAt >= deedStartDate) && (!deedEndDate || payment.createdAt <= deedEndDate)) {
-				for (const method of payment.paymentMethods) {
-					deeds.push({
-						type: 'credit',
-						action: 'payment',
-						value: method.amount,
-						date: payment.createdAt,
-						description: payment.description ?? '',
-						currencyId: method.currencyId,
-						currency: method.currency,
-					})
-					addToMap(totalCreditMap, method.currencyId, method.amount)
+			const inPeriod = (!deedStartDate || payment.createdAt >= deedStartDate) && (!deedEndDate || payment.createdAt <= deedEndDate)
+			if (inPeriod) {
+				const pmValues = buildDeedValues(payment.paymentMethods.map((m) => ({ amount: m.amount, currencyId: m.currencyId, currency: m.currency })))
+				if (pmValues.length > 0) {
+					deeds.push({ type: 'credit', action: 'payment', date: payment.createdAt, description: payment.description ?? '', values: pmValues })
+					for (const v of pmValues) addToMap(totalCreditMap, v.currencyId, v.amount)
 				}
-				for (const ch of payment.changeMethods ?? []) {
-					if (isChangeBalanceExcludedFromDebt(ch.type)) continue
-					deeds.push({
-						type: 'credit',
-						action: 'payment',
-						value: ch.amount,
-						date: payment.createdAt,
-						description: payment.description ?? '',
-						currencyId: ch.currencyId,
-						currency: ch.currency,
-					})
-					addToMap(totalCreditMap, ch.currencyId, ch.amount)
+				const chValues = buildDeedValues(
+					(payment.changeMethods ?? [])
+						.filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type))
+						.map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
+				)
+				if (chValues.length > 0) {
+					deeds.push({ type: 'credit', action: 'payment', date: payment.createdAt, description: payment.description ?? '', values: chValues })
+					for (const v of chValues) addToMap(totalCreditMap, v.currencyId, v.amount)
 				}
 			}
 		}
 
-		const filteredDeeds = deeds.filter((d) => !d.value.equals(0)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+		const filteredDeeds = deeds
+			.map((d) => ({ ...d, values: d.values.filter((v) => !v.amount.equals(0)) }))
+			.filter((d) => d.values.length > 0)
+			.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
 		const allCurrencies = new Set([...totalDebitMap.keys(), ...totalCreditMap.keys()])
 		const debtByCurrencyMap = new Map<string, Decimal>()

@@ -40,6 +40,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/semi': ['off'],
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       'prettier/prettier': ['error', { semi: false }],
       'no-undef': 'error',
       'no-shadow-restricted-names': 'off',

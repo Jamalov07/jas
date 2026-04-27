@@ -8,14 +8,18 @@ export declare interface SupplierDebtByCurrency {
 	currency: CurrencyBrief
 }
 
+export declare interface SupplierDeedValue {
+	amount: Decimal
+	currencyId: string
+	currency: CurrencyBrief
+}
+
 export declare interface SupplierDeed {
 	type: 'debit' | 'credit'
+	action: 'payment' | 'arrival' | 'change'
 	date: Date
-	action?: 'payment' | 'arrival' | 'change'
-	value: Decimal
 	description: string
-	currencyId?: string
-	currency: CurrencyBrief
+	values: SupplierDeedValue[]
 }
 
 export declare interface SupplierDeedInfo {

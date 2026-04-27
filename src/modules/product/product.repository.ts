@@ -244,6 +244,19 @@ export class ProductRepository {
 		})
 	}
 
+	async createProductPrice(productId: string, data: { type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currencyId: string; exchangeRate: Decimal }) {
+		return await this.prisma.productPriceModel.create({
+			data: {
+				productId,
+				type: data.type,
+				price: data.price,
+				totalPrice: data.totalPrice,
+				currencyId: data.currencyId,
+				exchangeRate: data.exchangeRate,
+			},
+		})
+	}
+
 	async deleteOne(query: ProductDeleteOneRequest) {
 		const product = await this.prisma.productModel.delete({
 			where: { id: query.id },

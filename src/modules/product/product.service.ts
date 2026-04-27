@@ -234,6 +234,12 @@ export class ProductService {
 		const needPriceUpdate = body.count !== undefined || hasPricePatch
 
 		if (needPriceUpdate) {
+			const allPriceTypes: Array<'cost' | 'selling' | 'wholesale'> = ['cost', 'selling', 'wholesale']
+			const existingTypeSet = new Set(current.prices.map((p) => p.type as string))
+
+			// Yangi yaratilishi kerak bo'lgan price type lar (DB da yo'q, lekin body da bor)
+			const typesToCreate = allPriceTypes.filter((t) => !existingTypeSet.has(t) && body.prices?.[t]?.currencyId && body.prices[t]?.price !== undefined)
+
 			const currencyIds = new Set<string>()
 			for (const priceRecord of current.prices) {
 				const typeKey = priceRecord.type as 'cost' | 'selling' | 'wholesale'
@@ -241,8 +247,13 @@ export class ProductService {
 				const newCurrencyId = priceInput?.currencyId ?? priceRecord.currencyId
 				currencyIds.add(newCurrencyId)
 			}
+			for (const typeKey of typesToCreate) {
+				currencyIds.add(body.prices![typeKey]!.currencyId!)
+			}
+
 			const exchangeRateByCurrencyId = await this.productRepository.findCurrencyExchangeRatesByIds([...currencyIds])
 
+			// Mavjud price larni yangilash
 			for (const priceRecord of current.prices) {
 				const typeKey = priceRecord.type as 'cost' | 'selling' | 'wholesale'
 				const priceInput = body.prices?.[typeKey]
@@ -253,6 +264,23 @@ export class ProductService {
 				const exchangeRate = exchangeRateByCurrencyId.get(newCurrencyId) ?? new Decimal(0)
 
 				await this.productRepository.updateProductPrice(priceRecord.id, {
+					price: newPrice,
+					totalPrice: newTotalPrice,
+					currencyId: newCurrencyId,
+					exchangeRate,
+				})
+			}
+
+			// DB da mavjud bo'lmagan price type larni yaratish
+			for (const typeKey of typesToCreate) {
+				const priceInput = body.prices![typeKey]!
+				const newPrice = new Decimal(priceInput.price!)
+				const newCurrencyId = priceInput.currencyId!
+				const newTotalPrice = new Decimal(newCount).mul(newPrice)
+				const exchangeRate = exchangeRateByCurrencyId.get(newCurrencyId) ?? new Decimal(0)
+
+				await this.productRepository.createProductPrice(current.id, {
+					type: typeKey as PriceTypeEnum,
 					price: newPrice,
 					totalPrice: newTotalPrice,
 					currencyId: newCurrencyId,
