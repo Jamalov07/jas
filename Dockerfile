@@ -1,21 +1,24 @@
-# ─── Stage 1: Dependencies ───────────────────────────────────────────────────
-FROM node:22-alpine AS deps
+# syntax=docker/dockerfile:1.4
+
+# ─── Base: pnpm setup (shared) ───────────────────────────────────────────────
+FROM node:22-alpine AS base
 
 RUN npm install -g pnpm
+
+# ─── Stage 1: Dependencies ───────────────────────────────────────────────────
+FROM base AS deps
 
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma/
 
-# Full install (with scripts) so prisma engines & client generate properly
-RUN pnpm install --frozen-lockfile && \
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile && \
     npx prisma generate
 
 # ─── Stage 2: Builder ────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
-
-RUN npm install -g pnpm
+FROM base AS builder
 
 WORKDIR /app
 
@@ -43,5 +46,5 @@ RUN mkdir -p uploads
 
 EXPOSE 3000
 
-# prisma migrate deploy — runs migration at startup (needs DATABASE_URL from env)
+# prisma db push — runs schema sync at startup (needs DATABASE_URL from env)
 CMD ["sh", "-c", "npx prisma db push && node dist/main"]

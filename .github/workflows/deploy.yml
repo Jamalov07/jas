@@ -17,8 +17,10 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
+          command_timeout: 20m
           script: |
             set -euo pipefail
+            export DOCKER_BUILDKIT=1
             deploy_one() {
               local dir="$1"
               if [[ -z "$dir" ]]; then
@@ -27,7 +29,7 @@ jobs:
               echo ">>> Deploy: ${dir}"
               cd "$dir"
               git pull origin main
-              docker compose build --no-cache
+              docker compose build
               docker compose up -d --remove-orphans
             }
             deploy_one "${{ secrets.APP_DIR }}"
