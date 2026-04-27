@@ -14,6 +14,7 @@ import {
 	ProductCreateOne2RequestDto,
 	ProductUpdateOne2RequestDto,
 } from './dtos'
+import type { ProductPricesUpdateInput } from './interfaces'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -77,21 +78,40 @@ export class ProductController {
 		@Body() body: ProductUpdateOne2RequestDto,
 		@UploadedFile() image?: Express.Multer.File,
 	): Promise<ProductModifyResponseDto> {
-		const prices: Record<string, { price: Decimal; currencyId: string }> = {}
+		const prices = this.buildPricesUpdateFromMultipart(body)
 
-		if (body.prices_cost_price && body.prices_cost_currencyId) {
-			prices.cost = { price: new Decimal(Number(body.prices_cost_price)), currencyId: body.prices_cost_currencyId }
+		return this.productService.updateOne(query, { ...body, prices, image: image?.filename })
+	}
+
+	/** multipart/form-data flat maydonlardan `ProductPricesUpdateInput` — `createOne` bilan mos, partial yangilanish */
+	private buildPricesUpdateFromMultipart(body: ProductUpdateOne2RequestDto): ProductPricesUpdateInput | undefined {
+		const prices: ProductPricesUpdateInput = {}
+
+		const hasCost = body.prices_cost_currencyId != null || body.prices_cost_price !== undefined
+		if (hasCost) {
+			prices.cost = {
+				...(body.prices_cost_price !== undefined ? { price: new Decimal(Number(body.prices_cost_price)) } : {}),
+				...(body.prices_cost_currencyId ? { currencyId: body.prices_cost_currencyId } : {}),
+			}
 		}
 
-		if (body.prices_selling_currencyId && !body.prices_selling_price) {
-			prices.selling = { price: new Decimal(0), currencyId: body.prices_selling_currencyId }
+		const hasSelling = body.prices_selling_currencyId != null || body.prices_selling_price !== undefined
+		if (hasSelling) {
+			prices.selling = {
+				...(body.prices_selling_price !== undefined ? { price: new Decimal(Number(body.prices_selling_price)) } : {}),
+				...(body.prices_selling_currencyId ? { currencyId: body.prices_selling_currencyId } : {}),
+			}
 		}
 
-		if (!body.prices_wholesale_currencyId && body.prices_wholesale_price) {
-			prices.wholesale = { price: new Decimal(Number(body.prices_wholesale_price)), currencyId: body.prices_wholesale_currencyId }
+		const hasWholesale = body.prices_wholesale_currencyId != null || body.prices_wholesale_price !== undefined
+		if (hasWholesale) {
+			prices.wholesale = {
+				...(body.prices_wholesale_price !== undefined ? { price: new Decimal(Number(body.prices_wholesale_price ?? 0)) } : {}),
+				...(body.prices_wholesale_currencyId ? { currencyId: body.prices_wholesale_currencyId } : {}),
+			}
 		}
 
-		return this.productService.updateOne(query, { ...body, prices: prices ?? undefined, image: image?.filename })
+		return Object.keys(prices).length ? prices : undefined
 	}
 
 	@Delete('one')

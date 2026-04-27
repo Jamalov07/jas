@@ -230,7 +230,8 @@ export class ProductService {
 		await this.productRepository.updateOne(query, body)
 
 		const newCount = body.count !== undefined ? body.count : current.count
-		const needPriceUpdate = body.count !== undefined || body.prices
+		const hasPricePatch = Boolean(body.prices && Object.keys(body.prices).length > 0)
+		const needPriceUpdate = body.count !== undefined || hasPricePatch
 
 		if (needPriceUpdate) {
 			const currencyIds = new Set<string>()

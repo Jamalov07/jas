@@ -7,6 +7,15 @@ import { actionDescriptionConverter } from '../../../common/helper'
 
 const MODELS_WITHOUT_CREATED_AT = ['ActionModel', 'BotUserModel', 'ProductPriceModel', 'SellingProductMVPriceModel', 'ArrivalProductMVPriceModel', 'ReturningProductMVPriceModel']
 
+/** Nest `RequestMethod` nomi (kichik) → Prisma `ActionMethodEnum` (faqat DBda borlar) */
+const NEST_VERB_TO_ACTION: Record<string, ActionMethodEnum> = {
+	get: ActionMethodEnum.get,
+	post: ActionMethodEnum.post,
+	put: ActionMethodEnum.put,
+	patch: ActionMethodEnum.patch,
+	delete: ActionMethodEnum.delete,
+}
+
 const MODELS_WITHOUT_DELETED_AT = [
 	'ActionModel',
 	'BotUserModel',
@@ -57,17 +66,26 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 		const actions = Object.getOwnPropertyNames(controllerPrototype)
 			.filter((method) => method !== 'constructor')
 			.map((method) => {
-				const route = Reflect.getMetadata('path', controllerPrototype[method])
-				const methodType: ActionMethodEnum = Reflect.getMetadata('method', controllerPrototype[method])
+				const handler = controllerPrototype[method as keyof typeof controllerPrototype] as object
+				const route = Reflect.getMetadata('path', handler)
+				const methodType = Reflect.getMetadata('method', handler) as RequestMethod | undefined
+				const verb = typeof methodType === 'number' ? RequestMethod[methodType] : undefined
+				if (verb === undefined) return null
+
+				const methodLower = verb.toLowerCase()
+				const methodEnum = NEST_VERB_TO_ACTION[methodLower]
+				if (methodEnum === undefined) return null
+
 				const fullRoute = `${baseRoute}/${route || ''}`.replace(/\/+/g, '/')
 				return {
-					method: RequestMethod[methodType].toLowerCase(),
+					method: methodEnum,
 					url: fullRoute,
 					name: method,
-					description: actionDescriptionConverter(`${fullRoute}-${method}-${RequestMethod[methodType].toLowerCase()}`),
+					description: actionDescriptionConverter(`${fullRoute}-${method}-${methodLower}`),
 				}
 			})
-			.filter((action) => action.method !== 'get')
+			.filter((action): action is NonNullable<typeof action> => action !== null)
+			.filter((action) => action.method !== ActionMethodEnum.get)
 		await this.actionModel.createMany({ data: actions, skipDuplicates: true })
 	}
 
