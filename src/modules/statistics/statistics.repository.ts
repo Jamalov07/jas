@@ -182,8 +182,29 @@ export class StatisticsRepository {
 	}
 
 	async getSellingTotalStats() {
-		const [daily, weekly, monthly, yearly] = await Promise.all([this.getDayStats(), this.getWeekStats(), this.getMonthStats(), this.getYearStats()])
-		return { daily, weekly, monthly, yearly }
+		const now = convertUTCtoLocal(new Date())
+		const extracted = extractDateParts(now, 'day') as { year: number; month: number; day: number }
+
+		const dailyStart = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day, 0, 0, 0, 0))
+		const dailyEnd = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day, 23, 59, 59, 999))
+
+		const weeklyStart = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day - 6, 0, 0, 0, 0))
+		const weeklyEnd = dailyEnd
+
+		const monthlyStart = convertUTCtoLocal(new Date(extracted.year, extracted.month, 1, 0, 0, 0, 0))
+		const monthlyEnd = dailyEnd
+
+		const yearlyStart = convertUTCtoLocal(new Date(extracted.year, 0, 1, 0, 0, 0, 0))
+		const yearlyEnd = dailyEnd
+
+		const [dailyByCurrency, weeklyByCurrency, monthlyByCurrency, yearlyByCurrency] = await Promise.all([
+			this.getTotalsByCurrencyForPeriod(dailyStart, dailyEnd),
+			this.getTotalsByCurrencyForPeriod(weeklyStart, weeklyEnd),
+			this.getTotalsByCurrencyForPeriod(monthlyStart, monthlyEnd),
+			this.getTotalsByCurrencyForPeriod(yearlyStart, yearlyEnd),
+		])
+
+		return { dailyByCurrency, weeklyByCurrency, monthlyByCurrency, yearlyByCurrency }
 	}
 
 	// ─── All Product MV (cross-module) ─────────────────────────────────────────

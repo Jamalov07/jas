@@ -40,10 +40,14 @@ export declare interface StatisticsGetSellingPeriodStatsResponse extends GlobalR
 
 export declare interface StatisticsGetSellingTotalStatsResponse extends GlobalResponse {
 	data: {
-		daily: StatsPeriodEntry[]
-		weekly: StatsPeriodEntry[]
-		monthly: StatsPeriodEntry[]
-		yearly: StatsPeriodEntry[]
+		/** Bugungi kun (00:00–23:59, lokal) — valyuta bo‘yicha yig‘indi */
+		dailyByCurrency: StatsCurrencyEntry[]
+		/** Joriy “hafta” oynasi: bugundan 6 kun oldingi kun 00:00 — bugun 23:59 (bitta yig‘indi) */
+		weeklyByCurrency: StatsCurrencyEntry[]
+		/** Joriy oy: oy boshidan bugungacha */
+		monthlyByCurrency: StatsCurrencyEntry[]
+		/** Joriy yil: 1-yanvardan bugungacha */
+		yearlyByCurrency: StatsCurrencyEntry[]
 		clientDebtByCurrency: StatisticsTotalStatsClientDebtRow[]
 		supplierDebtByCurrency: StatisticsTotalStatsSupplierDebtRow[]
 	}

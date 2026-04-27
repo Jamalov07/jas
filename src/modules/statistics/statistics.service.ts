@@ -8,7 +8,7 @@ import {
 	StatisticsClientReportRequest,
 	StatisticsDashboardSummaryRequest,
 } from './interfaces'
-import type { StatsPeriodEntry } from './interfaces/response.interfaces'
+import type { StatsCurrencyEntry, StatsPeriodEntry } from './interfaces/response.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 import { PrismaService } from '../shared/prisma'
 import { ClientService } from '../client'
@@ -38,10 +38,8 @@ export class StatisticsService {
 		const [clientDebtByCurrency, supplierDebtByCurrency] = await Promise.all([this.buildClientDebtTotalsByCurrency(), this.buildSupplierDebtTotalsByCurrency()])
 
 		const currencyIds = new Set<string>()
-		for (const bucket of [raw.daily, raw.weekly, raw.monthly, raw.yearly] as StatsPeriodEntry[][]) {
-			for (const e of bucket) {
-				for (const r of e.byCurrency) currencyIds.add(r.currencyId)
-			}
+		for (const bucket of [raw.dailyByCurrency, raw.weeklyByCurrency, raw.monthlyByCurrency, raw.yearlyByCurrency] as StatsCurrencyEntry[][]) {
+			for (const r of bucket) currencyIds.add(r.currencyId)
 		}
 		for (const r of clientDebtByCurrency) currencyIds.add(r.currencyId)
 		for (const r of supplierDebtByCurrency) currencyIds.add(r.currencyId)
@@ -50,17 +48,11 @@ export class StatisticsService {
 		const enrichRows = <T extends { currencyId: string; currency: { id: string; name: string; symbol: string } }>(rows: T[]) =>
 			rows.map((r) => ({ ...r, currency: briefMap.get(r.currencyId) ?? r.currency }))
 
-		const enrichPeriod = (period: StatsPeriodEntry[]) =>
-			period.map((entry) => ({
-				...entry,
-				byCurrency: enrichRows(entry.byCurrency),
-			}))
-
 		const data = {
-			daily: enrichPeriod(raw.daily),
-			weekly: enrichPeriod(raw.weekly),
-			monthly: enrichPeriod(raw.monthly),
-			yearly: enrichPeriod(raw.yearly),
+			dailyByCurrency: enrichRows(raw.dailyByCurrency),
+			weeklyByCurrency: enrichRows(raw.weeklyByCurrency),
+			monthlyByCurrency: enrichRows(raw.monthlyByCurrency),
+			yearlyByCurrency: enrichRows(raw.yearlyByCurrency),
 			clientDebtByCurrency: enrichRows(clientDebtByCurrency),
 			supplierDebtByCurrency: enrichRows(supplierDebtByCurrency),
 		}
