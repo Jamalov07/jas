@@ -109,7 +109,10 @@ export class ArrivalFindManyRequestDto
 
 export class ArrivalFindOneRequestDto extends IntersectionType(PickType(ArrivalRequiredDto, ['id'])) implements ArrivalFindOneRequest {}
 
-export class ArrivalCreateOneRequestDto extends IntersectionType(PickType(ArrivalRequiredDto, ['supplierId', 'date'])) implements ArrivalCreateOneRequest {
+export class ArrivalCreateOneRequestDto
+	extends IntersectionType(PickType(ArrivalRequiredDto, ['supplierId', 'date']), PickType(ArrivalOptionalDto, ['description']))
+	implements ArrivalCreateOneRequest
+{
 	@ApiPropertyOptional({ type: ArrivalPaymentDto })
 	@IsOptional()
 	@ValidateNested()
@@ -124,7 +127,7 @@ export class ArrivalCreateOneRequestDto extends IntersectionType(PickType(Arriva
 	products?: ArrivalProduct[]
 }
 
-export class ArrivalUpdateOneRequestDto extends IntersectionType(PickType(ArrivalOptionalDto, ['deletedAt', 'supplierId', 'date'])) implements ArrivalUpdateOneRequest {
+export class ArrivalUpdateOneRequestDto extends IntersectionType(PickType(ArrivalOptionalDto, ['deletedAt', 'supplierId', 'date', 'description'])) implements ArrivalUpdateOneRequest {
 	@ApiPropertyOptional({ type: ArrivalPaymentDto })
 	@IsOptional()
 	@ValidateNested()

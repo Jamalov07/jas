@@ -40,6 +40,7 @@ const ARRIVAL_SELECT = {
 	staffId: true as const,
 	publicId: true as const,
 	date: true as const,
+	description: true as const,
 	createdAt: true as const,
 	updatedAt: true as const,
 	deletedAt: true as const,
@@ -138,6 +139,7 @@ export class ArrivalRepository {
 				supplierId: body.supplierId,
 				date: new Date(body.date),
 				staffId: body.staffId,
+				description: body.description,
 				...(body.payment &&
 					((body.payment.paymentMethods?.length ?? 0) > 0 || (body.payment.changeMethods?.length ?? 0) > 0) && {
 						payment: {
@@ -219,6 +221,7 @@ export class ArrivalRepository {
 			data: {
 				supplierId: body.supplierId,
 				date: body.date ? new Date(body.date) : undefined,
+				description: body.description,
 				deletedAt: body.deletedAt,
 			},
 		})

@@ -99,7 +99,10 @@ export class ReturningFindManyRequestDto
 
 export class ReturningFindOneRequestDto extends IntersectionType(PickType(ReturningRequiredDto, ['id'])) implements ReturningFindOneRequest {}
 
-export class ReturningCreateOneRequestDto extends IntersectionType(PickType(ReturningRequiredDto, ['clientId', 'date'])) implements ReturningCreateOneRequest {
+export class ReturningCreateOneRequestDto
+	extends IntersectionType(PickType(ReturningRequiredDto, ['clientId', 'date']), PickType(ReturningOptionalDto, ['description']))
+	implements ReturningCreateOneRequest
+{
 	@ApiPropertyOptional({ type: ReturningPaymentDto })
 	@IsOptional()
 	@ValidateNested()
@@ -114,7 +117,7 @@ export class ReturningCreateOneRequestDto extends IntersectionType(PickType(Retu
 	products?: ReturningProduct[]
 }
 
-export class ReturningUpdateOneRequestDto extends IntersectionType(PickType(ReturningOptionalDto, ['deletedAt', 'clientId', 'date'])) implements ReturningUpdateOneRequest {
+export class ReturningUpdateOneRequestDto extends IntersectionType(PickType(ReturningOptionalDto, ['deletedAt', 'clientId', 'date', 'description'])) implements ReturningUpdateOneRequest {
 	@ApiPropertyOptional({ type: ReturningPaymentDto })
 	@IsOptional()
 	@ValidateNested()

@@ -1,6 +1,6 @@
 import { GlobalResponse, PaginationResponse } from '@common'
 import { ClientDebtByCurrency } from '../../client/interfaces'
-import { ReturningRequired } from './fields.interfaces'
+import { ReturningOptional, ReturningRequired } from './fields.interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
 import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 
@@ -21,7 +21,7 @@ export declare interface ReturningFindManyData extends PaginationResponse<Return
 	changeCalc: ReturningChangeCalcEntry[]
 }
 
-export declare interface ReturningFindOneData extends Pick<ReturningRequired, 'id' | 'status' | 'date' | 'createdAt'> {
+export declare interface ReturningFindOneData extends Pick<ReturningRequired, 'id' | 'status' | 'date' | 'createdAt'>, Pick<ReturningOptional, 'description'> {
 	payment?: any
 	products?: any[]
 	totalPrices?: { currencyId: string; total: Decimal; currency?: { symbol: string } }[]

@@ -39,12 +39,12 @@ export declare interface ReturningGetManyRequest extends ReturningOptional, Pagi
 
 export declare interface ReturningGetOneRequest extends ReturningOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 
-export declare interface ReturningCreateOneRequest extends Pick<ReturningRequired, 'clientId' | 'date'>, Pick<ReturningOptional, 'staffId' | 'status'> {
+export declare interface ReturningCreateOneRequest extends Pick<ReturningRequired, 'clientId' | 'date'>, Pick<ReturningOptional, 'staffId' | 'status' | 'description'> {
 	payment?: ReturningPayment
 	products?: ReturningProduct[]
 }
 
-export declare interface ReturningUpdateOneRequest extends Pick<ReturningOptional, 'deletedAt' | 'clientId' | 'date' | 'staffId' | 'status'> {
+export declare interface ReturningUpdateOneRequest extends Pick<ReturningOptional, 'deletedAt' | 'clientId' | 'date' | 'staffId' | 'status' | 'description'> {
 	payment?: ReturningPayment
 	products?: ReturningProduct[]
 	productIdsToRemove?: string[]

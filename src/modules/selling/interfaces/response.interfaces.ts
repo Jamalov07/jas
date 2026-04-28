@@ -96,7 +96,7 @@ export declare interface SellingDebtByCurrencyRow {
 	currency: CurrencyBrief
 }
 
-export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' | 'status' | 'createdAt' | 'date'>, Pick<SellingOptional, 'publicId'> {
+export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' | 'status' | 'createdAt' | 'date'>, Pick<SellingOptional, 'publicId' | 'description'> {
 	client?: any
 	staff?: any
 	/** Hujjat bo‘yicha qoldiq qarz, valyuta bo‘yicha */

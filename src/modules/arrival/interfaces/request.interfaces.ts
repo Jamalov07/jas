@@ -41,12 +41,12 @@ export declare interface ArrivalGetManyRequest extends ArrivalOptional, Paginati
 
 export declare interface ArrivalGetOneRequest extends ArrivalOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 
-export declare interface ArrivalCreateOneRequest extends Pick<ArrivalRequired, 'supplierId' | 'date'>, Pick<ArrivalOptional, 'staffId'> {
+export declare interface ArrivalCreateOneRequest extends Pick<ArrivalRequired, 'supplierId' | 'date'>, Pick<ArrivalOptional, 'staffId' | 'description'> {
 	payment?: ArrivalPayment
 	products?: ArrivalProduct[]
 }
 
-export declare interface ArrivalUpdateOneRequest extends Pick<ArrivalOptional, 'deletedAt' | 'supplierId' | 'date' | 'staffId'> {
+export declare interface ArrivalUpdateOneRequest extends Pick<ArrivalOptional, 'deletedAt' | 'supplierId' | 'date' | 'staffId' | 'description'> {
 	payment?: ArrivalPayment
 	products?: ArrivalProduct[]
 	productIdsToRemove?: string[]

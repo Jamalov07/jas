@@ -41,6 +41,7 @@ const RETURNING_SELECT = {
 	publicId: true as const,
 	date: true as const,
 	status: true as const,
+	description: true as const,
 	createdAt: true as const,
 	updatedAt: true as const,
 	deletedAt: true as const,
@@ -139,6 +140,7 @@ export class ReturningRepository {
 				staffId: body.staffId,
 				status: body.status,
 				date: body.date ? new Date(body.date) : undefined,
+				description: body.description,
 				...(body.payment &&
 					((body.payment.paymentMethods?.length ?? 0) > 0 || (body.payment.changeMethods?.length ?? 0) > 0) && {
 						payment: {
@@ -211,6 +213,7 @@ export class ReturningRepository {
 				staffId: body.staffId,
 				status: body.status,
 				date: body.date ? new Date(body.date) : undefined,
+				description: body.description,
 				deletedAt: body.deletedAt,
 			},
 		})

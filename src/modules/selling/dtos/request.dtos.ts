@@ -92,7 +92,8 @@ export class SellingProductDto implements SellingProduct {
 	@IsNumber()
 	@Min(0)
 	@Max(100)
-	discount?: number
+	@IsDecimalIntOrBigInt()
+	discount?: Decimal
 
 	@ApiProperty({ type: String })
 	@IsNotEmpty()
@@ -111,7 +112,7 @@ export class SellingFindManyRequestDto
 export class SellingFindOneRequestDto extends IntersectionType(PickType(SellingRequiredDto, ['id'])) implements SellingFindOneRequest {}
 
 export class SellingCreateOneRequestDto
-	extends IntersectionType(PickType(SellingRequiredDto, ['clientId', 'date']), PickType(SellingOptionalDto, ['staffId']))
+	extends IntersectionType(PickType(SellingRequiredDto, ['clientId', 'date']), PickType(SellingOptionalDto, ['staffId', 'description']))
 	implements SellingCreateOneRequest
 {
 	@ApiPropertyOptional({ type: SellingPaymentDto })
@@ -134,7 +135,10 @@ export class SellingCreateOneRequestDto
 	send?: boolean
 }
 
-export class SellingUpdateOneRequestDto extends IntersectionType(PickType(SellingOptionalDto, ['deletedAt', 'clientId', 'date', 'status'])) implements SellingUpdateOneRequest {
+export class SellingUpdateOneRequestDto
+	extends IntersectionType(PickType(SellingOptionalDto, ['deletedAt', 'clientId', 'date', 'status', 'description']))
+	implements SellingUpdateOneRequest
+{
 	@ApiPropertyOptional({ type: SellingPaymentDto })
 	@IsOptional()
 	@ValidateNested()
