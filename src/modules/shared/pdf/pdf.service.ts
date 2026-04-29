@@ -6,6 +6,7 @@ import * as pdfMake from 'pdfmake/build/pdfmake'
 import vfsFonts from 'pdfmake/build/vfs_fonts'
 import { TDocumentDefinitions } from 'pdfmake/interfaces'
 import { resolvePdfLogoBase64 } from './constants'
+import { Decimal } from '@prisma/client/runtime/library'
 ;(pdfMake as any).vfs = vfsFonts
 
 @Injectable()
@@ -18,14 +19,14 @@ export class PdfService {
 		if (p && typeof p === 'object' && !Array.isArray(p) && p.selling) {
 			const s = p.selling
 			return {
-				price: s?.price,
+				price: s.price.mul(new Decimal(100).minus(s.discount ?? 0)).div(100) || s.price,
 				totalPrice: s?.totalPrice,
 				symbol: '' as string,
 			}
 		}
 		const row = Array.isArray(p) ? p[0] : undefined
 		return {
-			price: row?.price,
+			price: row?.price.mul(new Decimal(100).minus(row?.discount ?? 0)).div(100) || row?.price,
 			totalPrice: row?.totalPrice,
 			symbol: row?.currency?.symbol ?? '',
 		}
