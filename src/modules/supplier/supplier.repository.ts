@@ -50,7 +50,19 @@ export class SupplierRepository {
 		this.prisma = prisma
 	}
 
-	/** `search` bo‘lmasa `contains: undefined` bilan bo‘sh natija (client.repository bilan bir xil). */
+	private buildSupplierSearchFilter(search?: string): Prisma.SupplierModelWhereInput {
+		if (!search) return {}
+		const words = search.split(/\s+/).filter(Boolean)
+		const perWord = (word: string): Prisma.SupplierModelWhereInput => ({
+			OR: [
+				{ fullname: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ phone: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ description: { contains: word, mode: Prisma.QueryMode.insensitive } },
+			],
+		})
+		return words.length > 1 ? { AND: words.map(perWord) } : perWord(words[0])
+	}
+
 	private supplierFindManyWhere(query: SupplierFindManyRequest): Prisma.SupplierModelWhereInput {
 		let idPart: Prisma.SupplierModelWhereInput = {}
 		if (query.ids?.length) {
@@ -58,16 +70,7 @@ export class SupplierRepository {
 		}
 		return {
 			...idPart,
-			...(query.fullname ? { fullname: query.fullname } : {}),
-			...(query.search
-				? {
-						OR: [
-							{ fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
-							{ phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
-							{ description: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
-						],
-					}
-				: {}),
+			...this.buildSupplierSearchFilter(query.search),
 		}
 	}
 

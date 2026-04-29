@@ -263,7 +263,9 @@ export class SupplierService {
 					for (const v of pmValues) addToMap(totalCreditMap, v.currencyId, v.amount)
 				}
 				const chValues = buildDeedValues(
-					(payment.changeMethods ?? []).filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type)).map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
+					(payment.changeMethods ?? [])
+						.filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type))
+						.map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
 				)
 				if (chValues.length > 0) {
 					deeds.push({ type: 'credit', action: 'payment', date: payment.createdAt, description: payment.description ?? '', values: chValues })

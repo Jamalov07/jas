@@ -87,6 +87,19 @@ export class ClientRepository {
 	}
 
 	/** `search` bo‘lmasa `OR` + `contains: undefined` Prisma hech nima qaytarmasligi mumkin (masalan selling `findMany` dan `ids` bilan chaqiriq). */
+	private buildClientSearchFilter(search?: string): Prisma.ClientModelWhereInput {
+		if (!search) return {}
+		const words = search.split(/\s+/).filter(Boolean)
+		const perWord = (word: string): Prisma.ClientModelWhereInput => ({
+			OR: [
+				{ fullname: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ phone: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ description: { contains: word, mode: Prisma.QueryMode.insensitive } },
+			],
+		})
+		return words.length > 1 ? { AND: words.map(perWord) } : perWord(words[0])
+	}
+
 	private clientFindManyWhere(query: ClientFindManyRequest): Prisma.ClientModelWhereInput {
 		let idPart: Prisma.ClientModelWhereInput = {}
 		if (query.ids?.length) {
@@ -94,16 +107,7 @@ export class ClientRepository {
 		}
 		return {
 			...idPart,
-			...(query.fullname ? { fullname: query.fullname } : {}),
-			...(query.search
-				? {
-						OR: [
-							{ fullname: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
-							{ phone: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
-							{ description: { contains: query.search, mode: Prisma.QueryMode.insensitive } },
-						],
-					}
-				: {}),
+			...this.buildClientSearchFilter(query.search),
 		}
 	}
 
