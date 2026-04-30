@@ -348,9 +348,8 @@ export class SellingRepository {
 
 		if (body.status === SellingStatusEnum.accepted && existing.status !== SellingStatusEnum.accepted) {
 			const sellingDate = body.date ? new Date(body.date) : new Date()
-			const sortedProducts = [...existing.products].sort((a, b) => a.product.id.localeCompare(b.product.id))
-			for (let i = 0; i < sortedProducts.length; i++) {
-				const product = sortedProducts[sortedProducts.length - 1 - i]
+			for (let i = 0; i < existing.products.length; i++) {
+				const product = existing.products[i]
 				const newDate = new Date(sellingDate.getTime() - i * 1000)
 				await this.prisma.sellingProductMVModel.update({ where: { id: product.id }, data: { createdAt: newDate } })
 			}
