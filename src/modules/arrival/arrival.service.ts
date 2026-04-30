@@ -22,7 +22,7 @@ import {
 	ArrivalDeleteOneRequest,
 } from './interfaces'
 import { Decimal } from '@prisma/client/runtime/library'
-import { PriceTypeEnum } from '@prisma/client'
+import { ChangeMethodEnum, PriceTypeEnum } from '@prisma/client'
 
 type PriceEntry = { type: string; price: Decimal; totalPrice: Decimal; currencyId: string; currency: { symbol: string } }
 type ArrivalMvPriceRow = {
@@ -106,6 +106,7 @@ export class ArrivalService {
 		}
 
 		for (const ch of changeMethods) {
+			if (ch.type === ChangeMethodEnum.balance) continue
 			const existing = debtMap.get(ch.currencyId)
 			const symbol = existing?.symbol || ch.currency?.symbol || ''
 			debtMap.set(ch.currencyId, { amount: (existing?.amount ?? new Decimal(0)).plus(ch.amount), symbol })

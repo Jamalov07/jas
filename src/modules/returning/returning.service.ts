@@ -25,7 +25,7 @@ import {
 	ReturningCalcEntry,
 	ReturningChangeCalcEntry,
 } from './interfaces'
-import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
+import { ChangeMethodEnum, PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import { CommonService } from '../common'
 import { ClientService } from '../client'
 import { CurrencyRepository } from '../currency'
@@ -112,6 +112,7 @@ export class ReturningService {
 			debtMap.set(method.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(method.amount), symbol })
 		}
 		for (const ch of payment?.changeMethods ?? []) {
+			if (ch.type === ChangeMethodEnum.balance) continue
 			const existing = debtMap.get(ch.currencyId)
 			const symbol = existing?.symbol ?? (ch as { currency?: { symbol?: string } }).currency?.symbol
 			debtMap.set(ch.currencyId, { amount: (existing?.amount ?? new Decimal(0)).minus(ch.amount), symbol })
@@ -295,6 +296,7 @@ export class ReturningService {
 	}
 
 	async createOne(request: CRequest, body: ReturningCreateOneRequest) {
+		body.status = SellingStatusEnum.accepted
 		if ((body.payment?.paymentMethods?.length ?? 0) > 0 || (body.payment?.changeMethods?.length ?? 0) > 0) {
 			body.status = SellingStatusEnum.accepted
 		}

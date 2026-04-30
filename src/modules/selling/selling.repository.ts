@@ -286,7 +286,7 @@ export class SellingRepository {
 		await this.prisma.sellingModel.update({
 			where: { id: query.id },
 			data: {
-				date: existing.status !== SellingStatusEnum.accepted ? (body.date ? new Date(body.date) : undefined) : undefined,
+				date: body.date ? new Date(body.date) : undefined,
 				status: body.status,
 				clientId: body.clientId,
 				description: body.description,
