@@ -232,7 +232,7 @@ export class SupplierService {
 			if (arrInPeriod) {
 				const values = buildDeedValues(arr.products.flatMap((p) => p.prices.map((pr) => ({ amount: pr.totalPrice, currencyId: pr.currencyId, currency: pr.currency }))))
 				if (values.length > 0) {
-					deeds.push({ type: 'debit', action: 'arrival', date: arr.date, description: '', values })
+					deeds.push({ type: 'debit', action: 'arrival', date: arr.date, description: arr.description ?? '', values })
 					for (const v of values) addToMap(totalDebitMap, v.currencyId, v.amount)
 				}
 			}
@@ -246,15 +246,15 @@ export class SupplierService {
 						deeds.push({ type: 'credit', action: 'payment', date: payDate, description: arr.payment.description ?? '', values: pmValues })
 						for (const v of pmValues) addToMap(totalCreditMap, v.currencyId, v.amount)
 					}
-				const chValues = buildDeedValues(
-					(arr.payment.changeMethods ?? [])
-						.filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type))
-						.map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
-				)
-				if (chValues.length > 0) {
-					deeds.push({ type: 'debit', action: 'change', date: payDate, description: arr.payment.description ?? '', values: chValues })
-					for (const v of chValues) addToMap(totalDebitMap, v.currencyId, v.amount)
-				}
+					const chValues = buildDeedValues(
+						(arr.payment.changeMethods ?? [])
+							.filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type))
+							.map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
+					)
+					if (chValues.length > 0) {
+						deeds.push({ type: 'debit', action: 'change', date: payDate, description: arr.payment.description ?? '', values: chValues })
+						for (const v of chValues) addToMap(totalDebitMap, v.currencyId, v.amount)
+					}
 				}
 			}
 		}

@@ -37,7 +37,7 @@ export declare interface ArrivalFindManyRequest
 
 export declare interface ArrivalFindOneRequest extends Pick<ArrivalOptional, 'id'> {}
 
-export declare interface ArrivalGetManyRequest extends ArrivalOptional, PaginationRequest, Pick<RequestOtherFields, 'ids' | 'isDeleted'> {}
+export declare interface ArrivalGetManyRequest extends ArrivalOptional, PaginationRequest, Pick<RequestOtherFields, 'ids' | 'isDeleted' | 'search'> {}
 
 export declare interface ArrivalGetOneRequest extends ArrivalOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 

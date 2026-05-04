@@ -24,7 +24,11 @@ export declare interface ProductPricesUpdateInput {
 	wholesale?: ProductPriceUpdateInput
 }
 
-export declare interface ProductFindManyRequest extends Pick<ProductOptional, 'name'>, PaginationRequest, Pick<RequestOtherFields, 'isDeleted' | 'search'> {}
+export declare interface ProductFindManyRequest extends Pick<ProductOptional, 'name'>, PaginationRequest, Pick<RequestOtherFields, 'isDeleted' | 'search'> {
+	/** `true` bo‘lsa service oxirgi sotuv sanasi bo‘yicha qayta tartiradi (yangisi birinchi). Standart: faqat `name` asc (repository). */
+	sortByLastSellingDate?: boolean
+	clientId?: string
+}
 
 export declare interface ProductFindOneRequest extends Pick<ProductRequired, 'id'> {}
 

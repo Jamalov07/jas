@@ -28,6 +28,37 @@ export class ExcelService {
 		return `${dd}.${mm}.${yyyy} ${hh}:${min}`
 	}
 
+	/** Client / supplier modulidagi `findMany` qidiruvi bilan bir xil */
+	private relationalClientSearchSpread(search?: string): Pick<Prisma.SellingModelWhereInput, 'client'> | Record<string, never> {
+		if (!search) return {}
+		const words = search.split(/\s+/).filter(Boolean)
+		if (!words.length) return {}
+		const perWord = (word: string): Prisma.ClientModelWhereInput => ({
+			OR: [
+				{ fullname: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ phone: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ description: { contains: word, mode: Prisma.QueryMode.insensitive } },
+			],
+		})
+		const clientWhere = words.length > 1 ? { AND: words.map(perWord) } : perWord(words[0])
+		return { client: clientWhere }
+	}
+
+	private relationalSupplierSearchSpread(search?: string): Pick<Prisma.ArrivalModelWhereInput, 'supplier'> | Record<string, never> {
+		if (!search) return {}
+		const words = search.split(/\s+/).filter(Boolean)
+		if (!words.length) return {}
+		const perWord = (word: string): Prisma.SupplierModelWhereInput => ({
+			OR: [
+				{ fullname: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ phone: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ description: { contains: word, mode: Prisma.QueryMode.insensitive } },
+			],
+		})
+		const supplierWhere = words.length > 1 ? { AND: words.map(perWord) } : perWord(words[0])
+		return { supplier: supplierWhere }
+	}
+
 	private allBorder(): Partial<ExcelJS.Borders> {
 		return {
 			top: { style: 'thin', color: { argb: 'FF000000' } },
@@ -87,11 +118,12 @@ export class ExcelService {
 				clientId: query.clientId,
 				staffId: query.staffId,
 				status: SellingStatusEnum.accepted,
-				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
+				...this.relationalClientSearchSpread(query.search),
 				date: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
 			select: {
 				date: true,
+				description: true,
 				client: { select: { fullname: true, phone: true } },
 				staff: { select: { fullname: true } },
 				payment: {
@@ -156,7 +188,11 @@ export class ExcelService {
 				summa: totalStr,
 				paid: paidStr,
 				staff: item.staff.fullname,
-				info: item.payment?.description ?? '',
+				info:
+					[item.description, item.payment?.description]
+						.map((s) => (typeof s === 'string' ? s.trim() : ''))
+						.filter(Boolean)
+						.join(' · ') || '',
 				date: this.formatDate(item.date),
 			})
 			this.styleDataRow(row)
@@ -282,11 +318,13 @@ export class ExcelService {
 			where: {
 				deletedAt: null,
 				supplierId: query.supplierId,
-				OR: [{ supplier: { fullname: { contains: query.search, mode: 'insensitive' } } }, { supplier: { phone: { contains: query.search, mode: 'insensitive' } } }],
+				staffId: query.staffId,
+				...this.relationalSupplierSearchSpread(query.search),
 				createdAt: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
 			select: {
 				date: true,
+				description: true,
 				supplier: { select: { fullname: true } },
 				staff: { select: { fullname: true } },
 				payment: {
@@ -346,7 +384,11 @@ export class ExcelService {
 				summa: totalStr,
 				paid: paidStr,
 				staff: item.staff?.fullname ?? '',
-				info: item.payment?.description ?? '',
+				info:
+					[item.description, item.payment?.description]
+						.map((s) => (typeof s === 'string' ? s.trim() : ''))
+						.filter(Boolean)
+						.join(' · ') || '',
 				date: this.formatDate(item.date),
 			})
 			this.styleDataRow(row)
@@ -451,11 +493,13 @@ export class ExcelService {
 			where: {
 				status: query.status,
 				clientId: query.clientId,
-				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
+				staffId: query.staffId,
+				...this.relationalClientSearchSpread(query.search),
 				date: { ...(startDate && { gte: startDate }), ...(endDate && { lte: endDate }) },
 			},
 			select: {
 				date: true,
+				description: true,
 				client: { select: { fullname: true, phone: true } },
 				staff: { select: { fullname: true } },
 				payment: {
@@ -498,7 +542,11 @@ export class ExcelService {
 				client: `${item.client.fullname} - ${item.client.phone}`,
 				paid: paidStr,
 				staff: item.staff?.fullname ?? '',
-				info: item.payment?.description ?? '',
+				info:
+					[item.description, item.payment?.description]
+						.map((s) => (typeof s === 'string' ? s.trim() : ''))
+						.filter(Boolean)
+						.join(' · ') || '',
 				date: this.formatDate(item.date),
 			})
 			this.styleDataRow(row)
@@ -1154,7 +1202,7 @@ export class ExcelService {
 					select: { type: true, price: true, totalPrice: true, currency: { select: { symbol: true } } },
 				},
 			},
-			orderBy: { createdAt: 'desc' },
+			orderBy: [{ name: 'asc' }],
 		})
 
 		const workbook = new ExcelJS.Workbook()

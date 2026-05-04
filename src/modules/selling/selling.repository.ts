@@ -9,7 +9,7 @@ import {
 	SellingGetOneRequest,
 	SellingUpdateOneRequest,
 } from './interfaces'
-import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
+import { PriceTypeEnum, Prisma, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { calcSellingLineTotalPrice } from '@common'
 
@@ -61,6 +61,41 @@ export class SellingRepository {
 		this.prisma = prisma
 	}
 
+	/** `search` bo‘lmasa `OR` + `contains: undefined` Prisma hech nima qaytarmasligi mumkin (`getMany` da `ids` bilan chaqiriq). */
+	private buildSellingClientSearchFilter(search?: string): Prisma.SellingModelWhereInput {
+		if (!search) return {}
+		const words = search.split(/\s+/).filter(Boolean)
+		if (!words.length) return {}
+		const perWord = (word: string): Prisma.ClientModelWhereInput => ({
+			OR: [
+				{ fullname: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ phone: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ description: { contains: word, mode: Prisma.QueryMode.insensitive } },
+			],
+		})
+		const clientWhere = words.length > 1 ? { AND: words.map(perWord) } : perWord(words[0])
+		return { client: clientWhere }
+	}
+
+	private sellingFindManyWhere(query: SellingFindManyRequest): Prisma.SellingModelWhereInput {
+		return {
+			status: query.status,
+			staffId: query.staffId,
+			clientId: query.clientId,
+			...this.buildSellingClientSearchFilter(query.search),
+			date: { gte: query.startDate, lte: query.endDate },
+		}
+	}
+
+	private sellingGetManyWhere(query: SellingGetManyRequest): Prisma.SellingModelWhereInput {
+		return {
+			id: { in: query.ids },
+			status: query.status,
+			date: { gte: query.startDate, lte: query.endDate },
+			...this.buildSellingClientSearchFilter(query.search),
+		}
+	}
+
 	private async syncProductPrices(productId: string, newCount: number, priceUpdates?: { selling?: Decimal; cost?: Decimal }) {
 		const prices = await this.prisma.productPriceModel.findMany({
 			where: { productId },
@@ -87,13 +122,7 @@ export class SellingRepository {
 		}
 
 		const sellings = await this.prisma.sellingModel.findMany({
-			where: {
-				status: query.status,
-				staffId: query.staffId,
-				clientId: query.clientId,
-				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				date: { gte: query.startDate, lte: query.endDate },
-			},
+			where: this.sellingFindManyWhere(query),
 			orderBy: [{ date: 'desc' }],
 			select: SELLING_SELECT,
 			...paginationOptions,
@@ -147,13 +176,7 @@ export class SellingRepository {
 
 	async countFindMany(query: SellingFindManyRequest) {
 		return this.prisma.sellingModel.count({
-			where: {
-				status: query.status,
-				staffId: query.staffId,
-				clientId: query.clientId,
-				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				date: { gte: query.startDate, lte: query.endDate },
-			},
+			where: this.sellingFindManyWhere(query),
 		})
 	}
 
@@ -192,14 +215,14 @@ export class SellingRepository {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 		return this.prisma.sellingModel.findMany({
-			where: { id: { in: query.ids }, status: query.status, date: { gte: query.startDate, lte: query.endDate } },
+			where: this.sellingGetManyWhere(query),
 			select: SELLING_SELECT,
 			...paginationOptions,
 		})
 	}
 
 	async countGetMany(query: SellingGetManyRequest) {
-		return this.prisma.sellingModel.count({ where: { id: { in: query.ids }, status: query.status } })
+		return this.prisma.sellingModel.count({ where: this.sellingGetManyWhere(query) })
 	}
 
 	async createOne(body: SellingCreateOneRequest) {

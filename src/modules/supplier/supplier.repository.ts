@@ -17,6 +17,7 @@ const SUPPLIER_DEBT_SOURCE_SELECT = {
 		where: { deletedAt: null },
 		select: {
 			date: true,
+			description: true,
 			products: {
 				select: {
 					prices: {
@@ -124,6 +125,7 @@ export class SupplierRepository {
 					where: { deletedAt: null },
 					select: {
 						date: true,
+						description: true,
 						products: {
 							orderBy: [{ createdAt: 'desc' }],
 							select: {

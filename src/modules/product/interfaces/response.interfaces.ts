@@ -34,9 +34,11 @@ export declare interface ProductFindManyData extends PaginationResponse<ProductF
 
 export declare interface ProductFindOneData extends Pick<ProductRequired, 'id' | 'name' | 'createdAt'>, Pick<ProductOptional, 'count' | 'minAmount' | 'description' | 'image'> {
 	prices?: Record<PriceTypeEnum, ProductPriceData>
-	lastSellingDate?: Date
-	lastSellingCount?: number
-	lastSellingPrice?: Decimal
+	lastSelling?: {
+		date: Date | null
+		price: Decimal | null
+		count: number | null
+	}
 }
 
 export declare interface ProductFindManyResponse extends GlobalResponse {

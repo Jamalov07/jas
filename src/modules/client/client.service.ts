@@ -460,7 +460,7 @@ export class ClientService {
 			if (selInPeriod) {
 				const values = buildDeedValues(sel.products.flatMap((p) => p.prices.map((pr) => ({ amount: pr.totalPrice, currencyId: pr.currencyId, currency: pr.currency }))))
 				if (values.length > 0) {
-					deeds.push({ type: 'debit', action: 'selling', date: sel.date, description: '', values })
+					deeds.push({ type: 'debit', action: 'selling', date: sel.date, description: sel.description ?? '', values })
 					for (const v of values) addToMap(totalDebitMap, v.currencyId, v.amount)
 				}
 			}
@@ -474,15 +474,15 @@ export class ClientService {
 						deeds.push({ type: 'credit', action: 'payment', date: payDate, description: sel.payment.description ?? '', values: pmValues })
 						for (const v of pmValues) addToMap(totalCreditMap, v.currencyId, v.amount)
 					}
-				const chValues = buildDeedValues(
-					(sel.payment.changeMethods ?? [])
-						.filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type))
-						.map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
-				)
-				if (chValues.length > 0) {
-					deeds.push({ type: 'debit', action: 'change', date: payDate, description: sel.payment.description ?? '', values: chValues })
-					for (const v of chValues) addToMap(totalDebitMap, v.currencyId, v.amount)
-				}
+					const chValues = buildDeedValues(
+						(sel.payment.changeMethods ?? [])
+							.filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type))
+							.map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
+					)
+					if (chValues.length > 0) {
+						deeds.push({ type: 'debit', action: 'change', date: payDate, description: sel.payment.description ?? '', values: chValues })
+						for (const v of chValues) addToMap(totalDebitMap, v.currencyId, v.amount)
+					}
 				}
 			}
 		}
@@ -492,7 +492,7 @@ export class ClientService {
 			if (retInPeriod) {
 				const values = buildDeedValues(returning.products.flatMap((p) => p.prices.map((pr) => ({ amount: pr.totalPrice, currencyId: pr.currencyId, currency: pr.currency }))))
 				if (values.length > 0) {
-					deeds.push({ type: 'credit', action: 'returning', date: returning.date, description: '', values })
+					deeds.push({ type: 'credit', action: 'returning', date: returning.date, description: returning.description ?? '', values })
 					for (const v of values) addToMap(totalCreditMap, v.currencyId, v.amount)
 				}
 			}
@@ -506,15 +506,15 @@ export class ClientService {
 						deeds.push({ type: 'debit', action: 'returning', date: payDate, description: returning.payment.description ?? '', values: pmValues })
 						for (const v of pmValues) addToMap(totalDebitMap, v.currencyId, v.amount)
 					}
-				const chValues = buildDeedValues(
-					(returning.payment.changeMethods ?? [])
-						.filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type))
-						.map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
-				)
-				if (chValues.length > 0) {
-					deeds.push({ type: 'debit', action: 'returning', date: payDate, description: returning.payment.description ?? '', values: chValues })
-					for (const v of chValues) addToMap(totalDebitMap, v.currencyId, v.amount)
-				}
+					const chValues = buildDeedValues(
+						(returning.payment.changeMethods ?? [])
+							.filter((ch) => !isChangeBalanceExcludedFromDebt(ch.type))
+							.map((ch) => ({ amount: ch.amount, currencyId: ch.currencyId, currency: ch.currency })),
+					)
+					if (chValues.length > 0) {
+						deeds.push({ type: 'debit', action: 'returning', date: payDate, description: returning.payment.description ?? '', values: chValues })
+						for (const v of chValues) addToMap(totalDebitMap, v.currencyId, v.amount)
+					}
 				}
 			}
 		}

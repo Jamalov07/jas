@@ -12,7 +12,7 @@ import {
 } from '../interfaces'
 import { PaginationRequestDto, RequestOtherFieldsDto, IsDecimalIntOrBigInt } from '@common'
 import { ProductOptionalDto, ProductRequiredDto } from './fields.dtos'
-import { IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator'
+import { IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested, IsBoolean } from 'class-validator'
 import { Transform, Type } from 'class-transformer'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -80,9 +80,25 @@ export class ProductPricesUpdateInputDto implements ProductPricesUpdateInput {
 	wholesale?: ProductPriceUpdateInputDto
 }
 
+export class ProductFindManySortHintDto {
+	@ApiPropertyOptional({
+		description: 'Agar `true` bo‘lsa, ro‘yxat oxirgi sotuv sanasi bo‘yicha tartiladi (eng yangi birinchi). Standart: faqat nom bo‘yicha A→Z (ma’lumot bazasida).',
+	})
+	@IsOptional()
+	@Transform(({ value }) => ([false, 'false'].includes(value) ? false : [true, 'true'].includes(value) ? true : undefined))
+	@IsBoolean()
+	sortByLastSellingDate?: boolean
+}
+
 export class ProductFindManyRequestDto
-	extends IntersectionType(PickType(ProductOptionalDto, ['name']), PaginationRequestDto, PickType(RequestOtherFieldsDto, ['isDeleted', 'search']))
-	implements ProductFindManyRequest {}
+	extends IntersectionType(PickType(ProductOptionalDto, ['name']), PaginationRequestDto, PickType(RequestOtherFieldsDto, ['isDeleted', 'search']), ProductFindManySortHintDto)
+	implements ProductFindManyRequest
+{
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	clientId?: string
+}
 
 export class ProductFindOneRequestDto extends IntersectionType(PickType(ProductRequiredDto, ['id'])) implements ProductFindOneRequest {}
 

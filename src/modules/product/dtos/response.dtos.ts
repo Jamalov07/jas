@@ -38,14 +38,7 @@ export class ProductFindOneDataDto extends PickType(ProductRequiredDto, ['id', '
 	@ApiProperty({})
 	prices: Record<PriceTypeEnum, ProductPriceData>
 
-	@ApiPropertyOptional({ type: Date })
-	lastSellingDate?: Date
-
-	@ApiPropertyOptional({ type: Number })
-	lastSellingCount?: number
-
-	@ApiPropertyOptional({ type: Number })
-	lastSellingPrice?: Decimal
+	lastSelling?: { date: Date | null; price: Decimal | null; count: number | null }
 }
 
 export class ProductFindManyMoneyByCurrencyDto implements ProductFindManyMoneyByCurrency {

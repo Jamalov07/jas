@@ -35,7 +35,7 @@ export declare interface ReturningFindManyRequest
 
 export declare interface ReturningFindOneRequest extends Pick<ReturningOptional, 'id'> {}
 
-export declare interface ReturningGetManyRequest extends ReturningOptional, PaginationRequest, Pick<RequestOtherFields, 'ids' | 'isDeleted'> {}
+export declare interface ReturningGetManyRequest extends ReturningOptional, PaginationRequest, Pick<RequestOtherFields, 'ids' | 'isDeleted' | 'search'> {}
 
 export declare interface ReturningGetOneRequest extends ReturningOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 

@@ -103,9 +103,13 @@ export class ProductService {
 
 			return {
 				...rest,
-				lastSellingDate: lastSellingMV?.selling?.date ?? null,
-				lastSellingPrice: lastSellingMV?.prices?.find((pr) => pr.type === PriceTypeEnum.selling)?.price ?? lastSellingMV?.prices?.[0]?.price ?? null,
-				lastSellingCount: lastSellingMV?.count ?? null,
+				lastSelling: lastSellingMV
+					? {
+							date: lastSellingMV?.selling?.date ?? null,
+							price: lastSellingMV?.prices?.find((pr) => pr.type === PriceTypeEnum.selling)?.price ?? lastSellingMV?.prices?.[0]?.price ?? null,
+							count: lastSellingMV?.count ?? null,
+						}
+					: null,
 				prices: {
 					cost: p.prices.find((pri) => pri.type === PriceTypeEnum.cost),
 					selling: p.prices.find((pri) => pri.type === PriceTypeEnum.selling),
@@ -114,16 +118,20 @@ export class ProductService {
 			}
 		})
 
-		const sortedProducts = mappedProducts.sort((a, b) => {
-			if (!a.lastSellingDate && !b.lastSellingDate) return 0
-			if (!a.lastSellingDate) return 1
-			if (!b.lastSellingDate) return -1
-			return new Date(b.lastSellingDate).getTime() - new Date(a.lastSellingDate).getTime()
-		})
+		const sortByLastSelling = query.sortByLastSellingDate === true
+		const data = sortByLastSelling
+			? [...mappedProducts].sort((a, b) => {
+					if (!a.lastSelling.date && !b.lastSelling.date) return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+					if (!a.lastSelling.date) return 1
+					if (!b.lastSelling.date) return -1
+					const t = new Date(b.lastSelling.date).getTime() - new Date(a.lastSelling.date).getTime()
+					return t !== 0 ? t : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+				})
+			: mappedProducts
 
 		const pageMaps = this.emptyMoneyMaps()
 		let pageCount = 0
-		for (const p of sortedProducts) {
+		for (const p of data) {
 			pageCount += p.count
 			this.addMappedProductToMaps(pageMaps, p)
 		}
@@ -143,11 +151,11 @@ export class ProductService {
 			? {
 					totalCount: productsCount,
 					pagesCount: Math.ceil(productsCount / query.pageSize),
-					pageSize: sortedProducts.length,
-					data: sortedProducts,
+					pageSize: data.length,
+					data,
 					calc,
 				}
-			: { data: sortedProducts, calc }
+			: { data, calc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
@@ -165,9 +173,13 @@ export class ProductService {
 
 		const result = {
 			...rest,
-			lastSellingDate: lastSellingMV?.selling?.date ?? null,
-			lastSellingPrice: lastSellingMV?.prices?.find((pr) => pr.type === PriceTypeEnum.selling)?.price ?? lastSellingMV?.prices?.[0]?.price ?? null,
-			lastSellingCount: lastSellingMV?.count ?? null,
+			lastSelling: lastSellingMV
+				? {
+						date: lastSellingMV?.selling?.date ?? null,
+						price: lastSellingMV?.prices?.find((pr) => pr.type === PriceTypeEnum.selling)?.price ?? lastSellingMV?.prices?.[0]?.price ?? null,
+						count: lastSellingMV?.count ?? null,
+					}
+				: null,
 			prices: {
 				cost: product.prices.find((pri) => pri.type === PriceTypeEnum.cost),
 				selling: product.prices.find((pri) => pri.type === PriceTypeEnum.selling),

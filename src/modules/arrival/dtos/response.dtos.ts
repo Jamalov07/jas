@@ -10,7 +10,7 @@ import {
 	ArrivalModifyResponse,
 } from '../interfaces'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationResponseDto } from '@common'
-import { ArrivalRequiredDto } from './fields.dtos'
+import { ArrivalOptionalDto, ArrivalRequiredDto } from './fields.dtos'
 import { Decimal } from '@prisma/client/runtime/library'
 import { ChangeMethodEnum, PaymentMethodEnum } from '@prisma/client'
 
@@ -36,7 +36,10 @@ export class ArrivalChangeCalcEntryDto implements ArrivalChangeCalcEntry {
 	total: Decimal
 }
 
-export class ArrivalFindOneDataDto extends PickType(ArrivalRequiredDto, ['id', 'date', 'createdAt']) implements ArrivalFindOneData {
+export class ArrivalFindOneDataDto
+	extends IntersectionType(PickType(ArrivalRequiredDto, ['id', 'date', 'createdAt']), PickType(ArrivalOptionalDto, ['description']))
+	implements ArrivalFindOneData
+{
 	@ApiPropertyOptional()
 	payment?: any
 

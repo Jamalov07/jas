@@ -24,6 +24,9 @@ export class ArrivalRequiredDto extends DefaultRequiredFieldsDto implements Arri
 	@IsUUID('4')
 	staffId: string
 
+	@ApiPropertyOptional({ type: String, nullable: true })
+	@IsOptional()
+	@IsString()
 	description: string | null
 }
 

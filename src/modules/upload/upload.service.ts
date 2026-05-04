@@ -25,7 +25,7 @@ export class UploadService {
 		const workbook = XLSX.read(file.buffer, { type: 'buffer' })
 		const sheet = workbook.Sheets[workbook.SheetNames[0]]
 		// Massiv ko'rinishida o'qiymiz (indekslar bilan ishlash uchun)
-		// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+
 		const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][]
 
 		const prisma = this.prisma
@@ -183,7 +183,7 @@ export class UploadService {
 	async uploadClient(file: Express.Multer.File, query: UploadQueryDto) {
 		const workbook = XLSX.read(file.buffer, { type: 'buffer' })
 		const sheet = workbook.Sheets[workbook.SheetNames[0]]
-		// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+
 		const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][]
 
 		const prisma = this.prisma
@@ -340,7 +340,7 @@ export class UploadService {
 	async uploadProduct(file: Express.Multer.File, query: UploadQueryDto) {
 		const workbook = XLSX.read(file.buffer, { type: 'buffer' })
 		const sheet = workbook.Sheets[workbook.SheetNames[0]]
-		// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+
 		const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][]
 
 		const prisma = this.prisma

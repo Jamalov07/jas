@@ -30,6 +30,9 @@ export class ReturningRequiredDto extends DefaultRequiredFieldsDto implements Re
 	@IsEnum(SellingStatusEnum)
 	status: $Enums.SellingStatusEnum
 
+	@ApiPropertyOptional({ type: String, nullable: true })
+	@IsOptional()
+	@IsString()
 	description: string | null
 }
 

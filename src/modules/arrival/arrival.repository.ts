@@ -9,7 +9,7 @@ import {
 	ArrivalGetOneRequest,
 	ArrivalUpdateOneRequest,
 } from './interfaces'
-import { PriceTypeEnum } from '@prisma/client'
+import { PriceTypeEnum, Prisma } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const ARRIVAL_PRODUCT_MV_PRICE_SELECT = {
@@ -57,6 +57,39 @@ const ARRIVAL_SELECT = {
 export class ArrivalRepository {
 	constructor(private readonly prisma: PrismaService) {}
 
+	/** `search` bo‘lmasa `OR` + `contains: undefined` Prisma hech nima qaytarmasligi mumkin (`getMany` da `ids` bilan chaqiriq). */
+	private buildArrivalSupplierSearchFilter(search?: string): Prisma.ArrivalModelWhereInput {
+		if (!search) return {}
+		const words = search.split(/\s+/).filter(Boolean)
+		if (!words.length) return {}
+		const perWord = (word: string): Prisma.SupplierModelWhereInput => ({
+			OR: [
+				{ fullname: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ phone: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ description: { contains: word, mode: Prisma.QueryMode.insensitive } },
+			],
+		})
+		const supplierWhere = words.length > 1 ? { AND: words.map(perWord) } : perWord(words[0])
+		return { supplier: supplierWhere }
+	}
+
+	private arrivalFindManyWhere(query: ArrivalFindManyRequest): Prisma.ArrivalModelWhereInput {
+		return {
+			supplierId: query.supplierId,
+			staffId: query.staffId,
+			...this.buildArrivalSupplierSearchFilter(query.search),
+			date: { gte: query.startDate, lte: query.endDate },
+		}
+	}
+
+	private arrivalGetManyWhere(query: ArrivalGetManyRequest): Prisma.ArrivalModelWhereInput {
+		return {
+			id: { in: query.ids },
+			supplierId: query.supplierId,
+			...this.buildArrivalSupplierSearchFilter(query.search),
+		}
+	}
+
 	private async syncProductPrices(productId: string, newCount: number, priceUpdates?: { selling?: Decimal; cost?: Decimal }) {
 		const prices = await this.prisma.productPriceModel.findMany({
 			where: { productId },
@@ -83,12 +116,7 @@ export class ArrivalRepository {
 		}
 
 		return this.prisma.arrivalModel.findMany({
-			where: {
-				supplierId: query.supplierId,
-				staffId: query.staffId,
-				OR: [{ supplier: { fullname: { contains: query.search, mode: 'insensitive' } } }, { supplier: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				date: { gte: query.startDate, lte: query.endDate },
-			},
+			where: this.arrivalFindManyWhere(query),
 			orderBy: [{ date: 'desc' }],
 			select: ARRIVAL_SELECT,
 			...paginationOptions,
@@ -97,12 +125,7 @@ export class ArrivalRepository {
 
 	async countFindMany(query: ArrivalFindManyRequest) {
 		return this.prisma.arrivalModel.count({
-			where: {
-				supplierId: query.supplierId,
-				staffId: query.staffId,
-				OR: [{ supplier: { fullname: { contains: query.search, mode: 'insensitive' } } }, { supplier: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				date: { gte: query.startDate, lte: query.endDate },
-			},
+			where: this.arrivalFindManyWhere(query),
 		})
 	}
 
@@ -123,14 +146,14 @@ export class ArrivalRepository {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 		return this.prisma.arrivalModel.findMany({
-			where: { id: { in: query.ids }, supplierId: query.supplierId },
+			where: this.arrivalGetManyWhere(query),
 			select: ARRIVAL_SELECT,
 			...paginationOptions,
 		})
 	}
 
 	async countGetMany(query: ArrivalGetManyRequest) {
-		return this.prisma.arrivalModel.count({ where: { id: { in: query.ids }, supplierId: query.supplierId } })
+		return this.prisma.arrivalModel.count({ where: this.arrivalGetManyWhere(query) })
 	}
 
 	async createOne(body: ArrivalCreateOneRequest) {
@@ -220,6 +243,7 @@ export class ArrivalRepository {
 			where: { id: query.id },
 			data: {
 				supplierId: body.supplierId,
+				staffId: body.staffId,
 				date: body.date ? new Date(body.date) : undefined,
 				description: body.description,
 				deletedAt: body.deletedAt,

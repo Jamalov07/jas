@@ -37,7 +37,7 @@ export declare interface SellingFindManyRequest
 
 export declare interface SellingFindOneRequest extends Pick<SellingOptional, 'id'> {}
 
-export declare interface SellingGetManyRequest extends SellingOptional, PaginationRequest, Pick<RequestOtherFields, 'ids' | 'isDeleted' | 'startDate' | 'endDate'> {}
+export declare interface SellingGetManyRequest extends SellingOptional, PaginationRequest, Pick<RequestOtherFields, 'ids' | 'isDeleted' | 'search' | 'startDate' | 'endDate'> {}
 
 export declare interface SellingGetOneRequest extends SellingOptional, Pick<RequestOtherFields, 'isDeleted'> {}
 

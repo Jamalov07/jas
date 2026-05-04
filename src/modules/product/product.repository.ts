@@ -61,6 +61,7 @@ export class ProductRepository {
 				sellingMVs: {
 					orderBy: { selling: { date: 'desc' } },
 					take: 1,
+					where: { selling: { clientId: query.clientId } },
 					select: {
 						count: true,
 						prices: { orderBy: [{ createdAt: 'desc' as const }], select: { price: true, type: true } },
@@ -68,6 +69,7 @@ export class ProductRepository {
 					},
 				},
 			},
+			orderBy: [{ name: 'asc' }],
 			...paginationOptions,
 		})
 
@@ -117,6 +119,7 @@ export class ProductRepository {
 				count: true,
 				prices: { orderBy: [{ createdAt: 'desc' as const }], select: { type: true, totalPrice: true, currencyId: true } },
 			},
+			orderBy: [{ name: 'asc' }],
 		})
 	}
 
@@ -129,6 +132,7 @@ export class ProductRepository {
 		const products = await this.prisma.productModel.findMany({
 			where: { id: { in: query.ids }, name: query.name },
 			include: { prices: { select: PRICE_SELECT } },
+			orderBy: [{ name: 'asc' }],
 			...paginationOptions,
 		})
 

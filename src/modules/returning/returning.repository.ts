@@ -9,7 +9,7 @@ import {
 	ReturningGetOneRequest,
 	ReturningUpdateOneRequest,
 } from './interfaces'
-import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
+import { PriceTypeEnum, Prisma, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const RETURNING_PRODUCT_MV_PRICE_SELECT = {
@@ -61,6 +61,41 @@ export class ReturningRepository {
 		this.prisma = prisma
 	}
 
+	/** `search` bo‘lmasa `OR` + `contains: undefined` Prisma hech nima qaytarmasligi mumkin (`getMany` da `ids` bilan chaqiriq). */
+	private buildReturningClientSearchFilter(search?: string): Prisma.ReturningModelWhereInput {
+		if (!search) return {}
+		const words = search.split(/\s+/).filter(Boolean)
+		if (!words.length) return {}
+		const perWord = (word: string): Prisma.ClientModelWhereInput => ({
+			OR: [
+				{ fullname: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ phone: { contains: word, mode: Prisma.QueryMode.insensitive } },
+				{ description: { contains: word, mode: Prisma.QueryMode.insensitive } },
+			],
+		})
+		const clientWhere = words.length > 1 ? { AND: words.map(perWord) } : perWord(words[0])
+		return { client: clientWhere }
+	}
+
+	private returningFindManyWhere(query: ReturningFindManyRequest): Prisma.ReturningModelWhereInput {
+		return {
+			status: query.status,
+			staffId: query.staffId,
+			clientId: query.clientId,
+			...this.buildReturningClientSearchFilter(query.search),
+			date: { gte: query.startDate, lte: query.endDate },
+		}
+	}
+
+	private returningGetManyWhere(query: ReturningGetManyRequest): Prisma.ReturningModelWhereInput {
+		return {
+			id: { in: query.ids },
+			status: query.status,
+			clientId: query.clientId,
+			...this.buildReturningClientSearchFilter(query.search),
+		}
+	}
+
 	private async syncProductPrices(productId: string, newCount: number) {
 		const prices = await this.prisma.productPriceModel.findMany({
 			where: { productId },
@@ -81,13 +116,7 @@ export class ReturningRepository {
 		}
 
 		return this.prisma.returningModel.findMany({
-			where: {
-				status: query.status,
-				staffId: query.staffId,
-				clientId: query.clientId,
-				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				date: { gte: query.startDate, lte: query.endDate },
-			},
+			where: this.returningFindManyWhere(query),
 			orderBy: [{ date: 'desc' }],
 			select: RETURNING_SELECT,
 			...paginationOptions,
@@ -96,13 +125,7 @@ export class ReturningRepository {
 
 	async countFindMany(query: ReturningFindManyRequest) {
 		return this.prisma.returningModel.count({
-			where: {
-				status: query.status,
-				staffId: query.staffId,
-				clientId: query.clientId,
-				OR: [{ client: { fullname: { contains: query.search, mode: 'insensitive' } } }, { client: { phone: { contains: query.search, mode: 'insensitive' } } }],
-				date: { gte: query.startDate, lte: query.endDate },
-			},
+			where: this.returningFindManyWhere(query),
 		})
 	}
 
@@ -123,14 +146,14 @@ export class ReturningRepository {
 			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
 		}
 		return this.prisma.returningModel.findMany({
-			where: { id: { in: query.ids }, status: query.status, clientId: query.clientId },
+			where: this.returningGetManyWhere(query),
 			select: RETURNING_SELECT,
 			...paginationOptions,
 		})
 	}
 
 	async countGetMany(query: ReturningGetManyRequest) {
-		return this.prisma.returningModel.count({ where: { id: { in: query.ids }, status: query.status } })
+		return this.prisma.returningModel.count({ where: this.returningGetManyWhere(query) })
 	}
 
 	async createOne(body: ReturningCreateOneRequest) {

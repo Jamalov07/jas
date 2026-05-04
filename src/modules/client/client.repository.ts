@@ -17,6 +17,7 @@ const CLIENT_DEBT_SOURCE_SELECT = {
 		where: { status: SellingStatusEnum.accepted, deletedAt: null },
 		select: {
 			date: true,
+			description: true,
 			products: {
 				select: {
 					prices: {
@@ -43,6 +44,7 @@ const CLIENT_DEBT_SOURCE_SELECT = {
 		where: { status: SellingStatusEnum.accepted, deletedAt: null },
 		select: {
 			date: true,
+			description: true,
 			products: {
 				select: {
 					prices: {
@@ -150,6 +152,7 @@ export class ClientRepository {
 					where: { status: SellingStatusEnum.accepted, deletedAt: null },
 					select: {
 						date: true,
+						description: true,
 						products: {
 							select: {
 								prices: {
@@ -177,6 +180,7 @@ export class ClientRepository {
 					where: { status: SellingStatusEnum.accepted, deletedAt: null },
 					select: {
 						date: true,
+						description: true,
 						products: {
 							select: {
 								prices: {
