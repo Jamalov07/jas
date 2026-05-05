@@ -5,7 +5,7 @@ import { BotSellingProductTitleEnum } from '../../selling/enums'
 import { buildSellingPdfFooterSummaryBlock } from '../../selling/helpers/selling-channel-summary.helper'
 import * as pdfMake from 'pdfmake/build/pdfmake'
 import vfsFonts from 'pdfmake/build/vfs_fonts'
-import { TDocumentDefinitions } from 'pdfmake/interfaces'
+import { TDocumentDefinitions, Content } from 'pdfmake/interfaces'
 import { jasInstagramQrCodeBase64, jasTelegramQrCodeBase64, resolveBrandName, resolvePdfLogoBase64 } from './constants'
 import { Decimal } from '@prisma/client/runtime/library'
 ;(pdfMake as any).vfs = vfsFonts
@@ -113,51 +113,54 @@ export class PdfService {
 	}
 
 	async generateInvoicePdfBuffer2(selling: SellingFindOneData): Promise<Buffer> {
+		const jasQrHeader: Content | undefined =
+			resolveBrandName() === 'JAS'
+				? ({
+						columns: [
+							{
+								image: 'jasTelegramQrCode',
+								width: 70,
+								alignment: 'left',
+							},
+							{
+								width: '*',
+								stack: [
+									{ text: `Jasur G Blok 8-do'kon`, fontSize: 14, alignment: 'center', margin: [0, 4, 0, 4] },
+									{ text: `Jasur 91-773-22-99 Dilshod 91-733-22-99 Axror 97-050-86-83`, alignment: 'center', fontSize: 12 },
+								],
+								margin: [0, 20, 0, 0],
+							},
+							{
+								image: 'jasInstagramQrCode',
+								width: 70,
+								alignment: 'right',
+							},
+						],
+						margin: [0, 0, 0, 5],
+					} as Content)
+				: undefined
+
 		const docDefinition: TDocumentDefinitions = {
 			content: [
-				resolveBrandName() === 'JAS'
-					? {
-							columns: [
-								{
-									image: 'jasTelegramQrCode',
-									width: 70,
-									alignment: 'left',
-								},
-								{
-									width: '*',
-									stack: [
-										{ text: `Jasur G Blok 8-do'kon`, fontSize: 14, alignment: 'center', margin: [0, 4, 0, 4] },
-										{ text: `Jasur 91-773-22-99 Dilshod 91-733-22-99 Axror 97-050-86-83`, alignment: 'center', fontSize: 12 },
-									],
-									margin: [0, 20, 0, 0],
-								},
-								{
-									image: 'jasInstagramQrCode',
-									width: 70,
-									alignment: 'right',
-								},
-							],
-							margin: [0, 0, 0, 5],
-						}
-					: null,
-				{
-					columns: [
-						{
-							width: '*',
-							stack: [
-								{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
-								{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
-							],
-							margin: [0, 20, 0, 0],
-						},
-						{
-							image: 'logo',
-							width: 120,
-							alignment: 'right',
-						},
-					],
-					margin: [0, 0, 0, 10],
-				},
+				...(jasQrHeader ? [jasQrHeader] : []),
+				// {
+				// 	columns: [
+				// 		{
+				// 			width: '*',
+				// 			stack: [
+				// 				{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
+				// 				{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
+				// 			],
+				// 			margin: [0, 20, 0, 0],
+				// 		},
+				// 		{
+				// 			image: 'logo',
+				// 			width: 120,
+				// 			alignment: 'right',
+				// 		},
+				// 	],
+				// 	margin: [0, 0, 0, 10],
+				// },
 				{
 					table: {
 						headerRows: 1,

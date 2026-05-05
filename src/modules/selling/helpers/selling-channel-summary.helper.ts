@@ -37,9 +37,9 @@ export function buildSellingChannelSummaryBlock(selling: SellingFindOneData & { 
 	const newDebt = formatSellingMoneyRows(selling.client?.debtByCurrency as SellingDebtByCurrencyRow[] | undefined)
 
 	return (
-		`🧾 Sotuv\n` +
-		`📋 Buyurtma raqami: ${orderNo}\n` +
-		`🕐 Vaqt: ${formatDateFn(selling.date)}\n\n` +
+		`🧾 Sotuv - ${orderNo}\n` +
+		// `📋 Buyurtma raqami: ${orderNo}\n` +
+		// `🕐 Vaqt: ${formatDateFn(selling.date)}\n\n` +
 		`👤 Xaridor: ${buyer}\n\n` +
 		`📉 Eski qarz: ${oldDebt}\n` +
 		`💰 Jami sotuv summasi: ${saleTotal}\n` +

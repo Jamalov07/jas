@@ -7,7 +7,7 @@ import 'dotenv/config'
 /**
  * PDF invoice logotipi.
  * 1) `PDF_LOGO_BRAND=jas` yoki `kas` (ustuvor)
- * 2) Aks holda legacy: `APP === 'jas'` bo‘lsa jas, boshqa hammasi kas (oldingi `index.ts` bilan bir xil)
+ * 2) Aks holda legacy: `APP` (har qanday registrda `jas`) bo‘lsa jas
  *
  * Docker: `docker-compose` `PDF_LOGO_BRAND` yoki `.env`.
  */
@@ -16,9 +16,16 @@ export function resolvePdfLogoBase64(): string {
 	if (p === 'jas' || p === 'kas') {
 		return p === 'kas' ? kasLogoBase64 : jasLogoBase64
 	}
-	return process.env.APP === 'jas' ? jasLogoBase64 : kasLogoBase64
+	return process.env.APP?.trim().toLowerCase() === 'jas' ? jasLogoBase64 : kasLogoBase64
 }
 
+/**
+ * QR/header uchun brend nomi — `resolvePdfLogoBase64` bilan bir xil qoida (PDF_LOGO_BRAND ustuvor).
+ */
 export function resolveBrandName(): string {
-	return process.env.APP === 'jas' ? 'JAS' : 'KAS'
+	const p = process.env.PDF_LOGO_BRAND?.trim().toLowerCase()
+	if (p === 'jas' || p === 'kas') {
+		return p === 'kas' ? 'KAS' : 'JAS'
+	}
+	return process.env.APP?.trim().toLowerCase() === 'jas' ? 'JAS' : 'KAS'
 }
