@@ -2,10 +2,11 @@ import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma'
 import { SellingFindOneData } from '../../selling'
 import { BotSellingProductTitleEnum } from '../../selling/enums'
+import { buildSellingPdfFooterSummaryBlock } from '../../selling/helpers/selling-channel-summary.helper'
 import * as pdfMake from 'pdfmake/build/pdfmake'
 import vfsFonts from 'pdfmake/build/vfs_fonts'
 import { TDocumentDefinitions } from 'pdfmake/interfaces'
-import { resolvePdfLogoBase64 } from './constants'
+import { jasInstagramQrCodeBase64, jasTelegramQrCodeBase64, resolveBrandName, resolvePdfLogoBase64 } from './constants'
 import { Decimal } from '@prisma/client/runtime/library'
 ;(pdfMake as any).vfs = vfsFonts
 
@@ -114,13 +115,38 @@ export class PdfService {
 	async generateInvoicePdfBuffer2(selling: SellingFindOneData): Promise<Buffer> {
 		const docDefinition: TDocumentDefinitions = {
 			content: [
+				resolveBrandName() === 'JAS'
+					? {
+							columns: [
+								{
+									image: 'jasTelegramQrCode',
+									width: 70,
+									alignment: 'left',
+								},
+								{
+									width: '*',
+									stack: [
+										{ text: `Jasur G Blok 8-do'kon`, fontSize: 14, alignment: 'center', margin: [0, 4, 0, 4] },
+										{ text: `Jasur 91-773-22-99 Dilshod 91-733-22-99 Axror 97-050-86-83`, alignment: 'center', fontSize: 12 },
+									],
+									margin: [0, 20, 0, 0],
+								},
+								{
+									image: 'jasInstagramQrCode',
+									width: 70,
+									alignment: 'right',
+								},
+							],
+							margin: [0, 0, 0, 5],
+						}
+					: null,
 				{
 					columns: [
 						{
 							width: '*',
 							stack: [
-								{ text: `Клиент: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
-								{ text: `Дата продажа: ${this.formatDate(selling.date)}`, fontSize: 12 },
+								{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
+								{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
 							],
 							margin: [0, 20, 0, 0],
 						},
@@ -139,10 +165,10 @@ export class PdfService {
 						body: [
 							[
 								{ text: '№', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
-								{ text: 'Товар или услуга', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
-								{ text: 'Кол-во', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
-								{ text: 'Цена', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
-								{ text: 'Сумма', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Mahsulot nomi', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Soni', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Narxi', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Jami', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 							],
 							...(selling.products ?? [])
 								.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
@@ -173,16 +199,25 @@ export class PdfService {
 					margin: [0, 10, 0, 10],
 				},
 				{
-					text: `Итого: ${selling.totalPrices?.map((t) => `${t.total.toNumber()} ${(t as any).currency?.symbol ?? ''}`).join(' + ') || 0}`,
+					text: `Jami: ${selling.totalPrices?.map((t) => `${t.total.toNumber()} ${(t as any).currency?.symbol ?? ''}`).join(' + ') || 0}`,
 					fontSize: 13,
 					bold: true,
 					color: 'red',
 					alignment: 'right',
 					margin: [0, 5, 0, 0],
 				},
+				{
+					text: buildSellingPdfFooterSummaryBlock(selling as SellingFindOneData, (d) => this.formatDate(d)),
+					fontSize: 11,
+					alignment: 'left',
+					margin: [0, 12, 0, 0],
+					lineHeight: 1.4,
+				},
 			],
 			images: {
 				logo: resolvePdfLogoBase64(),
+				jasTelegramQrCode: jasTelegramQrCodeBase64,
+				jasInstagramQrCode: jasInstagramQrCodeBase64,
 			},
 			defaultStyle: {
 				font: 'Roboto',

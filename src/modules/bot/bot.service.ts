@@ -6,6 +6,7 @@ import { InjectBot } from 'nestjs-telegraf'
 import { MyBotName } from './constants'
 import { ConfigService } from '@nestjs/config'
 import { SellingFindOneData, SellingPaymentData, SellingProductData } from '../selling'
+import { buildSellingChannelSummaryBlock } from '../selling/helpers/selling-channel-summary.helper'
 import { ClientFindOneData } from '../client'
 import { BotSellingProductTitleEnum, BotSellingTitleEnum } from '../selling/enums'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -13,7 +14,12 @@ import { CurrencyBrief } from '../../common'
 
 type BotSellingData = Omit<SellingFindOneData, 'products'> & {
 	title?: BotSellingTitleEnum
-	debtByCurrency?: { currencyId: string; total?: Decimal; amount?: Decimal; currency: { id: string; name: string; symbol: string } }[]
+	debtByCurrency?: {
+		currencyId: string
+		total?: Decimal
+		amount?: Decimal
+		currency: { id: string; name: string; symbol: string }
+	}[]
 	products?: Array<SellingProductData & { status?: BotSellingProductTitleEnum }>
 }
 
@@ -143,14 +149,7 @@ export class BotService {
 	}
 
 	private buildSellingCaption(selling: BotSellingData): string {
-		console.log(selling.debtByCurrency)
-		const baseInfo =
-			`🧾 Продажа\n\n` +
-			`🆔 Заказ: ${selling.publicId ?? selling.id}\n` +
-			`💰 Сумма: ${this.formatTotalPrices(selling)}\n` +
-			`💸 Долг: ${(selling.debtByCurrency ?? []).map((debt) => `${debt.amount.toNumber()} ${debt.currency.symbol}`).join(' + ') || 0}\n`
-
-		const clientInfo = `👤 Клиент: ${selling.client?.fullname ?? ''}\n` + `📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}\n`
+		const summary = buildSellingChannelSummaryBlock(selling, (d) => this.formatDate(d)).trimEnd()
 
 		const findProductByStatus = (status: BotSellingProductTitleEnum) => selling.products?.find((p) => p.status === status)
 
@@ -158,28 +157,28 @@ export class BotService {
 
 		switch (selling.title) {
 			case BotSellingTitleEnum.new:
-				return `🧾 Новая продажа\n\n${baseInfo}\n${clientInfo}`
+				return `✅ Yangi sotuv\n\n${summary}`
 
 			case BotSellingTitleEnum.added: {
 				const p = findProductByStatus(BotSellingProductTitleEnum.new)
-				if (p) productInfo = `\n📦 Товар добавлен\n` + `• Название: ${p.product.name}\n` + `• Цена: ${this.getProductPrice(p)}\n` + `• Кол-во: ${p.count}`
-				return `${baseInfo}${productInfo}\n\n${clientInfo}`
+				if (p) productInfo = `\n📦 Mahsulot qo'shildi\n` + `• Nomi: ${p.product.name}\n` + `• Narxi: ${this.getProductPrice(p)}\n` + `• Soni: ${p.count}`
+				return `${summary}${productInfo}`
 			}
 
 			case BotSellingTitleEnum.updated: {
 				const p = findProductByStatus(BotSellingProductTitleEnum.updated)
-				if (p) productInfo = `\n♻️ Товар обновлён\n` + `• Название: ${p.product.name}\n` + `• Цена: ${this.getProductPrice(p)}\n` + `• Кол-во: ${p.count}`
-				return `${baseInfo}${productInfo}\n\n${clientInfo}`
+				if (p) productInfo = `\n♻️ Mahsulot yangilandi\n` + `• Nomi: ${p.product.name}\n` + `• Narxi: ${this.getProductPrice(p)}\n` + `• Soni: ${p.count}`
+				return `${summary}${productInfo}`
 			}
 
 			case BotSellingTitleEnum.deleted: {
 				const p = findProductByStatus(BotSellingProductTitleEnum.deleted)
-				if (p) productInfo = `\n🗑️ Товар удалён\n` + `• Название: ${p.product.name}\n` + `• Цена: ${this.getProductPrice(p)}\n` + `• Кол-во: ${p.count}`
-				return `${baseInfo}${productInfo}\n\n${clientInfo}`
+				if (p) productInfo = `\n🗑️ Mahsulot o'chirildi\n` + `• Nomi: ${p.product.name}\n` + `• Narxi: ${this.getProductPrice(p)}\n` + `• Soni: ${p.count}`
+				return `${summary}${productInfo}`
 			}
 
 			default:
-				return `${baseInfo}\n${clientInfo}`
+				return summary
 		}
 	}
 
@@ -197,7 +196,7 @@ export class BotService {
 		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling as any)
 		await this.bot.telegram.sendDocument(
 			channelId,
-			{ source: bufferPdf, filename: `${selling.client?.phone ?? 'chek'}.pdf` },
+			{ source: bufferPdf, filename: `${selling.client?.phone ?? 'xarid'}.pdf` },
 			{
 				caption: this.buildSellingCaption(selling),
 			},
@@ -208,9 +207,9 @@ export class BotService {
 		const channelId = this.configService.getOrThrow<string>('bot.sellingChannelId')
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
-		const baseInfo = `🧾 Продажа\n\n` + `🆔 Заказ: ${selling.publicId ?? selling.id}\n` + `💰 Сумма: ${this.formatTotalPrices(selling)}\n`
-		const clientInfo = `👤 Клиент: ${selling.client?.fullname ?? ''}\n` + `📊 Общий долг: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
-		await this.bot.telegram.sendMessage(channelId, `🗑️ Продажа удалено\n\n${baseInfo}\n\n${clientInfo}`)
+		const baseInfo = `🧾 Sotuv\n\n` + `🆔 Buyurtma: ${selling.publicId ?? selling.id}\n` + `💰 Jami: ${this.formatTotalPrices(selling)}\n`
+		const clientInfo = `👤 Xaridor: ${selling.client?.fullname ?? ''}\n` + `📊 Jami qarz: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
+		await this.bot.telegram.sendMessage(channelId, `🗑️ Sotuv o'chirildi\n\n${baseInfo}\n\n${clientInfo}`)
 	}
 
 	// ─── Payment notifications (shared helper) ────────────────────────────────
@@ -238,19 +237,19 @@ export class BotService {
 
 		return (
 			`${params.prefix}` +
-			`👤 Клиент: ${params.person.fullname}\n` +
-			`📞 Телефон: ${params.person.phone}\n\n` +
+			`👤 Xaridor: ${params.person.fullname}\n` +
+			`📞 Telefon raqam: ${params.person.phone}\n\n` +
 			// `💰 Сумма: ${total.toNumber()}\n\n` +
-			`💰 Сумма: ${total2 || 0}\n` +
+			`💰 Jami: ${total2 || 0}\n` +
 			// `💵 Наличными: ${byType('cash').toNumber()}\n` +
 			// `💳 Картой: ${byType('card').toNumber()}\n` +
 			// `🏦 Переводом: ${byType('transfer').toNumber()}\n` +
 			// `📦 Другое: ${byType('other').toNumber()}\n` +
 			// `🔁 Сдачa: ${changeTotal.toNumber()}\n` +
-			`🔁 Сдачa: ${change2 || 0}\n` +
-			`📅 Дата: ${this.formatDate(params.date)}\n` +
-			`📝 Описание: ${params.description ?? '-'}\n` +
-			`📊 Общий долг: ${this.formatDebt(params.debtByCurrency)}`
+			`🔁 Qaytim: ${change2 || 0}\n` +
+			`📅 Vaqt: ${this.formatDate(params.date)}\n` +
+			`📝 Tafsilot: ${params.description ?? '-'}\n` +
+			`📊 Jami qarz: ${this.formatDebt(params.debtByCurrency)}`
 		)
 	}
 
@@ -261,7 +260,7 @@ export class BotService {
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
-			prefix: isModified ? '♻️ Обновлено\n\n' : '',
+			prefix: isModified ? '♻️ Yangilandi\n\n' : '',
 			person: { fullname: client.fullname, phone: client.phone },
 			paymentMethods: payment.paymentMethods ?? [],
 			changeMethods: payment.changeMethods ?? [],
@@ -277,7 +276,7 @@ export class BotService {
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
-			prefix: '🗑️ Удалено\n\n',
+			prefix: `🗑️ O'chirildi\n\n`,
 			person: { fullname: client.fullname, phone: client.phone },
 			paymentMethods: payment.paymentMethods ?? [],
 			changeMethods: payment.changeMethods ?? [],
@@ -305,7 +304,7 @@ export class BotService {
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
-			prefix: isModified ? '♻️ Обновлено (оплата клиента)\n\n' : '💳 Оплата клиента\n\n',
+			prefix: isModified ? `♻️ Yangilandi (xaridor to'lovi)\n\n` : `💳 Xaridor to'lovi\n\n`,
 			person: payment.client,
 			paymentMethods: payment.paymentMethods ?? [],
 			changeMethods: payment.changeMethods ?? [],
@@ -330,7 +329,7 @@ export class BotService {
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
-			prefix: '🗑️ Удалено (оплата клиента)\n\n',
+			prefix: `🗑️ O'chirildi (xaridor to'lovi)\n\n`,
 			person: payment.client,
 			paymentMethods: payment.paymentMethods ?? [],
 			changeMethods: payment.changeMethods ?? [],
@@ -358,7 +357,7 @@ export class BotService {
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
-			prefix: isModified ? '♻️ Обновлено (оплата поставщику)\n\n' : '💳 Оплата поставщику\n\n',
+			prefix: isModified ? `♻️ Yangilandi (yetkazib beruvchi to'lovi)\n\n` : `💳 Yetkazib beruvchi to'lovi\n\n`,
 			person: payment.supplier,
 			paymentMethods: payment.paymentMethods ?? [],
 			changeMethods: payment.changeMethods ?? [],
@@ -383,7 +382,7 @@ export class BotService {
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
-			prefix: '🗑️ Удалено (оплата поставщику)\n\n',
+			prefix: `🗑️ O'chirildi (yetkazib beruvchi to'lovi)\n\n`,
 			person: payment.supplier,
 			paymentMethods: payment.paymentMethods ?? [],
 			changeMethods: payment.changeMethods ?? [],

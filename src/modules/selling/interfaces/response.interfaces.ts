@@ -99,6 +99,8 @@ export declare interface SellingDebtByCurrencyRow {
 export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' | 'status' | 'createdAt' | 'date'>, Pick<SellingOptional, 'publicId' | 'description'> {
 	client?: any
 	staff?: any
+	/** Shu hujjat qabul qilingunga qadar xaridor qarzi (kanal/PDF ostki qismi) */
+	clientDebtBeforeSelling?: SellingDebtByCurrencyRow[]
 	/** Hujjat bo‘yicha qoldiq qarz, valyuta bo‘yicha */
 	debtByCurrency?: SellingDebtByCurrencyRow[]
 	totalPrices?: SellingTotalByCurrency[]

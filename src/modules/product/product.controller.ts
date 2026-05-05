@@ -24,6 +24,14 @@ import { Decimal } from '@prisma/client/runtime/library'
 export class ProductController {
 	constructor(private readonly productService: ProductService) {}
 
+	@Get('many-new')
+	@ApiOkResponse({ type: ProductFindManyResponseDto })
+	@ApiOperation({ summary: 'get all products (optimized: parallel queries + SQL totals)' })
+	@AuthOptions(false, false)
+	async findManyNew(@Query() query: ProductFindManyRequestDto): Promise<ProductFindManyResponseDto> {
+		return this.productService.findManyNew({ ...query, isDeleted: false })
+	}
+
 	@Get('many')
 	@ApiOkResponse({ type: ProductFindManyResponseDto })
 	@ApiOperation({ summary: 'get all products' })

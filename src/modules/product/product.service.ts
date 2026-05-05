@@ -8,6 +8,7 @@ import { PriceTypeEnum } from '@prisma/client'
 import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { CurrencyRepository } from '../currency/currency.repository'
+import type { CurrencyFindOneData } from '../currency'
 
 type PriceAggRow = { type: PriceTypeEnum; totalPrice: Decimal; currencyId: string }
 
@@ -78,6 +79,26 @@ export class ProductService {
 			totalCosts: withCurrencyBriefTotalMany(toRows(maps.cost), briefMap),
 			totalPrices: withCurrencyBriefTotalMany(toRows(maps.selling), briefMap),
 			totalWholesales: withCurrencyBriefTotalMany(toRows(maps.wholesale), briefMap),
+		}
+	}
+
+	private decimalFromSqlSum(raw: unknown): Decimal {
+		if (raw == null) return new Decimal(0)
+		if (typeof raw === 'string') return new Decimal(raw)
+		if (typeof raw === 'number') return new Decimal(raw)
+		if (typeof raw === 'bigint') return new Decimal(raw.toString())
+		if (raw instanceof Decimal) return raw
+		if (typeof raw === 'object' && raw !== null && typeof (raw as { toString?: () => string }).toString === 'function') {
+			return new Decimal((raw as { toString(): string }).toString())
+		}
+		throw new Error('unexpected aggregate sum type')
+	}
+
+	private applySqlPriceAggToMoneyMaps(maps: MoneyMaps, rows: Array<{ type: string; currency_id: string; sum_total: unknown }>) {
+		for (const row of rows) {
+			const map = this.pickMoneyMap(maps, row.type as PriceTypeEnum)
+			if (!map) continue
+			map.set(row.currency_id, this.decimalFromSqlSum(row.sum_total))
 		}
 	}
 
@@ -158,6 +179,110 @@ export class ProductService {
 			: { data, calc }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
+	}
+
+	/** Optimallashtirilgan `many`: parallel DB chaqiriqlari, `calcTotal` uchun SQL agregatsiya, `isDeleted` filteri. */
+	async findManyNew(query: ProductFindManyRequest) {
+		const [products, totalsAgg, briefRows] = await Promise.all([
+			this.productRepository.findManyFast(query),
+			this.productRepository.fetchFindManyAggregatesFast(query),
+			this.currencyRepository.findActiveBriefOrdered(),
+		])
+
+		const activeCurrencyIds = briefRows.map((r) => r.id)
+		const briefMap = currencyBriefMapFromRows(briefRows.map(({ id, name, symbol }) => ({ id, name, symbol })))
+		const currencyById = new Map<string, CurrencyFindOneData>(briefRows.map((c) => [c.id, c]))
+
+		const totalMaps = this.emptyMoneyMaps()
+		this.applySqlPriceAggToMoneyMaps(totalMaps, totalsAgg.priceAgg)
+		const totalCount = Number(totalsAgg.totalInventoryUnits)
+		const productsCount = Number(totalsAgg.productsCount)
+
+		const attachPriceCurrency = (row: { id: string; type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currencyId: string; exchangeRate: Decimal } | undefined) => {
+			if (!row) return undefined
+			const currency =
+				currencyById.get(row.currencyId) ??
+				({
+					id: row.currencyId,
+					name: '',
+					symbol: '',
+					isActive: false,
+					exchangeRate: row.exchangeRate,
+					createdAt: new Date(0),
+				} satisfies CurrencyFindOneData)
+			return { ...row, currency }
+		}
+
+		const mappedProducts = products.map((product) => {
+			const rawMv = 'sellingMVs' in product ? product.sellingMVs : undefined
+			const sellingMVs = Array.isArray(rawMv) ? rawMv : undefined
+			const lastSellingMV = sellingMVs?.length ? sellingMVs[0] : null
+
+			return {
+				id: product.id,
+				count: product.count,
+				createdAt: product.createdAt,
+				description: product.description,
+				name: product.name,
+				minAmount: product.minAmount,
+				image: product.image,
+				lastSelling: lastSellingMV
+					? {
+							date: lastSellingMV?.selling?.date ?? null,
+							price: lastSellingMV?.prices?.find((pr) => pr.type === PriceTypeEnum.selling)?.price ?? lastSellingMV?.prices?.[0]?.price ?? null,
+							count: lastSellingMV?.count ?? null,
+						}
+					: null,
+				prices: {
+					cost: attachPriceCurrency(product.prices.find((pri) => pri.type === PriceTypeEnum.cost)),
+					selling: attachPriceCurrency(product.prices.find((pri) => pri.type === PriceTypeEnum.selling)),
+					wholesale: attachPriceCurrency(product.prices.find((pri) => pri.type === PriceTypeEnum.wholesale)),
+				},
+			}
+		})
+
+		const sortByLastSelling = query.sortByLastSellingDate === true
+		const data = sortByLastSelling
+			? [...mappedProducts].sort((a, b) => {
+					const ad = a.lastSelling?.date ?? null
+					const bd = b.lastSelling?.date ?? null
+					if (!ad && !bd) return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+					if (!ad) return 1
+					if (!bd) return -1
+					const t = new Date(bd).getTime() - new Date(ad).getTime()
+					return t !== 0 ? t : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+				})
+			: mappedProducts
+
+		const pageMaps = this.emptyMoneyMaps()
+		let pageCount = 0
+		for (const p of data) {
+			pageCount += p.count
+			this.addMappedProductToMaps(pageMaps, p)
+		}
+
+		const calcTotal: ProductFindManyCalc = {
+			totalCount,
+			...this.buildCalcFromMaps(activeCurrencyIds, totalMaps, briefMap),
+		}
+		const calcPage: ProductFindManyCalc = {
+			totalCount: pageCount,
+			...this.buildCalcFromMaps(activeCurrencyIds, pageMaps, briefMap),
+		}
+
+		const calc = { calcPage, calcTotal }
+
+		const result = query.pagination
+			? {
+					totalCount: productsCount,
+					pagesCount: Math.ceil(productsCount / query.pageSize),
+					pageSize: data.length,
+					data,
+					calc,
+				}
+			: { data, calc }
+
+		return createResponse({ data: result, success: { messages: ['find many new success'] } })
 	}
 
 	async findOne(query: ProductFindOneRequest) {

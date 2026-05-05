@@ -1,5 +1,7 @@
 import { jasLogoBase64 } from './jas-logo-base-64'
 import { kasLogoBase64 } from './kas-logo-base-64'
+export { jasInstagramQrCodeBase64 } from './jas-instagram-qr-code-base-64'
+export { jasTelegramQrCodeBase64 } from './jas-telegram-qr-code-base-64'
 import 'dotenv/config'
 
 /**
@@ -15,4 +17,8 @@ export function resolvePdfLogoBase64(): string {
 		return p === 'kas' ? kasLogoBase64 : jasLogoBase64
 	}
 	return process.env.APP === 'jas' ? jasLogoBase64 : kasLogoBase64
+}
+
+export function resolveBrandName(): string {
+	return process.env.APP === 'jas' ? 'JAS' : 'KAS'
 }

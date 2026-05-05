@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { deletedAtConverter } from '@common'
 import { PrismaService } from '../shared'
 import {
 	ProductCreateOneRequest,
@@ -9,7 +10,7 @@ import {
 	ProductGetOneRequest,
 	ProductUpdateOneRequest,
 } from './interfaces'
-import { PriceTypeEnum } from '@prisma/client'
+import { PriceTypeEnum, Prisma } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const PRICE_SELECT = {
@@ -37,6 +38,35 @@ export class ProductRepository {
 				name: { contains: word, mode: 'insensitive' as const },
 			})),
 		}
+	}
+
+	private buildFindManyWhereInput(query: ProductFindManyRequest): Prisma.ProductModelWhereInput {
+		const deletedAt = deletedAtConverter(query.isDeleted)
+		return {
+			...this.buildSearchFilter(query.search),
+			...(deletedAt !== undefined ? { deletedAt } : {}),
+		}
+	}
+
+	/** `many-new` agregatsiyasi: Prisma `where` bilan bir xil mantiq (qidiruv + soft-delete). */
+	private buildRawWhereProduct(query: ProductFindManyRequest): Prisma.Sql {
+		const parts: Prisma.Sql[] = []
+		const deletedAt = deletedAtConverter(query.isDeleted)
+		if (deletedAt === null) {
+			parts.push(Prisma.sql`p.deleted_at IS NULL`)
+		} else if (deletedAt !== undefined && typeof deletedAt === 'object' && deletedAt !== null && 'not' in deletedAt && deletedAt.not === null) {
+			parts.push(Prisma.sql`p.deleted_at IS NOT NULL`)
+		}
+
+		const searchWords = query.search?.split(/\s+/).filter(Boolean) ?? []
+		if (searchWords.length > 0) {
+			const wordConds = searchWords.map((word) => Prisma.sql`p.name ILIKE ${'%' + word + '%'}`)
+			const combined = searchWords.length > 1 ? Prisma.join(wordConds, ' AND ') : wordConds[0]!
+			parts.push(Prisma.sql`(${combined})`)
+		}
+
+		if (parts.length === 0) return Prisma.sql`TRUE`
+		return Prisma.join(parts, ' AND ')
 	}
 
 	async findMany(query: ProductFindManyRequest) {
@@ -121,6 +151,91 @@ export class ProductRepository {
 			},
 			orderBy: [{ name: 'asc' }],
 		})
+	}
+
+	/** `GET product/many-new` — valyuta JOIN siz narxlar, `clientId` bo‘lmasa `sellingMVs` yuklanmaydi. */
+	async findManyFast(query: ProductFindManyRequest) {
+		let paginationOptions = {}
+		if (query.pagination) {
+			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
+		}
+
+		const hasClientFilter = query.clientId != null && String(query.clientId).trim() !== ''
+
+		const baseSelect = {
+			id: true,
+			count: true,
+			createdAt: true,
+			description: true,
+			name: true,
+			minAmount: true,
+			image: true,
+			prices: {
+				select: {
+					id: true,
+					type: true,
+					price: true,
+					totalPrice: true,
+					currencyId: true,
+					exchangeRate: true,
+				},
+			},
+		} as const
+
+		const select = hasClientFilter
+			? {
+					...baseSelect,
+					sellingMVs: {
+						orderBy: { selling: { date: 'desc' as const } },
+						take: 1,
+						where: { selling: { clientId: query.clientId } },
+						select: {
+							count: true,
+							prices: { orderBy: [{ createdAt: 'desc' as const }], select: { price: true, type: true } },
+							selling: { select: { date: true } },
+						},
+					},
+				}
+			: baseSelect
+
+		return this.prisma.productModel.findMany({
+			where: this.buildFindManyWhereInput(query),
+			select,
+			orderBy: [{ name: 'asc' }],
+			...paginationOptions,
+		})
+	}
+
+	/**
+	 * Sahifa soni + ombor soni + narx agregatlari: COUNT va SUM(count) bitta SQL da (kamaytirilgan round-trip).
+	 */
+	async fetchFindManyAggregatesFast(query: ProductFindManyRequest): Promise<{
+		productsCount: bigint
+		totalInventoryUnits: bigint
+		priceAgg: Array<{ type: string; currency_id: string; sum_total: unknown }>
+	}> {
+		const w = this.buildRawWhereProduct(query)
+		const [metaRows, priceRows] = await Promise.all([
+			this.prisma.$queryRaw<Array<{ row_count: bigint; inventory_sum: bigint }>>`
+				SELECT
+					(SELECT COUNT(*)::bigint FROM product p WHERE ${w}) AS row_count,
+					(SELECT COALESCE(SUM(p.count), 0)::bigint FROM product p WHERE ${w}) AS inventory_sum
+			`,
+			this.prisma.$queryRaw<Array<{ type: string; currency_id: string; sum_total: unknown }>>`
+				SELECT pp.type::text AS type, pp.currency_id::text AS currency_id, SUM(pp.total_price) AS sum_total
+				FROM product p
+				INNER JOIN product_price pp ON pp.product_id = p.id AND pp.deleted_at IS NULL
+				WHERE ${w}
+				GROUP BY pp.type, pp.currency_id
+			`,
+		])
+
+		const m = metaRows[0]
+		return {
+			productsCount: m?.row_count ?? 0n,
+			totalInventoryUnits: m?.inventory_sum ?? 0n,
+			priceAgg: priceRows,
+		}
 	}
 
 	async getMany(query: ProductGetManyRequest) {

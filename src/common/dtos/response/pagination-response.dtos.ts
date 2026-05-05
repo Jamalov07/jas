@@ -17,7 +17,7 @@ export class PaginationRequestDto implements PaginationRequest {
 	@IsOptional()
 	pageSize?: number = PAGE_SIZE
 
-	@ApiPropertyOptional({ type: Boolean, example: false })
+	@ApiPropertyOptional({ type: Boolean, example: true })
 	@Transform(({ value }) => ![false, 'false'].includes(value))
 	@IsBoolean()
 	@IsOptional()

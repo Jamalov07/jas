@@ -6,6 +6,7 @@ import {
 	CurrencyDeleteOneRequest,
 	CurrencyFindManyRequest,
 	CurrencyFindOneRequest,
+	CurrencyFindOneData,
 	CurrencyGetManyRequest,
 	CurrencyGetOneRequest,
 	CurrencyUpdateOneRequest,
@@ -65,6 +66,19 @@ export class CurrencyRepository {
 			orderBy: { name: 'asc' },
 		})
 		return rows.map((r) => r.id)
+	}
+
+	/** Bitta so‘rov: aktiv valyutalar (`ProductPriceData.currency` uchun `CurrencyFindOneData`). */
+	async findActiveBriefOrdered(): Promise<CurrencyFindOneData[]> {
+		const rows = await this.prisma.currencyModel.findMany({
+			where: { isActive: true, deletedAt: null },
+			select: { id: true, name: true, symbol: true, isActive: true, exchangeRate: true, createdAt: true },
+			orderBy: { name: 'asc' },
+		})
+		return rows.map((r) => ({
+			...r,
+			exchangeRate: r.exchangeRate ?? new Decimal(0),
+		}))
 	}
 
 	async findExchangeRatesAndSymbolsByIds(ids: string[]): Promise<{ rates: Map<string, Decimal>; symbols: Map<string, string> }> {
