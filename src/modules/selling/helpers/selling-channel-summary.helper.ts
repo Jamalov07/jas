@@ -60,5 +60,7 @@ export function buildSellingPdfFooterSummaryBlock(
 	const paid = formatSellingPaymentTotals(selling.payment)
 	const newDebt = formatSellingMoneyRows(selling.client?.debtByCurrency as SellingDebtByCurrencyRow[] | undefined)
 
-	return [`Sotuv vaqti: ${time}`, `Xaridor: ${buyer}`, `Eski qarz: ${oldDebt}`, `Jami sotuv summasi: ${saleTotal}`, `Jami to'lov: ${paid}`, `Yangi qarz: ${newDebt}`].join('\n')
+	return [/* `Sotuv vaqti: ${time}`, `Xaridor: ${buyer}`, */ `Eski qarz: ${oldDebt}`, `Jami sotuv summasi: ${saleTotal}`, `Jami to'lov: ${paid}`, `Yangi qarz: ${newDebt}`].join(
+		'\n',
+	)
 }

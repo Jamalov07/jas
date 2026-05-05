@@ -132,7 +132,7 @@ export class PdfService {
 							},
 							{
 								image: 'jasInstagramQrCode',
-								width: 70,
+								width: 90,
 								alignment: 'right',
 							},
 						],
@@ -143,26 +143,26 @@ export class PdfService {
 		const docDefinition: TDocumentDefinitions = {
 			content: [
 				...(jasQrHeader ? [jasQrHeader] : []),
-				resolveBrandName() === 'JAS'
-					? undefined
-					: {
-							columns: [
-								{
-									width: '*',
-									stack: [
-										{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
-										{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
-									],
-									margin: [0, 20, 0, 0],
-								},
-								{
+				{
+					columns: [
+						{
+							width: '*',
+							stack: [
+								{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
+								{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
+							],
+							margin: [0, 20, 0, 0],
+						},
+						resolveBrandName() === 'JAS'
+							? undefined
+							: {
 									image: 'logo',
 									width: 120,
 									alignment: 'right',
 								},
-							],
-							margin: [0, 0, 0, 10],
-						},
+					],
+					margin: [0, 0, 0, 10],
+				},
 				{
 					table: {
 						headerRows: 1,
