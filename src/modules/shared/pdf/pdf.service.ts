@@ -143,24 +143,26 @@ export class PdfService {
 		const docDefinition: TDocumentDefinitions = {
 			content: [
 				...(jasQrHeader ? [jasQrHeader] : []),
-				// {
-				// 	columns: [
-				// 		{
-				// 			width: '*',
-				// 			stack: [
-				// 				{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
-				// 				{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
-				// 			],
-				// 			margin: [0, 20, 0, 0],
-				// 		},
-				// 		{
-				// 			image: 'logo',
-				// 			width: 120,
-				// 			alignment: 'right',
-				// 		},
-				// 	],
-				// 	margin: [0, 0, 0, 10],
-				// },
+				resolveBrandName() === 'JAS'
+					? undefined
+					: {
+							columns: [
+								{
+									width: '*',
+									stack: [
+										{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
+										{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
+									],
+									margin: [0, 20, 0, 0],
+								},
+								{
+									image: 'logo',
+									width: 120,
+									alignment: 'right',
+								},
+							],
+							margin: [0, 0, 0, 10],
+						},
 				{
 					table: {
 						headerRows: 1,
