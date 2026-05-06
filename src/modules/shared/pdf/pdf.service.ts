@@ -6,6 +6,7 @@ import { buildSellingPdfFooterSummaryBlock } from '../../selling/helpers/selling
 import * as pdfMake from 'pdfmake/build/pdfmake'
 import vfsFonts from 'pdfmake/build/vfs_fonts'
 import { TDocumentDefinitions, Content } from 'pdfmake/interfaces'
+import { formatDdMmYyyyHhMmForUzDisplay } from '../../../common'
 import { jasInstagramQrCodeBase64, jasTelegramQrCodeBase64, resolveBrandName, resolvePdfLogoBase64 } from './constants'
 import { Decimal } from '@prisma/client/runtime/library'
 ;(pdfMake as any).vfs = vfsFonts
@@ -125,8 +126,8 @@ export class PdfService {
 							{
 								width: '*',
 								stack: [
-									{ text: `Jasur G Blok 8-do'kon`, fontSize: 14, alignment: 'center', margin: [0, 4, 0, 4] },
-									{ text: `Jasur 91-773-22-99 Dilshod 91-733-22-99 Axror 97-050-86-83`, alignment: 'center', fontSize: 12 },
+									{ text: `Jasur G Blok 8-do'kon`, fontSize: 18, alignment: 'center', margin: [0, 4, 0, 4] },
+									{ text: `Jasur 91-773-22-99 Dilshod 91-733-22-99 Axror 97-950-86-83`, alignment: 'center', fontSize: 12 },
 								],
 								margin: [0, 20, 0, 0],
 							},
@@ -238,11 +239,6 @@ export class PdfService {
 	}
 
 	private formatDate(date: Date): string {
-		const dd = String(date.getDate()).padStart(2, '0')
-		const mm = String(date.getMonth() + 1).padStart(2, '0')
-		const yyyy = date.getFullYear()
-		const hh = String(date.getHours()).padStart(2, '0')
-		const min = String(date.getMinutes()).padStart(2, '0')
-		return `${dd}.${mm}.${yyyy} ${hh}:${min}`
+		return formatDdMmYyyyHhMmForUzDisplay(date)
 	}
 }
