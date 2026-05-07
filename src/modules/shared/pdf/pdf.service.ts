@@ -114,53 +114,50 @@ export class PdfService {
 	}
 
 	async generateInvoicePdfBuffer2(selling: SellingFindOneData): Promise<Buffer> {
-		const jasQrHeader: Content | undefined =
-			resolveBrandName() === 'JAS'
-				? ({
-						columns: [
-							{
-								image: 'jasTelegramQrCode',
-								width: 70,
-								alignment: 'left',
-							},
-							{
-								width: '*',
-								stack: [
-									{ text: `Jasur G Blok 8-do'kon`, fontSize: 18, alignment: 'center', margin: [0, 4, 0, 4] },
-									{ text: `Jasur 91-773-22-99 Dilshod 91-733-22-99 Axror 97-950-86-83`, alignment: 'center', fontSize: 12 },
-								],
-								margin: [0, 20, 0, 0],
-							},
-							{
-								image: 'jasInstagramQrCode',
-								width: 90,
-								alignment: 'right',
-							},
-						],
-						margin: [0, 0, 0, 5],
-					} as Content)
-				: undefined
+		if (resolveBrandName() === 'JAS') {
+			return this.generateJasInvoicePdfBuffer(selling)
+		} else {
+			return this.generateKasInvoicePdfBuffer(selling)
+		}
+	}
 
+	async generateJasInvoicePdfBuffer(selling: SellingFindOneData): Promise<Buffer> {
 		const docDefinition: TDocumentDefinitions = {
 			content: [
-				...(jasQrHeader ? [jasQrHeader] : []),
+				{
+					columns: [
+						{
+							image: 'jasTelegramQrCode',
+							width: 70,
+							alignment: 'left',
+						},
+						{
+							width: '*',
+							stack: [
+								{ text: `JASUR G BLOK 8-DO'KON`, fontSize: 18, alignment: 'center', margin: [0, 4, 0, 4] },
+								{ text: `Jasur 91-773-22-99 Dilshod 91-733-22-99 Axror 97-950-86-83`, alignment: 'center', fontSize: 12 },
+							],
+							margin: [0, 20, 0, 0],
+						},
+						{
+							image: 'jasInstagramQrCode',
+							width: 90,
+							alignment: 'right',
+						},
+					],
+					margin: [0, 0, 0, 5],
+				},
 				{
 					columns: [
 						{
 							width: '*',
 							stack: [
 								{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
+								selling.client?.phone ? { text: `Telefon raqami: ${selling.client?.phone ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] } : undefined,
 								{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
 							],
-							margin: [0, 20, 0, 0],
+							margin: [0, 10, 0, 0],
 						},
-						resolveBrandName() === 'JAS'
-							? undefined
-							: {
-									image: 'logo',
-									width: 120,
-									alignment: 'right',
-								},
 					],
 					margin: [0, 0, 0, 10],
 				},
@@ -224,6 +221,115 @@ export class PdfService {
 				logo: resolvePdfLogoBase64(),
 				jasTelegramQrCode: jasTelegramQrCodeBase64,
 				jasInstagramQrCode: jasInstagramQrCodeBase64,
+			},
+			defaultStyle: {
+				font: 'Roboto',
+			},
+		}
+
+		return new Promise((resolve) => {
+			const pdfDocGenerator = pdfMake.createPdf(docDefinition)
+			pdfDocGenerator.getBuffer((buffer) => {
+				resolve(Buffer.from(buffer))
+			})
+		})
+	}
+
+	async generateKasInvoicePdfBuffer(selling: SellingFindOneData): Promise<Buffer> {
+		const docDefinition: TDocumentDefinitions = {
+			content: [
+				{
+					columns: [
+						{
+							width: '*',
+							stack: [
+								{ text: `Mansur +998 99 044 00 24`, fontSize: 12, margin: [0, 4, 0, 4] },
+								{ text: `Mamur  +998 90 863 69 91`, fontSize: 12, margin: [0, 4, 0, 4] },
+							],
+							margin: [0, 20, 0, 0],
+						},
+						{
+							image: 'logo',
+							width: 120,
+							alignment: 'right',
+						},
+					],
+					margin: [0, 0, 0, 10],
+				},
+				{
+					columns: [
+						{
+							width: '*',
+							stack: [
+								{ text: `Xaridor: ${selling.client?.fullname ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] },
+								selling.client?.phone ? { text: `Telefon raqami: ${selling.client?.phone ?? ''}`, fontSize: 12, margin: [0, 4, 0, 4] } : undefined,
+								{ text: `Sotuv vaqti: ${this.formatDate(selling.date)}`, fontSize: 12 },
+							],
+							margin: [0, 10, 0, 0],
+						},
+					],
+					margin: [0, 0, 0, 10],
+				},
+				{
+					table: {
+						headerRows: 1,
+						widths: ['auto', '*', 50, 70, 80],
+						body: [
+							[
+								{ text: '№', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Mahsulot nomi', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Soni', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Narxi', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Jami', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+							],
+							...(selling.products ?? [])
+								.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
+								.map((item, index) => {
+									const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
+									const price = pr?.toNumber?.() ?? 0
+									const totalPrice = tpr?.toNumber?.() ?? price * item.count
+									return [
+										{ text: index + 1, fontSize: 12, alignment: 'center' },
+										{ text: item.product.name, fontSize: 12, alignment: 'left' },
+										{ text: item.count.toString(), fontSize: 12, alignment: 'center' },
+										{ text: `${price} ${sym}`, fontSize: 12, alignment: 'right' },
+										{ text: `${totalPrice} ${sym}`, fontSize: 12, alignment: 'right' },
+									]
+								}),
+						],
+					},
+					layout: {
+						hLineWidth: () => 0.8,
+						vLineWidth: () => 0.8,
+						hLineColor: () => '#666',
+						vLineColor: () => '#666',
+						paddingLeft: () => 6,
+						paddingRight: () => 6,
+						paddingTop: () => 6,
+						paddingBottom: () => 6,
+					},
+					margin: [0, 10, 0, 10],
+				},
+				{
+					text: `Jami: ${selling.totalPrices?.map((t) => `${t.total.toNumber()} ${(t as any).currency?.symbol ?? ''}`).join(' + ') || 0}`,
+					fontSize: 13,
+					bold: true,
+					color: 'red',
+					alignment: 'right',
+					margin: [0, 5, 0, 0],
+				},
+				{
+					text: buildSellingPdfFooterSummaryBlock(selling as SellingFindOneData, (d) => this.formatDate(d)),
+					fontSize: 11,
+					alignment: 'left',
+					margin: [0, 12, 0, 0],
+					lineHeight: 1.4,
+				},
+			],
+			images: {
+				logo: resolvePdfLogoBase64(),
+				// jasTelegramQrCode: jasTelegramQrCodeBase64,
+				// jasInstagramQrCode: jasInstagramQrCodeBase64,
 			},
 			defaultStyle: {
 				font: 'Roboto',
