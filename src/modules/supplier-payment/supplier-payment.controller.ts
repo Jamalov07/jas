@@ -32,6 +32,13 @@ export class SupplierPaymentController {
 		return this.supplierPaymentService.findMany({ ...query, isDeleted: false })
 	}
 
+	@Get('many-new')
+	@ApiOkResponse({ type: SupplierPaymentFindManyResponseDto })
+	@ApiOperation({ summary: 'get all supplierPayments (optimized)' })
+	findManyNew(@Query() query: SupplierPaymentFindManyRequestDto): Promise<SupplierPaymentFindManyResponseDto> {
+		return this.supplierPaymentService.findManyNew({ ...query, isDeleted: false })
+	}
+
 	@Get('one')
 	@ApiOperation({ summary: 'find one supplierPayment' })
 	@ApiOkResponse({ type: SupplierPaymentFindOneResponseDto })

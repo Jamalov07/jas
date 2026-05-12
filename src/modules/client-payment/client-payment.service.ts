@@ -96,6 +96,38 @@ export class ClientPaymentService {
 		return { data: data as ClientPaymentFindOneData[], calcByCurrency, totalsByCurrency }
 	}
 
+	/**
+	 * `enrichClientPaymentsFindManyData` ning optimallashtirilgan versiyasi:
+	 * - `findAllActiveIds()` faqat 1 marta chaqiriladi (eski versiyada 2 marta)
+	 * - `findBriefByIds()` faqat 1 marta chaqiriladi (eski versiyada 2 marta)
+	 * - currency va client debt so'rovlari parallel ishlaydi
+	 */
+	private async enrichPaymentsOptimized(payments: PaymentLikeForCalc[]) {
+		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
+		const columnCurrencyIds = resolvePaymentColumnCurrencyIds(activeCurrencyIds, payments)
+
+		const clientIds = [...new Set(payments.map((p) => (p as { client?: { id: string } }).client?.id).filter(Boolean))] as string[]
+
+		const [briefRows, debtMap] = await Promise.all([this.currencyRepository.findBriefByIds(columnCurrencyIds), this.clientService.getDebtSnapshotsByClientIds(clientIds)])
+		const briefMap = currencyBriefMapFromRows(briefRows)
+
+		const globalNetMap = this.mergeNetMapsForPayments(payments)
+		const calcByCurrency: ClientPaymentCalcByCurrency[] = withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(columnCurrencyIds, globalNetMap), briefMap)
+		const totalsByCurrency: ClientPaymentCalcByCurrency[] = withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(columnCurrencyIds, globalNetMap), briefMap)
+
+		const data = payments.map((p) => {
+			const row = p as typeof p & { client?: { id: string; fullname: string; phone: string }; staff?: { id: string; fullname: string; phone: string } }
+			const rowColumnIds = resolvePaymentColumnCurrencyIds(activeCurrencyIds, [p])
+			return {
+				...row,
+				...(row.client ? { client: { ...row.client, debtByCurrency: debtMap.get(row.client.id) ?? [] } } : {}),
+				totalsByCurrency: withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(rowColumnIds, this.netAmountsMapForPayment(p)), briefMap),
+			}
+		})
+
+		return { data: data as ClientPaymentFindOneData[], calcByCurrency, totalsByCurrency }
+	}
+
 	async findMany(query: ClientPaymentFindManyRequest) {
 		const payments = await this.clientPaymentRepository.findMany(query)
 		const paymentsCount = await this.clientPaymentRepository.countFindMany(query)
@@ -113,6 +145,29 @@ export class ClientPaymentService {
 			: { data, calcByCurrency, totalsByCurrency }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
+	}
+
+	async findManyNew(query: ClientPaymentFindManyRequest) {
+		const [payments, paymentsCount] = await Promise.all([
+			this.clientPaymentRepository.findMany(query),
+			query.pagination ? this.clientPaymentRepository.countFindMany(query) : Promise.resolve(0),
+		])
+
+		const { data, calcByCurrency, totalsByCurrency } = await this.enrichPaymentsOptimized(payments as PaymentLikeForCalc[])
+
+		const totalCount = query.pagination ? paymentsCount : data.length
+
+		return createResponse({
+			data: {
+				totalCount,
+				pagesCount: query.pagination ? Math.ceil(totalCount / query.pageSize) : 1,
+				pageSize: data.length,
+				data,
+				calcByCurrency,
+				totalsByCurrency,
+			},
+			success: { messages: ['find many success'] },
+		})
 	}
 
 	async findOne(query: ClientPaymentFindOneRequest) {

@@ -423,6 +423,86 @@ export class ClientService {
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
 
+	async findManyNew(query: ClientFindManyRequest) {
+		const hasDebtFilter = query.debtType !== undefined && query.debtValue !== undefined
+
+		// Debt filter bo'lsa barchasi kerak; aks holda DB darajasida pagination
+		const clients = await this.clientRepository.findManyNew({
+			...query,
+			fetchAll: hasDebtFilter,
+		})
+
+		// Bitta passda barcha currency ID larni yig'ish va xom qarzlarni hisoblash
+		const currencyIdSet = new Set<string>()
+		const clientsWithRawDebt = clients.map((c) => {
+			const debtMap = this.calcDebtByCurrency(c.sellings, c.payments, c.returnings)
+			for (const id of debtMap.keys()) currencyIdSet.add(id)
+			return {
+				id: c.id,
+				fullname: c.fullname,
+				phone: c.phone,
+				description: c.description ?? null,
+				telegram: c.telegram,
+				createdAt: c.createdAt,
+				lastSellingDate: c.sellings?.length ? c.sellings[0].date : null,
+				_rawDebt: Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
+			}
+		})
+
+		// Currency ma'lumotlarini parallel ravishda yuklash (bir round-trip)
+		const allCurrencyIds = [...currencyIdSet]
+		const [{ rates, symbols }, currencyBriefs] = await Promise.all([
+			this.currencyRepository.findExchangeRatesAndSymbolsByIds(allCurrencyIds),
+			this.currencyRepository.findBriefByIds(allCurrencyIds),
+		])
+		const currencyMap = currencyBriefMapFromRows(currencyBriefs)
+
+		const clientsProcessed = clientsWithRawDebt.map((c) => {
+			const netted = netDebtCrossCurrencyRows(c._rawDebt, rates, symbols)
+			const totalDebt = netted.reduce((acc, d) => acc.plus(d.amount), new Decimal(0))
+			const { _rawDebt, ...rest } = c
+			return {
+				...rest,
+				debtByCurrency: withCurrencyBriefAmountMany(netted, currencyMap),
+				_totalDebt: totalDebt,
+			}
+		})
+
+		// Debt filter qo'llash
+		const filtered = hasDebtFilter
+			? clientsProcessed.filter((c) => {
+					const threshold = new Decimal(query.debtValue!)
+					switch (query.debtType) {
+						case DebtTypeEnum.gt:
+							return c._totalDebt.gt(threshold)
+						case DebtTypeEnum.lt:
+							return c._totalDebt.lt(threshold)
+						case DebtTypeEnum.eq:
+							return c._totalDebt.eq(threshold)
+						default:
+							return true
+					}
+				})
+			: clientsProcessed
+
+		// Debt filter bor bo'lsa in-memory pagination, aks holda DB allaqachon paginate qilgan
+		const totalCount = hasDebtFilter || !query.pagination ? filtered.length : await this.clientRepository.countFindManyNew(query)
+
+		const pageData = hasDebtFilter && query.pagination ? filtered.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize) : filtered
+
+		const resultData = pageData.map(({ _totalDebt, ...rest }) => rest)
+
+		return createResponse({
+			data: {
+				totalCount,
+				pagesCount: query.pagination ? Math.ceil(totalCount / query.pageSize) : 1,
+				pageSize: resultData.length,
+				data: resultData,
+			},
+			success: { messages: ['find many success'] },
+		})
+	}
+
 	async findOne(query: ClientFindOneRequest) {
 		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
 		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined

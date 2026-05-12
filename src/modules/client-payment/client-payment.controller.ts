@@ -32,6 +32,13 @@ export class ClientPaymentController {
 		return this.clientPaymentService.findMany(query)
 	}
 
+	@Get('many-new')
+	@ApiOkResponse({ type: ClientPaymentFindManyResponseDto })
+	@ApiOperation({ summary: 'get all clientPayments (optimized)' })
+	findManyNew(@Query() query: ClientPaymentFindManyRequestDto): Promise<ClientPaymentFindManyResponseDto> {
+		return this.clientPaymentService.findManyNew(query)
+	}
+
 	@Get('one')
 	@ApiOperation({ summary: 'find one clientPayment' })
 	@ApiOkResponse({ type: ClientPaymentFindOneResponseDto })

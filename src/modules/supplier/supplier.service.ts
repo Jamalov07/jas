@@ -195,6 +195,91 @@ export class SupplierService {
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}
 
+	async findManyNew(query: SupplierFindManyRequest) {
+		const hasDebtFilter = query.debtType !== undefined && query.debtValue !== undefined
+
+		// Debt filter bo'lsa barcha recordlar kerak (in-memory filter uchun),
+		// aks holda DB darajasida pagination qilinadi
+		const suppliers = await this.supplierRepository.findManyNew({
+			...query,
+			fetchAll: hasDebtFilter,
+		})
+
+		// Bitta passda barcha currency ID larni yig'ish va xom qarzlarni hisoblash
+		const currencyIdSet = new Set<string>()
+		const suppliersWithRawDebt = suppliers.map((s) => {
+			const debtMap = this.calcDebtByCurrency(s.arrivals, s.payments)
+			for (const id of debtMap.keys()) currencyIdSet.add(id)
+			return {
+				id: s.id,
+				fullname: s.fullname,
+				phone: s.phone,
+				description: s.description ?? null,
+				createdAt: s.createdAt,
+				lastArrivalDate: s.arrivals?.length ? s.arrivals[0].date : null,
+				_rawDebt: Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
+			}
+		})
+
+		// Currency ma'lumotlarini parallel ravishda yuklash (bir request o'rniga ikki parallel)
+		const allCurrencyIds = [...currencyIdSet]
+		const [{ rates, symbols }, currencyBriefs] = await Promise.all([
+			this.currencyRepository.findExchangeRatesAndSymbolsByIds(allCurrencyIds),
+			this.currencyRepository.findBriefByIds(allCurrencyIds),
+		])
+		const currencyMap = currencyBriefMapFromRows(currencyBriefs)
+
+		// Qarzlarni valyutalar bo'yicha netlashtirish va currency brief qo'shish
+		const suppliersProcessed = suppliersWithRawDebt.map((s) => {
+			const netted = netDebtCrossCurrencyRows(s._rawDebt, rates, symbols)
+			const totalDebt = netted.reduce((acc, d) => acc.plus(d.amount), new Decimal(0))
+			const { _rawDebt, ...rest } = s
+			return {
+				...rest,
+				debtByCurrency: withCurrencyBriefAmountMany(netted, currencyMap),
+				_totalDebt: totalDebt,
+			}
+		})
+
+		// Debt filter qo'llash
+		const filtered = hasDebtFilter
+			? suppliersProcessed.filter((s) => {
+					const threshold = new Decimal(query.debtValue!)
+					switch (query.debtType) {
+						case DebtTypeEnum.gt:
+							return s._totalDebt.gt(threshold)
+						case DebtTypeEnum.lt:
+							return s._totalDebt.lt(threshold)
+						case DebtTypeEnum.eq:
+							return s._totalDebt.eq(threshold)
+						default:
+							return true
+					}
+				})
+			: suppliersProcessed
+
+		// totalCount ni aniqlash:
+		// - debt filter bor → barcha filtered recordlar xotirada, count bepul
+		// - pagination + debt filter yo'q → DB dan count olish kerak
+		// - pagination yo'q → barcha recordlar xotirada, count bepul
+		const totalCount = hasDebtFilter || !query.pagination ? filtered.length : await this.supplierRepository.countFindManyNew(query)
+
+		// Debt filter bo'lsa in-memory pagination, aks holda DB allaqachon paginate qilgan
+		const pageData = hasDebtFilter && query.pagination ? filtered.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize) : filtered
+
+		const resultData = pageData.map(({ _totalDebt, ...rest }) => rest)
+
+		return createResponse({
+			data: {
+				totalCount,
+				pagesCount: query.pagination ? Math.ceil(totalCount / query.pageSize) : 1,
+				pageSize: resultData.length,
+				data: resultData,
+			},
+			success: { messages: ['find many success'] },
+		})
+	}
+
 	async findOne(query: SupplierFindOneRequest) {
 		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
 		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined

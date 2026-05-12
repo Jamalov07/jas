@@ -204,6 +204,38 @@ export class SupplierRepository {
 		return count
 	}
 
+	async findManyNew(query: SupplierFindManyRequest & { fetchAll?: boolean }) {
+		const where: Prisma.SupplierModelWhereInput = {
+			deletedAt: query.isDeleted === true ? { not: null } : null,
+			...this.supplierFindManyWhere(query),
+		}
+
+		const paginationOptions =
+			query.pagination && !query.fetchAll ? { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize } : {}
+
+		return this.prisma.supplierModel.findMany({
+			where,
+			select: {
+				id: true,
+				fullname: true,
+				phone: true,
+				description: true,
+				createdAt: true,
+				...SUPPLIER_DEBT_SOURCE_SELECT,
+			},
+			...paginationOptions,
+		})
+	}
+
+	async countFindManyNew(query: SupplierFindManyRequest): Promise<number> {
+		return this.prisma.supplierModel.count({
+			where: {
+				deletedAt: query.isDeleted === true ? { not: null } : null,
+				...this.supplierFindManyWhere(query),
+			},
+		})
+	}
+
 	async createOne(body: SupplierCreateOneRequest) {
 		const supplier = await this.prisma.supplierModel.create({
 			data: {

@@ -96,6 +96,43 @@ export class SupplierPaymentService {
 		return { data: data as SupplierPaymentFindOneData[], calcByCurrency, totalsByCurrency }
 	}
 
+	/**
+	 * `enrichSupplierPaymentsFindManyData` ning optimallashtirilgan versiyasi:
+	 * - `findAllActiveIds()` faqat 1 marta chaqiriladi (eski versiyada 2 marta)
+	 * - `findBriefByIds()` faqat 1 marta chaqiriladi (eski versiyada 2 marta)
+	 * - currency va supplier debt so'rovlari parallel ishlaydi
+	 */
+	private async enrichPaymentsOptimized(payments: PaymentLikeForCalc[]) {
+		// Faol valyuta IDlarini bir marta olish
+		const activeCurrencyIds = await this.currencyRepository.findAllActiveIds()
+		const columnCurrencyIds = resolvePaymentColumnCurrencyIds(activeCurrencyIds, payments)
+
+		// Supplier IDlarini yig'ish
+		const supplierIds = [...new Set(payments.map((p) => (p as { supplier?: { id: string } }).supplier?.id).filter(Boolean))] as string[]
+
+		// Currency brief va supplier qarzlarini parallel yuklash
+		const [briefRows, debtMap] = await Promise.all([this.currencyRepository.findBriefByIds(columnCurrencyIds), this.supplierService.getDebtSnapshotsBySupplierIds(supplierIds)])
+		const briefMap = currencyBriefMapFromRows(briefRows)
+
+		// Umumiy to'lovlar yig'indisi (calcByCurrency = totalsByCurrency, bir xil hisob)
+		const globalNetMap = this.mergeNetMapsForPayments(payments)
+		const calcByCurrency: SupplierPaymentCalcByCurrency[] = withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(columnCurrencyIds, globalNetMap), briefMap)
+		const totalsByCurrency: SupplierPaymentCalcByCurrency[] = withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(columnCurrencyIds, globalNetMap), briefMap)
+
+		// Har bir to'lov uchun totalsByCurrency va supplier debt qo'shish
+		const data = payments.map((p) => {
+			const row = p as typeof p & { supplier?: { id: string; fullname: string; phone: string }; staff?: { id: string; fullname: string; phone: string } }
+			const rowColumnIds = resolvePaymentColumnCurrencyIds(activeCurrencyIds, [p])
+			return {
+				...row,
+				...(row.supplier ? { supplier: { ...row.supplier, debtByCurrency: debtMap.get(row.supplier.id) ?? [] } } : {}),
+				totalsByCurrency: withCurrencyBriefTotalMany(fillCurrencyTotalsByActiveIds(rowColumnIds, this.netAmountsMapForPayment(p)), briefMap),
+			}
+		})
+
+		return { data: data as SupplierPaymentFindOneData[], calcByCurrency, totalsByCurrency }
+	}
+
 	async findMany(query: SupplierPaymentFindManyRequest) {
 		const payments = await this.supplierPaymentRepository.findMany(query)
 		const paymentsCount = await this.supplierPaymentRepository.countFindMany(query)
@@ -113,6 +150,30 @@ export class SupplierPaymentService {
 			: { data, calcByCurrency, totalsByCurrency }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
+	}
+
+	async findManyNew(query: SupplierPaymentFindManyRequest) {
+		// findMany va countFindMany ni parallel ishlatish
+		const [payments, paymentsCount] = await Promise.all([
+			this.supplierPaymentRepository.findMany(query),
+			query.pagination ? this.supplierPaymentRepository.countFindMany(query) : Promise.resolve(0),
+		])
+
+		const { data, calcByCurrency, totalsByCurrency } = await this.enrichPaymentsOptimized(payments as PaymentLikeForCalc[])
+
+		const totalCount = query.pagination ? paymentsCount : data.length
+
+		return createResponse({
+			data: {
+				totalCount,
+				pagesCount: query.pagination ? Math.ceil(totalCount / query.pageSize) : 1,
+				pageSize: data.length,
+				data,
+				calcByCurrency,
+				totalsByCurrency,
+			},
+			success: { messages: ['find many success'] },
+		})
 	}
 
 	async findOne(query: SupplierPaymentFindOneRequest) {

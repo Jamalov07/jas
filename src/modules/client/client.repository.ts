@@ -243,6 +243,35 @@ export class ClientRepository {
 		return count
 	}
 
+	async findManyNew(query: ClientFindManyRequest & { fetchAll?: boolean }) {
+		const where = this.clientFindManyWhere(query)
+		let paginationOptions = {}
+		if (query.pagination && !query.fetchAll) {
+			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
+		}
+
+		return this.prisma.clientModel.findMany({
+			where,
+			select: {
+				id: true,
+				fullname: true,
+				phone: true,
+				description: true,
+				createdAt: true,
+				telegram: { select: { id: true, isActive: true } },
+				...CLIENT_DEBT_SOURCE_SELECT,
+			},
+			orderBy: [{ sellings: { _count: 'desc' } }, { createdAt: 'desc' }],
+			...paginationOptions,
+		})
+	}
+
+	async countFindManyNew(query: ClientFindManyRequest): Promise<number> {
+		return this.prisma.clientModel.count({
+			where: this.clientFindManyWhere(query),
+		})
+	}
+
 	async getMany(query: ClientGetManyRequest) {
 		let paginationOptions = {}
 		if (query.pagination) {

@@ -32,6 +32,13 @@ export class ClientController {
 		return this.clientService.findMany(query)
 	}
 
+	@Get('many-new')
+	@ApiOkResponse({ type: ClientFindManyResponseDto })
+	@ApiOperation({ summary: 'get all clients (optimized)' })
+	findManyNew(@Query() query: ClientFindManyRequestDto): Promise<ClientFindManyResponseDto> {
+		return this.clientService.findManyNew(query)
+	}
+
 	@Get('many/report')
 	@ApiOkResponse({ type: ClientFindManyResponseDto })
 	@ApiOperation({ summary: 'get all client reports' })
