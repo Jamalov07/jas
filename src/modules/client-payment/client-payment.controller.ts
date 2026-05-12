@@ -25,14 +25,14 @@ export class ClientPaymentController {
 		this.clientPaymentService = clientPaymentService
 	}
 
-	@Get('many')
+	@Get('many-old')
 	@ApiOkResponse({ type: ClientPaymentFindManyResponseDto })
 	@ApiOperation({ summary: 'get all clientPayments' })
 	async findMany(@Query() query: ClientPaymentFindManyRequestDto): Promise<ClientPaymentFindManyResponseDto> {
 		return this.clientPaymentService.findMany(query)
 	}
 
-	@Get('many-new')
+	@Get('many')
 	@ApiOkResponse({ type: ClientPaymentFindManyResponseDto })
 	@ApiOperation({ summary: 'get all clientPayments (optimized)' })
 	findManyNew(@Query() query: ClientPaymentFindManyRequestDto): Promise<ClientPaymentFindManyResponseDto> {

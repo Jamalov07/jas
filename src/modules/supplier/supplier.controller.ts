@@ -25,14 +25,14 @@ export class SupplierController {
 		this.supplierService = supplierService
 	}
 
-	@Get('many')
+	@Get('many-old')
 	@ApiOkResponse({ type: SupplierFindManyResponseDto })
 	@ApiOperation({ summary: 'get all suppliers' })
 	async findMany(@Query() query: SupplierFindManyRequestDto): Promise<SupplierFindManyResponseDto> {
 		return this.supplierService.findMany({ ...query, isDeleted: false })
 	}
 
-	@Get('many-new')
+	@Get('many')
 	@ApiOkResponse({ type: SupplierFindManyResponseDto })
 	@ApiOperation({ summary: 'get all suppliers (optimized)' })
 	findManyNew(@Query() query: SupplierFindManyRequestDto): Promise<SupplierFindManyResponseDto> {
