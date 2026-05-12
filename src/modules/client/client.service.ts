@@ -140,11 +140,15 @@ export class ClientService {
 				Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount })),
 			)
 		}
-		const { rates, symbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...allCurrencyIds])
+		const ids = [...allCurrencyIds]
+		const [{ rates, symbols }, currencyBriefs] = await Promise.all([
+			this.currencyRepository.findExchangeRatesAndSymbolsByIds(ids),
+			this.currencyRepository.findBriefByIds(ids),
+		])
 		for (const [id, arr] of rawByClient.entries()) {
 			rawByClient.set(id, netDebtCrossCurrencyRows(arr, rates, symbols))
 		}
-		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...allCurrencyIds]))
+		const currencyMap = currencyBriefMapFromRows(currencyBriefs)
 		const out = new Map<string, ClientDebtByCurrency[]>()
 		for (const row of rows) {
 			const arr = rawByClient.get(row.id) ?? []

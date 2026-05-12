@@ -11,11 +11,41 @@ import {
 	CurrencyGetOneRequest,
 	CurrencyUpdateOneRequest,
 } from './interfaces'
+
+/** Valyuta ma'lumotlari kamdan-kam o'zgaradi — 60 soniyalik TTL kesh juda ko'p DB round-tripni kamaytiradi */
+const CACHE_TTL_MS = 60_000
+
+interface CacheEntry<T> {
+	value: T
+	expiresAt: number
+}
+
 @Injectable()
 export class CurrencyRepository {
 	private readonly prisma: PrismaService
+	private readonly _cache = new Map<string, CacheEntry<unknown>>()
+
 	constructor(prisma: PrismaService) {
 		this.prisma = prisma
+	}
+
+	private _get<T>(key: string): T | undefined {
+		const entry = this._cache.get(key)
+		if (!entry) return undefined
+		if (Date.now() > entry.expiresAt) {
+			this._cache.delete(key)
+			return undefined
+		}
+		return entry.value as T
+	}
+
+	private _set<T>(key: string, value: T): void {
+		this._cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
+	}
+
+	/** Currency yozilganda (create/update/delete) kesh tozalanadi */
+	private _invalidate(): void {
+		this._cache.clear()
 	}
 
 	async findMany(query: CurrencyFindManyRequest) {
@@ -60,30 +90,38 @@ export class CurrencyRepository {
 	}
 
 	async findAllActiveIds(): Promise<string[]> {
+		const cached = this._get<string[]>('activeIds')
+		if (cached) return cached
 		const rows = await this.prisma.currencyModel.findMany({
 			where: { isActive: true, deletedAt: null },
 			select: { id: true },
 			orderBy: { name: 'asc' },
 		})
-		return rows.map((r) => r.id)
+		const result = rows.map((r) => r.id)
+		this._set('activeIds', result)
+		return result
 	}
 
-	/** Bitta so‘rov: aktiv valyutalar (`ProductPriceData.currency` uchun `CurrencyFindOneData`). */
+	/** Bitta so'rov: aktiv valyutalar (`ProductPriceData.currency` uchun `CurrencyFindOneData`). */
 	async findActiveBriefOrdered(): Promise<CurrencyFindOneData[]> {
+		const cached = this._get<CurrencyFindOneData[]>('activeBriefOrdered')
+		if (cached) return cached
 		const rows = await this.prisma.currencyModel.findMany({
 			where: { isActive: true, deletedAt: null },
 			select: { id: true, name: true, symbol: true, isActive: true, exchangeRate: true, createdAt: true },
 			orderBy: { name: 'asc' },
 		})
-		return rows.map((r) => ({
-			...r,
-			exchangeRate: r.exchangeRate ?? new Decimal(0),
-		}))
+		const result = rows.map((r) => ({ ...r, exchangeRate: r.exchangeRate ?? new Decimal(0) }))
+		this._set('activeBriefOrdered', result)
+		return result
 	}
 
 	async findExchangeRatesAndSymbolsByIds(ids: string[]): Promise<{ rates: Map<string, Decimal>; symbols: Map<string, string> }> {
-		const unique = [...new Set(ids.filter(Boolean))]
+		const unique = [...new Set(ids.filter(Boolean))].sort()
 		if (unique.length === 0) return { rates: new Map(), symbols: new Map() }
+		const cacheKey = `rates:${unique.join(',')}`
+		const cached = this._get<{ rates: Map<string, Decimal>; symbols: Map<string, string> }>(cacheKey)
+		if (cached) return cached
 		const rows = await this.prisma.currencyModel.findMany({
 			where: { id: { in: unique } },
 			select: { id: true, exchangeRate: true, symbol: true },
@@ -94,16 +132,23 @@ export class CurrencyRepository {
 			rates.set(r.id, r.exchangeRate ?? new Decimal(0))
 			symbols.set(r.id, r.symbol)
 		}
-		return { rates, symbols }
+		const result = { rates, symbols }
+		this._set(cacheKey, result)
+		return result
 	}
 
 	async findBriefByIds(ids: string[]): Promise<Array<{ id: string; name: string; symbol: string }>> {
-		const unique = [...new Set(ids.filter(Boolean))]
+		const unique = [...new Set(ids.filter(Boolean))].sort()
 		if (unique.length === 0) return []
-		return this.prisma.currencyModel.findMany({
+		const cacheKey = `brief:${unique.join(',')}`
+		const cached = this._get<Array<{ id: string; name: string; symbol: string }>>(cacheKey)
+		if (cached) return cached
+		const result = await this.prisma.currencyModel.findMany({
 			where: { id: { in: unique } },
 			select: { id: true, name: true, symbol: true },
 		})
+		this._set(cacheKey, result)
+		return result
 	}
 
 	async countFindMany(query: CurrencyFindManyRequest) {
@@ -187,7 +232,7 @@ export class CurrencyRepository {
 				isActive: body.isActive,
 			},
 		})
-
+		this._invalidate()
 		return currency
 	}
 
@@ -201,20 +246,16 @@ export class CurrencyRepository {
 				isActive: body.isActive,
 			},
 		})
-
+		this._invalidate()
 		return currency
 	}
 
 	async deleteOne(query: CurrencyDeleteOneRequest) {
-		// const currency = await this.prisma.currencyModel.delete({
-		// 	where: { id: query.id },
-		// })
-
 		const currency = await this.prisma.currencyModel.update({
 			where: { id: query.id },
 			data: { deletedAt: new Date() },
 		})
-
+		this._invalidate()
 		return currency
 	}
 }

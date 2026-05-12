@@ -431,6 +431,8 @@ model ClientSellingPaymentModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([clientId, deletedAt, createdAt])
+  @@index([staffId, deletedAt, createdAt])
   @@map("client_selling_payment")
 }
 
@@ -449,6 +451,7 @@ model ClientSellingPaymentMethodModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([paymentId])
   @@map("client_selling_payment_method")
 }
 
@@ -467,6 +470,7 @@ model ClientSellingPaymentChangeMethodModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([paymentId])
   @@map("client_selling_change_method")
 }
 
@@ -567,6 +571,8 @@ model SupplierArrivalPaymentModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([supplierId, deletedAt, createdAt])
+  @@index([staffId, deletedAt, createdAt])
   @@map("supplier_arrival_payment")
 }
 
@@ -585,6 +591,7 @@ model SupplierArrivalPaymentMethodModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([paymentId])
   @@map("supplier_arrival_payment_method")
 }
 
@@ -603,6 +610,7 @@ model SupplierArrivalPaymentChangeMethodModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([paymentId])
   @@map("supplier_arrival_change_method")
 }
 
@@ -766,6 +774,8 @@ model ClientPaymentModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([clientId, deletedAt, createdAt])
+  @@index([staffId, deletedAt, createdAt])
   @@map("client_payment")
 }
 
@@ -784,6 +794,7 @@ model ClientPaymentMethodModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([paymentId])
   @@map("client_payment_method")
 }
 
@@ -802,6 +813,7 @@ model ClientPaymentChangeMethodModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([paymentId])
   @@map("client_payment_change_method")
 }
 
@@ -826,6 +838,8 @@ model SupplierPaymentModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([supplierId, deletedAt, createdAt])
+  @@index([staffId, deletedAt, createdAt])
   @@map("supplier_payment")
 }
 
@@ -844,6 +858,7 @@ model SupplierPaymentMethodModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([paymentId])
   @@map("supplier_payment_method")
 }
 
@@ -862,6 +877,7 @@ model SupplierPaymentChangeMethodModel {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([id])
+  @@index([paymentId])
   @@map("supplier_payment_change_method")
 }
 
@@ -919,6 +935,7 @@ model DayCloseLog {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
 
   @@id([ id ])
+  @@index([closedDate])
   @@map("day_close_log")
 }
 
