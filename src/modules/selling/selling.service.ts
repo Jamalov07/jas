@@ -411,6 +411,13 @@ export class SellingService {
 
 		body.staffId = request.user.id
 
+		/** Kanal/PDF «Eski qarz» — sotuv yaratilishidan oldingi holat (findOne qarzi netlashtirilgan, invoice xom: ayirish noto‘g‘ri chiqardi) */
+		let clientDebtBeforeSellingForBot: SellingDebtByCurrencyRow[] | undefined
+		if (body.send) {
+			const pre = await this.clientService.getDebtSnapshotsByClientIds([body.clientId])
+			clientDebtBeforeSellingForBot = (pre.get(body.clientId) ?? []) as SellingDebtByCurrencyRow[]
+		}
+
 		const selling = await this.sellingRepository.createOne(body)
 
 		if (body.send && selling.status === SellingStatusEnum.accepted) {
@@ -428,7 +435,7 @@ export class SellingService {
 					totalPrices,
 					payment,
 					debtByCurrency: invoiceDebt,
-					clientDebtBeforeSelling: this.computeClientDebtBeforeSelling(clientResult.data.debtByCurrency, invoiceDebt),
+					clientDebtBeforeSelling: clientDebtBeforeSellingForBot ?? this.computeClientDebtBeforeSelling(clientResult.data.debtByCurrency, invoiceDebt),
 					products: selling.products.map((p) => ({ ...p, status: BotSellingProductTitleEnum.new })),
 				} as any
 
@@ -486,6 +493,18 @@ export class SellingService {
 
 		body.staffId = request.user.id
 
+		/** Yangilashdan oldingi joriy qarz (kanal/PDF «Eski qarz»); qabul qilingan sotuvni tahrirlashda ham DB yangilanishidan oldin */
+		let clientDebtBeforeSellingForBot: SellingDebtByCurrencyRow[] | undefined
+		const needsClientDebtSnapshotBeforeUpdate =
+			existingSelling.status === SellingStatusEnum.accepted ||
+			(body.payment?.paymentMethods?.length ?? 0) > 0 ||
+			(body.payment?.changeMethods?.length ?? 0) > 0 ||
+			body.status === SellingStatusEnum.accepted
+		if (needsClientDebtSnapshotBeforeUpdate) {
+			const pre = await this.clientService.getDebtSnapshotsByClientIds([existingSelling.client.id])
+			clientDebtBeforeSellingForBot = (pre.get(existingSelling.client.id) ?? []) as SellingDebtByCurrencyRow[]
+		}
+
 		await this.sellingRepository.updateOne(query, body)
 
 		const updatedSelling = await this.sellingRepository.findOne({ id: query.id })
@@ -508,7 +527,8 @@ export class SellingService {
 					totalPrices,
 					payment,
 					debtByCurrency: invoiceDebt,
-					clientDebtBeforeSelling: this.computeClientDebtBeforeSelling(clientResult.data.debtByCurrency, invoiceDebt),
+					clientDebtBeforeSelling:
+						clientDebtBeforeSellingForBot ?? this.computeClientDebtBeforeSelling(clientResult.data.debtByCurrency, invoiceDebt),
 					products: updatedSelling.products.map((p) => ({ ...p, status: BotSellingProductTitleEnum.new })),
 				} as any
 
