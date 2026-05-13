@@ -210,8 +210,7 @@ export class SupplierRepository {
 			...this.supplierFindManyWhere(query),
 		}
 
-		const paginationOptions =
-			query.pagination && !query.fetchAll ? { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize } : {}
+		const paginationOptions = query.pagination && !query.fetchAll ? { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize } : {}
 
 		return this.prisma.supplierModel.findMany({
 			where,

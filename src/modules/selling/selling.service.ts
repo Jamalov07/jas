@@ -167,31 +167,6 @@ export class SellingService {
 		}))
 	}
 
-	/** `findOne`dan kelgan joriy qarzdan shu hujjat qarzdorligini ayirib, oldingi qarzni olamiz. */
-	private computeClientDebtBeforeSelling(
-		clientDebtAfter: SellingDebtByCurrencyRow[] | undefined,
-		invoiceDebt: Array<{ currencyId: string; amount: Decimal; currency?: { symbol?: string; id?: string; name?: string } }>,
-	): SellingDebtByCurrencyRow[] {
-		const afterMap = new Map((clientDebtAfter ?? []).map((r) => [r.currencyId, r]))
-		const invMap = new Map(invoiceDebt.map((r) => [r.currencyId, r.amount]))
-		const ids = new Set<string>([...afterMap.keys(), ...invMap.keys()])
-		const result: SellingDebtByCurrencyRow[] = []
-		for (const currencyId of ids) {
-			const after = afterMap.get(currencyId)
-			const invAmt = invMap.get(currencyId) ?? new Decimal(0)
-			const newAmt = after?.amount ?? new Decimal(0)
-			const oldAmt = newAmt.minus(invAmt)
-			const invRow = invoiceDebt.find((x) => x.currencyId === currencyId)
-			const currency: SellingDebtByCurrencyRow['currency'] =
-				after?.currency ??
-				(invRow?.currency?.id != null || invRow?.currency?.name != null || invRow?.currency?.symbol != null
-					? { id: invRow.currency.id ?? currencyId, name: invRow.currency.name ?? '', symbol: invRow.currency.symbol ?? '' }
-					: { id: currencyId, name: '', symbol: '' })
-			result.push({ currencyId, amount: oldAmt, currency })
-		}
-		return result
-	}
-
 	/** Joriy `findMany` sahifasidagi barcha sellinglar bo‘yicha yig‘indilar */
 	private buildFindManyCalcPage(
 		sellings: Awaited<ReturnType<SellingRepository['findMany']>>,
@@ -411,13 +386,6 @@ export class SellingService {
 
 		body.staffId = request.user.id
 
-		/** Kanal/PDF «Eski qarz» — sotuv yaratilishidan oldingi holat (findOne qarzi netlashtirilgan, invoice xom: ayirish noto‘g‘ri chiqardi) */
-		let clientDebtBeforeSellingForBot: SellingDebtByCurrencyRow[] | undefined
-		if (body.send) {
-			const pre = await this.clientService.getDebtSnapshotsByClientIds([body.clientId])
-			clientDebtBeforeSellingForBot = (pre.get(body.clientId) ?? []) as SellingDebtByCurrencyRow[]
-		}
-
 		const selling = await this.sellingRepository.createOne(body)
 
 		if (body.send && selling.status === SellingStatusEnum.accepted) {
@@ -428,6 +396,8 @@ export class SellingService {
 
 				const invoiceDebt = this.calcDebtByCurrency2(totalPrices, payment)
 
+				const clientDebtBeforeSellingResolved = await this.clientService.deriveClientDebtBeforeSellingFromCurrentState(body.clientId, selling)
+
 				const sellingInfo = {
 					...selling,
 					client: clientResult.data,
@@ -435,11 +405,11 @@ export class SellingService {
 					totalPrices,
 					payment,
 					debtByCurrency: invoiceDebt,
-					clientDebtBeforeSelling: clientDebtBeforeSellingForBot ?? this.computeClientDebtBeforeSelling(clientResult.data.debtByCurrency, invoiceDebt),
+					clientDebtBeforeSelling: clientDebtBeforeSellingResolved,
 					products: selling.products.map((p) => ({ ...p, status: BotSellingProductTitleEnum.new })),
 				} as any
 
-				if (clientResult.data.telegram?.id) {
+				if (body.send && clientResult.data.telegram?.id) {
 					await this.botService.sendSellingToClient(sellingInfo).catch((e) => console.log('bot client error:', e))
 				}
 				await this.botService.sendSellingToChannel(sellingInfo).catch((e) => console.log('bot channel error:', e))
@@ -467,6 +437,10 @@ export class SellingService {
 			throw new BadRequestException(ERROR_MSG.SELLING.NOT_FOUND.UZ)
 		}
 
+		/** PATCH boshidagi joriy qarz — `body` / `updateOne` DB dan oldin (kanal «Eski qarz») */
+		const clientDebtBeforeSellingForBot = ((await this.clientService.getDebtSnapshotsByClientIds([existingSelling.client.id])).get(existingSelling.client.id) ??
+			[]) as SellingDebtByCurrencyRow[]
+
 		if ((body.payment?.paymentMethods?.length ?? 0) > 0 || (body.payment?.changeMethods?.length ?? 0) > 0) {
 			body.status = SellingStatusEnum.accepted
 		}
@@ -493,18 +467,6 @@ export class SellingService {
 
 		body.staffId = request.user.id
 
-		/** Yangilashdan oldingi joriy qarz (kanal/PDF «Eski qarz»); qabul qilingan sotuvni tahrirlashda ham DB yangilanishidan oldin */
-		let clientDebtBeforeSellingForBot: SellingDebtByCurrencyRow[] | undefined
-		const needsClientDebtSnapshotBeforeUpdate =
-			existingSelling.status === SellingStatusEnum.accepted ||
-			(body.payment?.paymentMethods?.length ?? 0) > 0 ||
-			(body.payment?.changeMethods?.length ?? 0) > 0 ||
-			body.status === SellingStatusEnum.accepted
-		if (needsClientDebtSnapshotBeforeUpdate) {
-			const pre = await this.clientService.getDebtSnapshotsByClientIds([existingSelling.client.id])
-			clientDebtBeforeSellingForBot = (pre.get(existingSelling.client.id) ?? []) as SellingDebtByCurrencyRow[]
-		}
-
 		await this.sellingRepository.updateOne(query, body)
 
 		const updatedSelling = await this.sellingRepository.findOne({ id: query.id })
@@ -527,8 +489,7 @@ export class SellingService {
 					totalPrices,
 					payment,
 					debtByCurrency: invoiceDebt,
-					clientDebtBeforeSelling:
-						clientDebtBeforeSellingForBot ?? this.computeClientDebtBeforeSelling(clientResult.data.debtByCurrency, invoiceDebt),
+					clientDebtBeforeSelling: clientDebtBeforeSellingForBot,
 					products: updatedSelling.products.map((p) => ({ ...p, status: BotSellingProductTitleEnum.new })),
 				} as any
 

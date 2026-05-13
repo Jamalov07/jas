@@ -109,10 +109,7 @@ export class SupplierService {
 			)
 		}
 		const ids = [...allCurrencyIds]
-		const [{ rates, symbols }, currencyBriefs] = await Promise.all([
-			this.currencyRepository.findExchangeRatesAndSymbolsByIds(ids),
-			this.currencyRepository.findBriefByIds(ids),
-		])
+		const [{ rates, symbols }, currencyBriefs] = await Promise.all([this.currencyRepository.findExchangeRatesAndSymbolsByIds(ids), this.currencyRepository.findBriefByIds(ids)])
 		for (const [id, arr] of rawBySupplier.entries()) {
 			rawBySupplier.set(id, netDebtCrossCurrencyRows(arr, rates, symbols))
 		}
