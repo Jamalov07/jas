@@ -35,6 +35,7 @@ import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { BotService } from '../bot'
 import { BotSellingProductTitleEnum, BotSellingTitleEnum } from './enums'
+import { computeClientDebtBeforeSellingFromClosingTotals } from './helpers/selling-channel-summary.helper'
 import { ClientService } from '../client'
 import { CurrencyRepository } from '../currency'
 
@@ -396,7 +397,11 @@ export class SellingService {
 
 				const invoiceDebt = this.calcDebtByCurrency2(totalPrices, payment)
 
-				const clientDebtBeforeSellingResolved = await this.clientService.deriveClientDebtBeforeSellingFromCurrentState(body.clientId, selling)
+				const clientDebtBeforeSellingResolved = computeClientDebtBeforeSellingFromClosingTotals(
+					clientResult.data.debtByCurrency as SellingDebtByCurrencyRow[] | undefined,
+					totalPrices,
+					payment,
+				)
 
 				const sellingInfo = {
 					...selling,
@@ -436,10 +441,6 @@ export class SellingService {
 		if (!existingSelling) {
 			throw new BadRequestException(ERROR_MSG.SELLING.NOT_FOUND.UZ)
 		}
-
-		/** PATCH boshidagi joriy qarz — `body` / `updateOne` DB dan oldin (kanal «Eski qarz») */
-		const clientDebtBeforeSellingForBot = ((await this.clientService.getDebtSnapshotsByClientIds([existingSelling.client.id])).get(existingSelling.client.id) ??
-			[]) as SellingDebtByCurrencyRow[]
 
 		if ((body.payment?.paymentMethods?.length ?? 0) > 0 || (body.payment?.changeMethods?.length ?? 0) > 0) {
 			body.status = SellingStatusEnum.accepted
@@ -481,6 +482,12 @@ export class SellingService {
 				const isFirstAccept = !wasAccepted && isAcceptedNow
 
 				const invoiceDebt = this.calcDebtByCurrency2(totalPrices, payment)
+
+				const clientDebtBeforeSellingForBot = computeClientDebtBeforeSellingFromClosingTotals(
+					clientResult.data.debtByCurrency as SellingDebtByCurrencyRow[] | undefined,
+					totalPrices,
+					payment,
+				)
 
 				const sellingInfo = {
 					...updatedSelling,

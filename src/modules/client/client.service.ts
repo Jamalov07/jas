@@ -26,7 +26,7 @@ import {
 	ClientReportPaymentRow,
 	ClientReportSummary,
 } from './interfaces'
-import { ChangeMethodEnum, PriceTypeEnum } from '@prisma/client'
+import { ChangeMethodEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const isChangeBalanceExcludedFromDebt = (type: string) => type === ChangeMethodEnum.balance
@@ -152,58 +152,6 @@ export class ClientService {
 			out.set(row.id, withCurrencyBriefAmountMany(arr, currencyMap))
 		}
 		return out
-	}
-
-	/**
-	 * Kanal/PDF «Eski qarz»: DB da sotuv allaqachon bor deb, `findOne.debtByCurrency` (yangi qarz) bilan
-	 * bir xil manba va nettingda hisoblanadi — xom joriy qarzdan shu hujjatning xom deltasini ayiramiz,
-	 * keyin `netDebtCrossCurrencyRows`. Bitta valyutada: eski = yangi − sotuv + to'lov (qaytim qoidalari
-	 * `calcDebtByCurrency` dagidek).
-	 */
-	async deriveClientDebtBeforeSellingFromCurrentState(
-		clientId: string,
-		selling: {
-			products: Array<{ prices: Array<{ type: PriceTypeEnum; totalPrice: Decimal; currencyId: string }> }>
-			payment?: {
-				paymentMethods: Array<{ type: string; amount: Decimal; currencyId: string }>
-				changeMethods?: Array<{ type: string; amount: Decimal; currencyId: string }> | null
-			} | null
-		},
-	): Promise<ClientDebtByCurrency[]> {
-		const rows = await this.clientRepository.findDebtSourcesByClientIds([clientId])
-		const row = rows.find((r) => r.id === clientId)
-		if (!row) return []
-
-		const rawAfterMap = this.calcDebtByCurrency(row.sellings, row.payments, row.returnings)
-		const deltaMap = this.calcDebtByCurrency(
-			[
-				{
-					products: selling.products.map((p) => ({
-						prices: p.prices.filter((pr) => pr.type === PriceTypeEnum.selling).map((pr) => ({ totalPrice: pr.totalPrice, currencyId: pr.currencyId })),
-					})),
-					payment: selling.payment ?? undefined,
-				},
-			],
-			[],
-			[],
-		)
-
-		const currencyIds = new Set<string>([...rawAfterMap.keys(), ...deltaMap.keys()])
-		const rawBeforeRows: { currencyId: string; amount: Decimal }[] = []
-		for (const currencyId of currencyIds) {
-			const after = rawAfterMap.get(currencyId) ?? new Decimal(0)
-			const d = deltaMap.get(currencyId) ?? new Decimal(0)
-			const before = after.minus(d)
-			if (!before.isZero()) rawBeforeRows.push({ currencyId, amount: before })
-		}
-
-		if (rawBeforeRows.length === 0) return []
-
-		const ids = [...new Set(rawBeforeRows.map((r) => r.currencyId))]
-		const [{ rates, symbols }, currencyBriefs] = await Promise.all([this.currencyRepository.findExchangeRatesAndSymbolsByIds(ids), this.currencyRepository.findBriefByIds(ids)])
-		const netted = netDebtCrossCurrencyRows(rawBeforeRows, rates, symbols)
-		const currencyMap = currencyBriefMapFromRows(currencyBriefs)
-		return withCurrencyBriefAmountMany(netted, currencyMap)
 	}
 
 	private inReportPeriod(d: Date, start?: Date, end?: Date): boolean {

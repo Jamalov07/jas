@@ -1,6 +1,50 @@
 import { Decimal } from '@prisma/client/runtime/library'
 import type { SellingDebtByCurrencyRow, SellingFindOneData, SellingPaymentData } from '../interfaces'
 
+const emptyBrief = (currencyId: string): SellingDebtByCurrencyRow['currency'] => ({
+	id: currencyId,
+	name: '',
+	symbol: '',
+})
+
+/**
+ * Bot/kanal/PDF «Eski qarz» — har bir valyutada:
+ * **eski = yangi oxirgi qarz + shu sotuv bo‘yicha jami to‘lov − shu sotuv jami summasi**
+ * (`yangi = eski + sotuv − to‘lov` tenglamasining teskarisi).
+ */
+export function computeClientDebtBeforeSellingFromClosingTotals(
+	newDebtRows: SellingDebtByCurrencyRow[] | undefined,
+	totalPrices: SellingFindOneData['totalPrices'] | undefined,
+	payment: SellingPaymentData | undefined,
+): SellingDebtByCurrencyRow[] {
+	const newMap = new Map((newDebtRows ?? []).map((r) => [r.currencyId, r]))
+	const saleMap = new Map<string, { total: Decimal; currency: SellingDebtByCurrencyRow['currency'] }>()
+	for (const t of totalPrices ?? []) {
+		const c = (t as { currency?: SellingDebtByCurrencyRow['currency'] }).currency
+		saleMap.set(t.currencyId, { total: t.total, currency: c ?? emptyBrief(t.currencyId) })
+	}
+	const payMap = new Map<string, { total: Decimal; currency: SellingDebtByCurrencyRow['currency'] }>()
+	for (const m of payment?.paymentMethods ?? []) {
+		const cur = payMap.get(m.currencyId)
+		const c = m.currency
+		payMap.set(m.currencyId, {
+			total: (cur?.total ?? new Decimal(0)).plus(m.amount),
+			currency: c ? { id: c.id, name: c.name, symbol: c.symbol } : (cur?.currency ?? emptyBrief(m.currencyId)),
+		})
+	}
+	const ids = new Set<string>([...newMap.keys(), ...saleMap.keys(), ...payMap.keys()])
+	const out: SellingDebtByCurrencyRow[] = []
+	for (const currencyId of ids) {
+		const newAmt = newMap.get(currencyId)?.amount ?? new Decimal(0)
+		const saleAmt = saleMap.get(currencyId)?.total ?? new Decimal(0)
+		const payAmt = payMap.get(currencyId)?.total ?? new Decimal(0)
+		const oldAmt = newAmt.plus(payAmt).minus(saleAmt)
+		const currency = newMap.get(currencyId)?.currency ?? saleMap.get(currencyId)?.currency ?? payMap.get(currencyId)?.currency ?? emptyBrief(currencyId)
+		out.push({ currencyId, amount: oldAmt, currency })
+	}
+	return out.filter((r) => !r.amount.isZero())
+}
+
 /** Ko‘p valyutali qarz / summa — Telegram caption va PDF ostki qismi uchun */
 export function formatSellingMoneyRows(rows: { amount: Decimal; currency: { symbol: string } }[] | undefined): string {
 	if (!rows?.length) return '0'
