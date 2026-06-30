@@ -378,6 +378,55 @@ export class BotService {
 		await this.bot.telegram.sendMessage(channelId, message)
 	}
 
+	async sendClientPaymentToClient(
+		payment: {
+			description?: string | null
+			createdAt: Date
+			paymentMethods: PaymentMethod[]
+			changeMethods?: PaymentMethod[]
+			client: { fullname: string; phone: string }
+		},
+		isModified: boolean,
+		client: ClientFindOneData,
+	) {
+		const telegramId = client.telegram?.id
+		if (!telegramId) return
+		const message = this.buildPaymentMessage({
+			prefix: isModified ? `♻️ Yangilandi (xaridor to'lovi)\n\n` : `💳 Xaridor to'lovi\n\n`,
+			person: payment.client,
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency: client.debtByCurrency ?? [],
+		})
+		await this.bot.telegram.sendMessage(telegramId, message)
+	}
+
+	async sendDeletedClientPaymentToClient(
+		payment: {
+			description?: string | null
+			createdAt: Date
+			paymentMethods: PaymentMethod[]
+			changeMethods?: PaymentMethod[]
+			client: { fullname: string; phone: string }
+		},
+		client: ClientFindOneData,
+	) {
+		const telegramId = client.telegram?.id
+		if (!telegramId) return
+		const message = this.buildPaymentMessage({
+			prefix: `🗑️ O'chirildi (xaridor to'lovi)\n\n`,
+			person: payment.client,
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency: client.debtByCurrency ?? [],
+		})
+		await this.bot.telegram.sendMessage(telegramId, message)
+	}
+
 	// ─── Supplier payment notifications ───────────────────────────────────────
 
 	async sendSupplierPaymentToChannel(
