@@ -567,9 +567,15 @@ export class SellingService {
 				} as any
 
 				await this.botService.sendDeletedSellingToChannel(sellingInfo).catch((e) => console.log('bot channel error:', e))
+				if (resolveBrandName() === 'KAS' && clientResult.data.telegram?.id) {
+					await this.botService.sendDeletedSellingToClient(sellingInfo).catch((e) => console.log('bot client error:', e))
+				}
 
 				if ((payment?.paymentMethods?.length ?? 0) > 0 || (payment?.changeMethods?.length ?? 0) > 0) {
 					await this.botService.sendDeletedPaymentToChannel(payment, clientResult.data).catch((e) => console.log('bot payment error:', e))
+					if (resolveBrandName() === 'KAS' && clientResult.data.telegram?.id) {
+						await this.botService.sendDeletedPaymentToClient(payment, clientResult.data).catch((e) => console.log('bot payment client error:', e))
+					}
 				}
 			} catch (e) {
 				console.log('bot send error:', e)

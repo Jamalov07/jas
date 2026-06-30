@@ -212,6 +212,29 @@ export class BotService {
 		await this.bot.telegram.sendMessage(channelId, `🗑️ Sotuv o'chirildi\n\n${baseInfo}\n\n${clientInfo}`)
 	}
 
+	async sendDeletedSellingToClient(selling: BotSellingData) {
+		const telegramId = selling.client?.telegram?.id
+		if (!telegramId) return
+		const baseInfo = `🧾 Sotuv\n\n` + `🆔 Buyurtma: ${selling.publicId ?? selling.id}\n` + `💰 Jami: ${this.formatTotalPrices(selling)}\n`
+		const clientInfo = `👤 Xaridor: ${selling.client?.fullname ?? ''}\n` + `📊 Jami qarz: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
+		await this.bot.telegram.sendMessage(telegramId, `🗑️ Sotuv o'chirildi\n\n${baseInfo}\n\n${clientInfo}`)
+	}
+
+	async sendDeletedPaymentToClient(payment: SellingPaymentData, client: ClientFindOneData) {
+		const telegramId = client.telegram?.id
+		if (!telegramId) return
+		const message = this.buildPaymentMessage({
+			prefix: `🗑️ O'chirildi\n\n`,
+			person: { fullname: client.fullname, phone: client.phone },
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency: client.debtByCurrency ?? [],
+		})
+		await this.bot.telegram.sendMessage(telegramId, message)
+	}
+
 	// ─── Payment notifications (shared helper) ────────────────────────────────
 
 	private formatDebt(debtByCurrency: DebtEntry[]): string {
