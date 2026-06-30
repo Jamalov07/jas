@@ -271,6 +271,21 @@ export class BotService {
 		await this.bot.telegram.sendMessage(channelId, message)
 	}
 
+	async sendPaymentToClient(payment: SellingPaymentData, client: ClientFindOneData) {
+		const telegramId = client.telegram?.id
+		if (!telegramId) return
+		const message = this.buildPaymentMessage({
+			prefix: '',
+			person: { fullname: client.fullname, phone: client.phone },
+			paymentMethods: payment.paymentMethods ?? [],
+			changeMethods: payment.changeMethods ?? [],
+			description: payment.description,
+			date: payment.createdAt,
+			debtByCurrency: client.debtByCurrency ?? [],
+		})
+		await this.bot.telegram.sendMessage(telegramId, message)
+	}
+
 	async sendDeletedPaymentToChannel(payment: SellingPaymentData, client: ClientFindOneData) {
 		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
 		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
