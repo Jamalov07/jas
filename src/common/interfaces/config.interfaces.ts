@@ -13,9 +13,9 @@ export declare interface JwtConfigOptions {
 }
 
 export declare interface BotConfigOptions {
-	token: string
-	sellingChannelId: string
-	paymentChannelId: string
+	token?: string
+	sellingChannelId?: string
+	paymentChannelId?: string
 }
 
 export declare interface OldServiceConfigOptions {

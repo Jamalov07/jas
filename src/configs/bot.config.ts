@@ -1,10 +1,15 @@
 import { registerAs } from '@nestjs/config'
 import { BotConfigOptions } from '@common'
 
+const envOrUndefined = (value: string | undefined): string | undefined => {
+	const trimmed = value?.trim()
+	return trimmed || undefined
+}
+
 export const botConfig = registerAs('bot', (): BotConfigOptions => {
 	return {
-		token: process.env.BOT_TOKEN ?? undefined,
-		paymentChannelId: process.env.PAYMENT_CHANNEL_ID ?? undefined,
-		sellingChannelId: process.env.SELLING_CHANNEL_ID ?? undefined,
+		token: envOrUndefined(process.env.BOT_TOKEN),
+		paymentChannelId: envOrUndefined(process.env.PAYMENT_CHANNEL_ID),
+		sellingChannelId: envOrUndefined(process.env.SELLING_CHANNEL_ID),
 	}
 })

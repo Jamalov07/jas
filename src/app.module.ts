@@ -55,7 +55,7 @@ import { join } from 'path'
 		ArrivalModule,
 		ArrivalProductMVModule,
 		AuthModule,
-		BotModule,
+		BotModule.forRoot(),
 		ClientModule,
 		ClientPaymentModule,
 		CommonModule,

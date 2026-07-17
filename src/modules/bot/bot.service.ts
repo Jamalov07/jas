@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Optional } from '@nestjs/common'
 import { PdfService, PrismaService } from '../shared'
 import { Context, Markup, Telegraf } from 'telegraf'
 import { BotLanguageEnum } from '@prisma/client'
@@ -35,11 +35,23 @@ export class BotService {
 		prisma: PrismaService,
 		pdfService: PdfService,
 		configService: ConfigService,
-		@InjectBot(MyBotName) private readonly bot: Telegraf<Context>,
+		@Optional() @InjectBot(MyBotName) private readonly bot?: Telegraf<Context>,
 	) {
 		this.prisma = prisma
 		this.pdfService = pdfService
 		this.configService = configService
+	}
+
+	private isBotEnabled(): boolean {
+		return !!this.bot
+	}
+
+	private getSellingChannelId(): string | undefined {
+		return this.configService.get<string>('bot.sellingChannelId')
+	}
+
+	private getPaymentChannelId(): string | undefined {
+		return this.configService.get<string>('bot.paymentChannelId')
 	}
 
 	async onStart(context: Context) {
@@ -183,18 +195,21 @@ export class BotService {
 	}
 
 	async sendSellingToClient(selling: BotSellingData) {
+		if (!this.isBotEnabled()) return
 		const telegramId = selling.client?.telegram?.id
 		if (!telegramId) return
 		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling as any)
-		await this.bot.telegram.sendDocument(telegramId, { source: bufferPdf, filename: `xarid.pdf` }, { caption: this.buildSellingCaption(selling) })
+		await this.bot!.telegram.sendDocument(telegramId, { source: bufferPdf, filename: `xarid.pdf` }, { caption: this.buildSellingCaption(selling) })
 	}
 
 	async sendSellingToChannel(selling: BotSellingData) {
-		const channelId = this.configService.getOrThrow<string>('bot.sellingChannelId')
-		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!this.isBotEnabled()) return
+		const channelId = this.getSellingChannelId()
+		if (!channelId) return
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling as any)
-		await this.bot.telegram.sendDocument(
+		await this.bot!.telegram.sendDocument(
 			channelId,
 			{ source: bufferPdf, filename: `${selling.client?.phone ?? 'xarid'}.pdf` },
 			{
@@ -204,23 +219,27 @@ export class BotService {
 	}
 
 	async sendDeletedSellingToChannel(selling: BotSellingData) {
-		const channelId = this.configService.getOrThrow<string>('bot.sellingChannelId')
-		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!this.isBotEnabled()) return
+		const channelId = this.getSellingChannelId()
+		if (!channelId) return
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const baseInfo = `🧾 Sotuv\n\n` + `🆔 Buyurtma: ${selling.publicId ?? selling.id}\n` + `💰 Jami: ${this.formatTotalPrices(selling)}\n`
 		const clientInfo = `👤 Xaridor: ${selling.client?.fullname ?? ''}\n` + `📊 Jami qarz: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
-		await this.bot.telegram.sendMessage(channelId, `🗑️ Sotuv o'chirildi\n\n${baseInfo}\n\n${clientInfo}`)
+		await this.bot!.telegram.sendMessage(channelId, `🗑️ Sotuv o'chirildi\n\n${baseInfo}\n\n${clientInfo}`)
 	}
 
 	async sendDeletedSellingToClient(selling: BotSellingData) {
+		if (!this.isBotEnabled()) return
 		const telegramId = selling.client?.telegram?.id
 		if (!telegramId) return
 		const baseInfo = `🧾 Sotuv\n\n` + `🆔 Buyurtma: ${selling.publicId ?? selling.id}\n` + `💰 Jami: ${this.formatTotalPrices(selling)}\n`
 		const clientInfo = `👤 Xaridor: ${selling.client?.fullname ?? ''}\n` + `📊 Jami qarz: ${this.formatDebt(selling.client?.debtByCurrency ?? [])}`
-		await this.bot.telegram.sendMessage(telegramId, `🗑️ Sotuv o'chirildi\n\n${baseInfo}\n\n${clientInfo}`)
+		await this.bot!.telegram.sendMessage(telegramId, `🗑️ Sotuv o'chirildi\n\n${baseInfo}\n\n${clientInfo}`)
 	}
 
 	async sendDeletedPaymentToClient(payment: SellingPaymentData, client: ClientFindOneData) {
+		if (!this.isBotEnabled()) return
 		const telegramId = client.telegram?.id
 		if (!telegramId) return
 		const message = this.buildPaymentMessage({
@@ -232,10 +251,8 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency: client.debtByCurrency ?? [],
 		})
-		await this.bot.telegram.sendMessage(telegramId, message)
+		await this.bot!.telegram.sendMessage(telegramId, message)
 	}
-
-	// ─── Payment notifications (shared helper) ────────────────────────────────
 
 	private formatDebt(debtByCurrency: DebtEntry[]): string {
 		if (!debtByCurrency.length) return '0'
@@ -279,8 +296,10 @@ export class BotService {
 	// ─── Selling payment notifications ────────────────────────────────────────
 
 	async sendPaymentToChannel(payment: SellingPaymentData, isModified: boolean = false, client: ClientFindOneData) {
-		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
-		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!this.isBotEnabled()) return
+		const channelId = this.getPaymentChannelId()
+		if (!channelId) return
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
 			prefix: isModified ? '♻️ Yangilandi\n\n' : '',
@@ -291,10 +310,11 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency: client.debtByCurrency ?? [],
 		})
-		await this.bot.telegram.sendMessage(channelId, message)
+		await this.bot!.telegram.sendMessage(channelId, message)
 	}
 
 	async sendPaymentToClient(payment: SellingPaymentData, client: ClientFindOneData) {
+		if (!this.isBotEnabled()) return
 		const telegramId = client.telegram?.id
 		if (!telegramId) return
 		const message = this.buildPaymentMessage({
@@ -306,12 +326,14 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency: client.debtByCurrency ?? [],
 		})
-		await this.bot.telegram.sendMessage(telegramId, message)
+		await this.bot!.telegram.sendMessage(telegramId, message)
 	}
 
 	async sendDeletedPaymentToChannel(payment: SellingPaymentData, client: ClientFindOneData) {
-		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
-		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!this.isBotEnabled()) return
+		const channelId = this.getPaymentChannelId()
+		if (!channelId) return
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
 			prefix: `🗑️ O'chirildi\n\n`,
@@ -322,7 +344,7 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency: client.debtByCurrency ?? [],
 		})
-		await this.bot.telegram.sendMessage(channelId, message)
+		await this.bot!.telegram.sendMessage(channelId, message)
 	}
 
 	// ─── Client standalone payment notifications ──────────────────────────────
@@ -338,8 +360,10 @@ export class BotService {
 		isModified: boolean,
 		debtByCurrency: DebtEntry[],
 	) {
-		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
-		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!this.isBotEnabled()) return
+		const channelId = this.getPaymentChannelId()
+		if (!channelId) return
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
 			prefix: isModified ? `♻️ Yangilandi (xaridor to'lovi)\n\n` : `💳 Xaridor to'lovi\n\n`,
@@ -350,7 +374,7 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency,
 		})
-		await this.bot.telegram.sendMessage(channelId, message)
+		await this.bot!.telegram.sendMessage(channelId, message)
 	}
 
 	async sendDeletedClientPaymentToChannel(
@@ -363,8 +387,10 @@ export class BotService {
 		},
 		debtByCurrency: DebtEntry[],
 	) {
-		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
-		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!this.isBotEnabled()) return
+		const channelId = this.getPaymentChannelId()
+		if (!channelId) return
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
 			prefix: `🗑️ O'chirildi (xaridor to'lovi)\n\n`,
@@ -375,7 +401,7 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency,
 		})
-		await this.bot.telegram.sendMessage(channelId, message)
+		await this.bot!.telegram.sendMessage(channelId, message)
 	}
 
 	async sendClientPaymentToClient(
@@ -389,6 +415,7 @@ export class BotService {
 		isModified: boolean,
 		client: ClientFindOneData,
 	) {
+		if (!this.isBotEnabled()) return
 		const telegramId = client.telegram?.id
 		if (!telegramId) return
 		const message = this.buildPaymentMessage({
@@ -400,7 +427,7 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency: client.debtByCurrency ?? [],
 		})
-		await this.bot.telegram.sendMessage(telegramId, message)
+		await this.bot!.telegram.sendMessage(telegramId, message)
 	}
 
 	async sendDeletedClientPaymentToClient(
@@ -413,6 +440,7 @@ export class BotService {
 		},
 		client: ClientFindOneData,
 	) {
+		if (!this.isBotEnabled()) return
 		const telegramId = client.telegram?.id
 		if (!telegramId) return
 		const message = this.buildPaymentMessage({
@@ -424,7 +452,7 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency: client.debtByCurrency ?? [],
 		})
-		await this.bot.telegram.sendMessage(telegramId, message)
+		await this.bot!.telegram.sendMessage(telegramId, message)
 	}
 
 	// ─── Supplier payment notifications ───────────────────────────────────────
@@ -440,8 +468,10 @@ export class BotService {
 		isModified: boolean,
 		debtByCurrency: DebtEntry[],
 	) {
-		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
-		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!this.isBotEnabled()) return
+		const channelId = this.getPaymentChannelId()
+		if (!channelId) return
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
 			prefix: isModified ? `♻️ Yangilandi (yetkazib beruvchi to'lovi)\n\n` : `💳 Yetkazib beruvchi to'lovi\n\n`,
@@ -452,7 +482,7 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency,
 		})
-		await this.bot.telegram.sendMessage(channelId, message)
+		await this.bot!.telegram.sendMessage(channelId, message)
 	}
 
 	async sendDeletedSupplierPaymentToChannel(
@@ -465,8 +495,10 @@ export class BotService {
 		},
 		debtByCurrency: DebtEntry[],
 	) {
-		const channelId = this.configService.getOrThrow<string>('bot.paymentChannelId')
-		const chatInfo = await this.bot.telegram.getChat(channelId).catch(() => undefined)
+		if (!this.isBotEnabled()) return
+		const channelId = this.getPaymentChannelId()
+		if (!channelId) return
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
 		if (!chatInfo) return
 		const message = this.buildPaymentMessage({
 			prefix: `🗑️ O'chirildi (yetkazib beruvchi to'lovi)\n\n`,
@@ -477,7 +509,7 @@ export class BotService {
 			date: payment.createdAt,
 			debtByCurrency,
 		})
-		await this.bot.telegram.sendMessage(channelId, message)
+		await this.bot!.telegram.sendMessage(channelId, message)
 	}
 
 	// ─── Private helpers ──────────────────────────────────────────────────────
