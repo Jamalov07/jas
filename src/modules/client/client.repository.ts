@@ -10,6 +10,17 @@ import {
 	ClientUpdateOneRequest,
 } from './interfaces'
 import { PriceTypeEnum, Prisma, SellingStatusEnum } from '@prisma/client'
+import { aggregateClientDebtByIds, fetchClientLastSellingDates } from '@common'
+
+/** Ro'yxat uchun yengil select — tarix yuklanmaydi */
+const CLIENT_LIST_LIGHT_SELECT = {
+	id: true,
+	fullname: true,
+	phone: true,
+	description: true,
+	createdAt: true,
+	telegram: { select: { id: true, isActive: true } },
+} as const
 
 /** `ClientService.calcDebtByCurrency` uchun — `findMany` bilan bir xil ma’lumot */
 const CLIENT_DEBT_SOURCE_SELECT = {
@@ -241,6 +252,49 @@ export class ClientRepository {
 		})
 
 		return count
+	}
+
+	/** `GET /client/many-fast` — faqat asosiy maydonlar, pagination DB da */
+	async findManyFastLight(query: ClientFindManyRequest) {
+		const where = this.clientFindManyWhere(query)
+		let paginationOptions = {}
+		if (query.pagination) {
+			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
+		}
+
+		return this.prisma.clientModel.findMany({
+			where,
+			select: CLIENT_LIST_LIGHT_SELECT,
+			orderBy: [{ sellings: { _count: 'desc' } }, { createdAt: 'desc' }],
+			...paginationOptions,
+		})
+	}
+
+	async findAllIdsForMany(query: ClientFindManyRequest): Promise<string[]> {
+		const rows = await this.prisma.clientModel.findMany({
+			where: this.clientFindManyWhere(query),
+			select: { id: true },
+			orderBy: [{ sellings: { _count: 'desc' } }, { createdAt: 'desc' }],
+		})
+		return rows.map((r) => r.id)
+	}
+
+	async findManyLightByIds(ids: string[]) {
+		if (ids.length === 0) return []
+		const rows = await this.prisma.clientModel.findMany({
+			where: { id: { in: ids } },
+			select: CLIENT_LIST_LIGHT_SELECT,
+		})
+		const byId = new Map(rows.map((r) => [r.id, r]))
+		return ids.map((id) => byId.get(id)).filter(Boolean) as typeof rows
+	}
+
+	aggregateDebtByClientIds(clientIds: string[]) {
+		return aggregateClientDebtByIds(this.prisma, clientIds)
+	}
+
+	fetchLastSellingDates(clientIds: string[]) {
+		return fetchClientLastSellingDates(this.prisma, clientIds)
 	}
 
 	async findManyNew(query: ClientFindManyRequest & { fetchAll?: boolean }) {

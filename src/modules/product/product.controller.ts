@@ -32,6 +32,14 @@ export class ProductController {
 		return this.productService.findManyNew({ ...query, isDeleted: false })
 	}
 
+	@Get('many-fast')
+	@ApiOkResponse({ type: ProductFindManyResponseDto })
+	@ApiOperation({ summary: 'get all products (fast — no sellingMVs, SQL last-selling batch)' })
+	@AuthOptions(false, false)
+	async findManyFast(@Query() query: ProductFindManyRequestDto): Promise<ProductFindManyResponseDto> {
+		return this.productService.findManyFast({ ...query, isDeleted: false })
+	}
+
 	@Get('many-old')
 	@ApiOkResponse({ type: ProductFindManyResponseDto })
 	@ApiOperation({ summary: 'get all products' })

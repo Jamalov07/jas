@@ -1,20 +1,94 @@
 {
   "info": {
-    "_postman_id": "jas-api-collection",
+    "_postman_id": "jas-api-collection-v2",
     "name": "JAS API Collection",
-    "description": "Full API collection for JAS backend. Set `baseUrl` and `accessToken` variables before use. Sign in first to get the token.",
+    "description": "JAS backend API — barcha endpointlar (2026).\\n\\n**Sozlash:**\\n1. `baseUrl` — default `http://localhost:5000`\\n2. **Sign In** ni ishga tushiring (token avtomatik saqlanadi)\\n3. Pagination: `pageNumber`, `pageSize`, `pagination=true`\\n\\n**Auth talab qilinadigan endpointlar** bearer token bilan ishlaydi (selling/arrival create, staff profile, va h.k.)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
-    { "key": "accessToken", "value": "", "type": "string" },
-    { "key": "refreshToken", "value": "", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "supplierId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "currencyId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "staffId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sellingId",
+      "value": "",
+      "type": "string"
+    }
   ],
   "auth": {
     "type": "bearer",
-    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "description": "Server holati. Auth talab qilinmaydi.",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Server holati. Auth talab qilinmaydi."
+          }
+        }
+      ]
+    },
     {
       "name": "Auth",
       "item": [
@@ -24,40 +98,85 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "if (res.data && res.data.accessToken) {",
+                  "if (res.data?.accessToken) {",
                   "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
                   "  pm.collectionVariables.set('refreshToken', res.data.refreshToken);",
                   "}"
-                ],
-                "type": "text/javascript"
+                ]
               }
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"+998901234567\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"phone\": \"+998901234567\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{baseUrl}}/auth/sign-in", "host": ["{{baseUrl}}"], "path": ["auth", "sign-in"] }
+            "url": {
+              "raw": "{{baseUrl}}/auth/sign-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "sign-in"
+              ]
+            }
           }
         },
         {
           "name": "Get Profile",
+          "description": "Auth talab qilinadi (@AuthOptions true,true)",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{baseUrl}}/auth/profile", "host": ["{{baseUrl}}"], "path": ["auth", "profile"] }
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Auth talab qilinadi (@AuthOptions true,true)"
           }
         },
         {
           "name": "Sign Out",
+          "description": "Auth talab qilinadi",
           "request": {
             "method": "POST",
-            "url": { "raw": "{{baseUrl}}/auth/sign-out", "host": ["{{baseUrl}}"], "path": ["auth", "sign-out"] }
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/sign-out",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "sign-out"
+              ]
+            },
+            "description": "Auth talab qilinadi"
           }
         },
         {
@@ -66,480 +185,36 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "if (res.data && res.data.accessToken) {",
+                  "if (res.data?.accessToken) {",
                   "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
                   "  pm.collectionVariables.set('refreshToken', res.data.refreshToken);",
                   "}"
-                ],
-                "type": "text/javascript"
+                ]
               }
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{refreshToken}}" }],
-            "url": { "raw": "{{baseUrl}}/auth/refresh-token", "host": ["{{baseUrl}}"], "path": ["auth", "refresh-token"] }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Action",
-      "item": [
-        {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{refreshToken}}"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/action/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["action", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "search", "value": "", "disabled": true }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Find One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/action/one?id=ACTION_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["action", "one"],
-              "query": [{ "key": "id", "value": "ACTION_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated description\",\n  \"permissionId\": \"PERMISSION_UUID\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/action/one?id=ACTION_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["action", "one"],
-              "query": [{ "key": "id", "value": "ACTION_ID" }]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Arrival",
-      "item": [
-        {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/arrival/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "supplierId", "value": "", "disabled": true },
-                { "key": "staffId", "value": "", "disabled": true },
-                { "key": "search", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Find One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/arrival/one?id=ARRIVAL_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival", "one"],
-              "query": [{ "key": "id", "value": "ARRIVAL_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Create One",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"supplierId\": \"SUPPLIER_UUID\",\n  \"date\": \"2025-01-01T00:00:00.000Z\",\n  \"payment\": {\n    \"paymentMethods\": [\n      { \"type\": \"cash\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 100000 }\n    ],\n    \"description\": \"To'lov tavsifi\"\n  },\n  \"products\": [\n    {\n      \"productId\": \"PRODUCT_UUID\",\n      \"count\": 10,\n      \"cost\": 5000,\n      \"costCurrencyId\": \"CURRENCY_UUID\",\n      \"price\": 8000,\n      \"priceCurrencyId\": \"CURRENCY_UUID\"\n    }\n  ]\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/arrival/one", "host": ["{{baseUrl}}"], "path": ["arrival", "one"] }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"supplierId\": \"SUPPLIER_UUID\",\n  \"date\": \"2025-01-02T00:00:00.000Z\",\n  \"payment\": {\n    \"paymentMethods\": [\n      { \"type\": \"card\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 50000 }\n    ],\n    \"description\": \"Yangilangan tavsif\"\n  },\n  \"products\": [\n    {\n      \"productId\": \"PRODUCT_UUID\",\n      \"count\": 5,\n      \"cost\": 5000,\n      \"costCurrencyId\": \"CURRENCY_UUID\",\n      \"price\": 8000,\n      \"priceCurrencyId\": \"CURRENCY_UUID\"\n    }\n  ],\n  \"productIdsToRemove\": []\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/arrival/one?id=ARRIVAL_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival", "one"],
-              "query": [{ "key": "id", "value": "ARRIVAL_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/arrival/one?id=ARRIVAL_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival", "one"],
-              "query": [
-                { "key": "id", "value": "ARRIVAL_ID" },
-                { "key": "method", "value": "soft" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Excel Download Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/arrival/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival", "excel-download", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Excel Download One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/arrival/excel-download/one?id=ARRIVAL_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival", "excel-download", "one"],
-              "query": [{ "key": "id", "value": "ARRIVAL_ID" }]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Arrival Product MV",
-      "item": [
-        {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/arrival-product-mv/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival-product-mv", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "arrivalId", "value": "", "disabled": true },
-                { "key": "productId", "value": "", "disabled": true }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Find One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/arrival-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Create One",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"arrivalId\": \"ARRIVAL_UUID\",\n  \"productId\": \"PRODUCT_UUID\",\n  \"count\": 5,\n  \"cost\": 5000,\n  \"costCurrencyId\": \"CURRENCY_UUID\",\n  \"price\": 8000,\n  \"priceCurrencyId\": \"CURRENCY_UUID\"\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/arrival-product-mv/one", "host": ["{{baseUrl}}"], "path": ["arrival-product-mv", "one"] }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"count\": 8,\n  \"cost\": 5500,\n  \"costCurrencyId\": \"CURRENCY_UUID\",\n  \"price\": 9000,\n  \"priceCurrencyId\": \"CURRENCY_UUID\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/arrival-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/arrival-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["arrival-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Client",
-      "item": [
-        {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["client", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "search", "value": "", "disabled": true }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Find Many Report",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client/many/report?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["client", "many", "report"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Find One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client/one?id=CLIENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["client", "one"],
-              "query": [{ "key": "id", "value": "CLIENT_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Create One",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullname\": \"Alisher Nazarov\",\n  \"phone\": \"+998901234567\"\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/client/one", "host": ["{{baseUrl}}"], "path": ["client", "one"] }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullname\": \"Yangilangan Ism\",\n  \"phone\": \"+998907654321\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/client/one?id=CLIENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["client", "one"],
-              "query": [{ "key": "id", "value": "CLIENT_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/client/one?id=CLIENT_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["client", "one"],
-              "query": [
-                { "key": "id", "value": "CLIENT_ID" },
-                { "key": "method", "value": "soft" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Excel Download Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["client", "excel-download", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Excel Download One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client/excel-download/one?id=CLIENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["client", "excel-download", "one"],
-              "query": [{ "key": "id", "value": "CLIENT_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Excel With Product Download One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client/excel-with-product-download/one?id=CLIENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["client", "excel-with-product-download", "one"],
-              "query": [{ "key": "id", "value": "CLIENT_ID" }]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Client Payment",
-      "item": [
-        {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client-payment/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["client-payment", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "clientId", "value": "", "disabled": true },
-                { "key": "staffId", "value": "", "disabled": true },
-                { "key": "search", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Find One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client-payment/one?id=PAYMENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["client-payment", "one"],
-              "query": [{ "key": "id", "value": "PAYMENT_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Create One",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"clientId\": \"CLIENT_UUID\",\n  \"description\": \"To'lov tavsifi\",\n  \"paymentMethods\": [\n    { \"type\": \"cash\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 500000 }\n  ]\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/client-payment/one", "host": ["{{baseUrl}}"], "path": ["client-payment", "one"] }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"description\": \"Yangilangan tavsif\",\n  \"paymentMethods\": [\n    { \"type\": \"card\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 300000 }\n  ]\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/client-payment/one?id=PAYMENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["client-payment", "one"],
-              "query": [{ "key": "id", "value": "PAYMENT_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/client-payment/one?id=PAYMENT_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["client-payment", "one"],
-              "query": [
-                { "key": "id", "value": "PAYMENT_ID" },
-                { "key": "method", "value": "soft" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Excel Download Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/client-payment/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["client-payment", "excel-download", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
+              "raw": "{{baseUrl}}/auth/refresh-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh-token"
               ]
             }
           }
@@ -552,38 +227,122 @@
         {
           "name": "Create Day Close",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
-            "url": { "raw": "{{baseUrl}}/common/day-close", "host": ["{{baseUrl}}"], "path": ["common", "day-close"] }
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/common/day-close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "common",
+                "day-close"
+              ]
+            }
           }
         },
         {
           "name": "Get Day Close",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/common/day-close?date=2025-01-01",
-              "host": ["{{baseUrl}}"],
-              "path": ["common", "day-close"],
-              "query": [{ "key": "date", "value": "2025-01-01", "disabled": true }]
+              "raw": "{{baseUrl}}/common/day-close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "common",
+                "day-close"
+              ]
             }
+          }
+        },
+        {
+          "name": "Update Staff Currency",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currencyId\": \"{{currencyId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/common/staff/currency",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "common",
+                "staff",
+                "currency"
+              ]
+            },
+            "description": "Auth talab qilinadi"
           }
         }
       ]
     },
     {
-      "name": "Currency",
+      "name": "Action",
       "item": [
         {
           "name": "Find Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/currency/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["currency", "many"],
+              "raw": "{{baseUrl}}/action/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "action",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "name",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "permissionId",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -592,52 +351,59 @@
           "name": "Find One",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/currency/one?id=CURRENCY_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["currency", "one"],
-              "query": [{ "key": "id", "value": "CURRENCY_ID" }]
+              "raw": "{{baseUrl}}/action/one?id=ACTION_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "action",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "ACTION_UUID"
+                }
+              ]
             }
-          }
-        },
-        {
-          "name": "Create One",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"USD\",\n  \"symbol\": \"$\",\n  \"course\": 12500\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/currency/one", "host": ["{{baseUrl}}"], "path": ["currency", "one"] }
           }
         },
         {
           "name": "Update One",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"course\": 12700\n}"
+              "raw": "{\n  \"description\": \"Updated\",\n  \"permissionId\": \"PERMISSION_UUID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/currency/one?id=CURRENCY_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["currency", "one"],
-              "query": [{ "key": "id", "value": "CURRENCY_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/currency/one?id=CURRENCY_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["currency", "one"],
-              "query": [{ "key": "id", "value": "CURRENCY_ID" }]
+              "raw": "{{baseUrl}}/action/one?id=ACTION_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "action",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "ACTION_UUID"
+                }
+              ]
             }
           }
         }
@@ -649,14 +415,41 @@
         {
           "name": "Find Many",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/permission/many?page=1&pageSize=50",
-              "host": ["{{baseUrl}}"],
-              "path": ["permission", "many"],
+              "raw": "{{baseUrl}}/permission/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permission",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "50" }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "name",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -665,11 +458,22 @@
           "name": "Find One",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/permission/one?id=PERMISSION_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["permission", "one"],
-              "query": [{ "key": "id", "value": "PERMISSION_ID" }]
+              "raw": "{{baseUrl}}/permission/one?id=PERMISSION_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permission",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "PERMISSION_UUID"
+                }
+              ]
             }
           }
         },
@@ -677,28 +481,67 @@
           "name": "Create One",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"admin\",\n  \"description\": \"Administrator ruxsati\"\n}"
+              "raw": "{\n  \"name\": \"manager\",\n  \"actionsToConnect\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{baseUrl}}/permission/one", "host": ["{{baseUrl}}"], "path": ["permission", "one"] }
+            "url": {
+              "raw": "{{baseUrl}}/permission/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permission",
+                "one"
+              ]
+            }
           }
         },
         {
           "name": "Update One",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"manager\",\n  \"description\": \"Menejer ruxsati\"\n}"
+              "raw": "{\n  \"name\": \"admin\",\n  \"actionsToConnect\": [],\n  \"actionsToDisconnect\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/permission/one?id=PERMISSION_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["permission", "one"],
-              "query": [{ "key": "id", "value": "PERMISSION_ID" }]
+              "raw": "{{baseUrl}}/permission/one?id=PERMISSION_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permission",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "PERMISSION_UUID"
+                }
+              ]
             }
           }
         },
@@ -706,11 +549,409 @@
           "name": "Delete One",
           "request": {
             "method": "DELETE",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/permission/one?id=PERMISSION_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["permission", "one"],
-              "query": [{ "key": "id", "value": "PERMISSION_ID" }]
+              "raw": "{{baseUrl}}/permission/one?id=PERMISSION_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permission",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "PERMISSION_UUID"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Currency",
+      "item": [
+        {
+          "name": "Find Many",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/currency/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "currency",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/currency/one?id=%7B%7BcurrencyId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "currency",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{currencyId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"USD\",\n  \"symbol\": \"$\",\n  \"exchangeRate\": 12500,\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/currency/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "currency",
+                "one"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update One",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exchangeRate\": 12700\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/currency/one?id=%7B%7BcurrencyId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "currency",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{currencyId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/currency/one?id=%7B%7BcurrencyId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "currency",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{currencyId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Staff",
+      "item": [
+        {
+          "name": "Find Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Many Deleted",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/many/deleted?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "many",
+                "deleted"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/one?id=%7B%7BstaffId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{staffId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Bobur Karimov\",\n  \"phone\": \"+998911234567\",\n  \"password\": \"securePass123\",\n  \"actionsToConnect\": [],\n  \"pagesToConnect\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "one"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update One",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Yangilangan Ism\",\n  \"currencyId\": \"{{currencyId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff/one?id=%7B%7BstaffId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{staffId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Restore One",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/one/restore?id=%7B%7BstaffId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "one",
+                "restore"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{staffId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/staff/one?id=%7B%7BstaffId%7D%7D&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{staffId}}"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
+              ]
             }
           }
         }
@@ -720,17 +961,95 @@
       "name": "Product",
       "item": [
         {
-          "name": "Find Many",
+          "name": "Find Many (optimized)",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/product/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["product", "many"],
+              "raw": "{{baseUrl}}/product/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "search", "value": "", "disabled": true }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sortByLastSellingDate",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Many Old",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product/many-old?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "many-old"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -739,40 +1058,150 @@
           "name": "Find One",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/product/one?id=PRODUCT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["product", "one"],
-              "query": [{ "key": "id", "value": "PRODUCT_ID" }]
+              "raw": "{{baseUrl}}/product/one?id=%7B%7BproductId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{productId}}"
+                }
+              ]
             }
           }
         },
         {
-          "name": "Create One",
+          "name": "Create One (multipart)",
+          "description": "multipart/form-data — image ixtiyoriy",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Mahsulot nomi\",\n  \"unit\": \"dona\"\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Mahsulot nomi",
+                  "type": "text"
+                },
+                {
+                  "key": "count",
+                  "value": "100",
+                  "type": "text"
+                },
+                {
+                  "key": "minAmount",
+                  "value": "5",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Tavsif",
+                  "type": "text"
+                },
+                {
+                  "key": "prices_cost_price",
+                  "value": "5000",
+                  "type": "text"
+                },
+                {
+                  "key": "prices_cost_currencyId",
+                  "value": "{{currencyId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "prices_selling_price",
+                  "value": "8000",
+                  "type": "text"
+                },
+                {
+                  "key": "prices_selling_currencyId",
+                  "value": "{{currencyId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "disabled": true
+                }
+              ]
             },
-            "url": { "raw": "{{baseUrl}}/product/one", "host": ["{{baseUrl}}"], "path": ["product", "one"] }
+            "url": {
+              "raw": "{{baseUrl}}/product/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "one"
+              ]
+            },
+            "description": "multipart/form-data — image ixtiyoriy"
           }
         },
         {
-          "name": "Update One",
+          "name": "Update One (multipart)",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Yangilangan mahsulot\",\n  \"unit\": \"kg\"\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Yangilangan nom",
+                  "type": "text"
+                },
+                {
+                  "key": "count",
+                  "value": "120",
+                  "type": "text"
+                },
+                {
+                  "key": "prices_selling_price",
+                  "value": "8500",
+                  "type": "text"
+                },
+                {
+                  "key": "prices_selling_currencyId",
+                  "value": "{{currencyId}}",
+                  "type": "text"
+                }
+              ]
             },
             "url": {
-              "raw": "{{baseUrl}}/product/one?id=PRODUCT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["product", "one"],
-              "query": [{ "key": "id", "value": "PRODUCT_ID" }]
+              "raw": "{{baseUrl}}/product/one?id=%7B%7BproductId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{productId}}"
+                }
+              ]
             }
           }
         },
@@ -780,13 +1209,21 @@
           "name": "Delete One",
           "request": {
             "method": "DELETE",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/product/one?id=PRODUCT_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["product", "one"],
+              "raw": "{{baseUrl}}/product/one?id=%7B%7BproductId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "one"
+              ],
               "query": [
-                { "key": "id", "value": "PRODUCT_ID" },
-                { "key": "method", "value": "soft" }
+                {
+                  "key": "id",
+                  "value": "{{productId}}"
+                }
               ]
             }
           }
@@ -795,13 +1232,1181 @@
           "name": "Excel Download Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/product/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["product", "excel-download", "many"],
+              "raw": "{{baseUrl}}/product/excel-download/many?pageNumber=1&pageSize=20&pagination=true&pagination=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "product",
+                "excel-download",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "pagination",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Client",
+      "item": [
+        {
+          "name": "Find Many (optimized)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "debtType",
+                  "value": "gt",
+                  "disabled": true,
+                  "description": "gt | lt | eq"
+                },
+                {
+                  "key": "debtValue",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "2025-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2025-12-31",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Many Old",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/many-old?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "many-old"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Many Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/many/report?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "many",
+                "report"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/one?id=%7B%7BclientId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "deedStartDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "deedEndDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Alisher Nazarov\",\n  \"phone\": \"+998901234567\",\n  \"description\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/client/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "one"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update One",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Yangilangan Ism\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/client/one?id=%7B%7BclientId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{clientId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/one?id=%7B%7BclientId%7D%7D&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel Download Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/excel-download/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "excel-download",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel Download One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/excel-download/one?id=%7B%7BclientId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "excel-download",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{clientId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel With Product Download One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client/excel-with-product-download/one?id=%7B%7BclientId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client",
+                "excel-with-product-download",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{clientId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Supplier",
+      "item": [
+        {
+          "name": "Find Many (optimized)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "debtType",
+                  "value": "gt",
+                  "disabled": true
+                },
+                {
+                  "key": "debtValue",
+                  "value": "0",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Many Old",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/many-old?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "many-old"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/one?id=%7B%7BsupplierId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{supplierId}}"
+                },
+                {
+                  "key": "deedStartDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "deedEndDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Hamkor Kompaniya\",\n  \"phone\": \"+998712345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/supplier/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "one"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update One",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"Yangilangan\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/supplier/one?id=%7B%7BsupplierId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{supplierId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/one?id=%7B%7BsupplierId%7D%7D&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{supplierId}}"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel Download Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/excel-download/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "excel-download",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel Download One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/excel-download/one?id=%7B%7BsupplierId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "excel-download",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{supplierId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel With Product Download One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/excel-with-product-download/one?id=%7B%7BsupplierId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "excel-with-product-download",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{supplierId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Selling",
+      "item": [
+        {
+          "name": "Find Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/selling/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "staffId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "accepted",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/selling/one?id=%7B%7BsellingId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{sellingId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"date\": \"2025-01-01T00:00:00.000Z\",\n  \"staffId\": \"{{staffId}}\",\n  \"send\": false,\n  \"description\": \"\",\n  \"payment\": {\n    \"paymentMethods\": [\n      {\n        \"type\": \"cash\",\n        \"currencyId\": \"{{currencyId}}\",\n        \"amount\": 100000\n      }\n    ],\n    \"changeMethods\": [],\n    \"description\": \"Sotuv to'lovi\"\n  },\n  \"products\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"count\": 3,\n      \"price\": 25000,\n      \"currencyId\": \"{{currencyId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/selling/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling",
+                "one"
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Update One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"accepted\",\n  \"send\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/selling/one?id=%7B%7BsellingId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{sellingId}}"
+                }
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/selling/one?id=%7B%7BsellingId%7D%7D&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{sellingId}}"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel Download Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/selling/excel-download/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling",
+                "excel-download",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel Download One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/selling/excel-download/one?id=%7B%7BsellingId%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling",
+                "excel-download",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{sellingId}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Arrival",
+      "item": [
+        {
+          "name": "Find Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arrival/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "supplierId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "staffId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arrival/one?id=ARRIVAL_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "ARRIVAL_UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"date\": \"2025-01-01T00:00:00.000Z\",\n  \"payment\": {\n    \"paymentMethods\": [\n      {\n        \"type\": \"cash\",\n        \"currencyId\": \"{{currencyId}}\",\n        \"amount\": 100000\n      }\n    ]\n  },\n  \"products\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"count\": 10,\n      \"cost\": 5000,\n      \"costCurrencyId\": \"{{currencyId}}\",\n      \"price\": 8000,\n      \"priceCurrencyId\": \"{{currencyId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/arrival/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival",
+                "one"
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Update One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productIdsToRemove\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/arrival/one?id=ARRIVAL_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "ARRIVAL_UUID"
+                }
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arrival/one?id=ARRIVAL_UUID&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "ARRIVAL_UUID"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel Download Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arrival/excel-download/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival",
+                "excel-download",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excel Download One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arrival/excel-download/one?id=ARRIVAL_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival",
+                "excel-download",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "ARRIVAL_UUID"
+                }
               ]
             }
           }
@@ -815,18 +2420,47 @@
           "name": "Find Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/returning/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning", "many"],
+              "raw": "{{baseUrl}}/returning/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "clientId", "value": "", "disabled": true },
-                { "key": "staffId", "value": "", "disabled": true },
-                { "key": "search", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -835,11 +2469,22 @@
           "name": "Find One",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/returning/one?id=RETURNING_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning", "one"],
-              "query": [{ "key": "id", "value": "RETURNING_ID" }]
+              "raw": "{{baseUrl}}/returning/one?id=RETURNING_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "RETURNING_UUID"
+                }
+              ]
             }
           }
         },
@@ -847,28 +2492,67 @@
           "name": "Create One",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"clientId\": \"CLIENT_UUID\",\n  \"date\": \"2025-01-01T00:00:00.000Z\",\n  \"payment\": {\n    \"paymentMethods\": [\n      { \"type\": \"cash\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 50000 }\n    ],\n    \"description\": \"Qaytarish\"\n  },\n  \"products\": [\n    {\n      \"productId\": \"PRODUCT_UUID\",\n      \"count\": 2,\n      \"price\": 8000,\n      \"currencyId\": \"CURRENCY_UUID\"\n    }\n  ]\n}"
+              "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"date\": \"2025-01-01T00:00:00.000Z\",\n  \"status\": \"accepted\",\n  \"payment\": {\n    \"paymentMethods\": [\n      {\n        \"type\": \"cash\",\n        \"currencyId\": \"{{currencyId}}\",\n        \"amount\": 50000\n      }\n    ]\n  },\n  \"products\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"count\": 2,\n      \"price\": 8000,\n      \"currencyId\": \"{{currencyId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{baseUrl}}/returning/one", "host": ["{{baseUrl}}"], "path": ["returning", "one"] }
+            "url": {
+              "raw": "{{baseUrl}}/returning/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning",
+                "one"
+              ]
+            }
           }
         },
         {
           "name": "Update One",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"clientId\": \"CLIENT_UUID\",\n  \"date\": \"2025-01-02T00:00:00.000Z\",\n  \"products\": [\n    {\n      \"productId\": \"PRODUCT_UUID\",\n      \"count\": 3,\n      \"price\": 9000,\n      \"currencyId\": \"CURRENCY_UUID\"\n    }\n  ],\n  \"productIdsToRemove\": []\n}"
+              "raw": "{\n  \"productIdsToRemove\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/returning/one?id=RETURNING_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning", "one"],
-              "query": [{ "key": "id", "value": "RETURNING_ID" }]
+              "raw": "{{baseUrl}}/returning/one?id=RETURNING_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "RETURNING_UUID"
+                }
+              ]
             }
           }
         },
@@ -876,13 +2560,25 @@
           "name": "Delete One",
           "request": {
             "method": "DELETE",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/returning/one?id=RETURNING_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning", "one"],
+              "raw": "{{baseUrl}}/returning/one?id=RETURNING_UUID&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning",
+                "one"
+              ],
               "query": [
-                { "key": "id", "value": "RETURNING_ID" },
-                { "key": "method", "value": "soft" }
+                {
+                  "key": "id",
+                  "value": "RETURNING_UUID"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
               ]
             }
           }
@@ -891,13 +2587,33 @@
           "name": "Excel Download Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/returning/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning", "excel-download", "many"],
+              "raw": "{{baseUrl}}/returning/excel-download/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning",
+                "excel-download",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
               ]
             }
           }
@@ -906,32 +2622,115 @@
           "name": "Excel Download One",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/returning/excel-download/one?id=RETURNING_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning", "excel-download", "one"],
-              "query": [{ "key": "id", "value": "RETURNING_ID" }]
+              "raw": "{{baseUrl}}/returning/excel-download/one?id=RETURNING_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning",
+                "excel-download",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "RETURNING_UUID"
+                }
+              ]
             }
           }
         }
       ]
     },
     {
-      "name": "Returning Product MV",
+      "name": "Client Payment",
       "item": [
         {
-          "name": "Find Many",
+          "name": "Find Many (optimized)",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/returning-product-mv/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning-product-mv", "many"],
+              "raw": "{{baseUrl}}/client-payment/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client-payment",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "returningId", "value": "", "disabled": true },
-                { "key": "productId", "value": "", "disabled": true }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "clientId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "staffId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Many Old",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/client-payment/many-old?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client-payment",
+                "many-old"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
               ]
             }
           }
@@ -940,119 +2739,92 @@
           "name": "Find One",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/returning-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Create One",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"returningId\": \"RETURNING_UUID\",\n  \"productId\": \"PRODUCT_UUID\",\n  \"count\": 2,\n  \"price\": 8000,\n  \"currencyId\": \"CURRENCY_UUID\"\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/returning-product-mv/one", "host": ["{{baseUrl}}"], "path": ["returning-product-mv", "one"] }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"count\": 3,\n  \"price\": 9000,\n  \"currencyId\": \"CURRENCY_UUID\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/returning-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/returning-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["returning-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Selling",
-      "item": [
-        {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/selling/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling", "many"],
+              "raw": "{{baseUrl}}/client-payment/one?id=CLIENT_PAYMENT_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client-payment",
+                "one"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "clientId", "value": "", "disabled": true },
-                { "key": "staffId", "value": "", "disabled": true },
-                { "key": "status", "value": "", "disabled": true },
-                { "key": "search", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
+                {
+                  "key": "id",
+                  "value": "CLIENT_PAYMENT_UUID"
+                }
               ]
             }
           }
         },
         {
-          "name": "Find One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/selling/one?id=SELLING_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling", "one"],
-              "query": [{ "key": "id", "value": "SELLING_ID" }]
-            }
-          }
-        },
-        {
           "name": "Create One",
+          "description": "Auth talab qilinadi",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"clientId\": \"CLIENT_UUID\",\n  \"date\": \"2025-01-01T00:00:00.000Z\",\n  \"staffId\": \"STAFF_UUID\",\n  \"send\": false,\n  \"payment\": {\n    \"paymentMethods\": [\n      { \"type\": \"cash\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 100000 }\n    ],\n    \"description\": \"Sotuv to'lovi\"\n  },\n  \"products\": [\n    {\n      \"productId\": \"PRODUCT_UUID\",\n      \"count\": 3,\n      \"price\": 25000,\n      \"currencyId\": \"CURRENCY_UUID\"\n    }\n  ]\n}"
+              "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"description\": \"To'lov\",\n  \"paymentMethods\": [\n    {\n      \"type\": \"cash\",\n      \"currencyId\": \"{{currencyId}}\",\n      \"amount\": 500000\n    }\n  ],\n  \"changeMethods\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{baseUrl}}/selling/one", "host": ["{{baseUrl}}"], "path": ["selling", "one"] }
+            "url": {
+              "raw": "{{baseUrl}}/client-payment/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client-payment",
+                "one"
+              ]
+            },
+            "description": "Auth talab qilinadi"
           }
         },
         {
           "name": "Update One",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"clientId\": \"CLIENT_UUID\",\n  \"date\": \"2025-01-02T00:00:00.000Z\",\n  \"send\": false,\n  \"payment\": {\n    \"paymentMethods\": [\n      { \"type\": \"transfer\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 80000 }\n    ],\n    \"description\": \"Yangilangan to'lov\"\n  }\n}"
+              "raw": "{\n  \"description\": \"Yangilangan\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/selling/one?id=SELLING_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling", "one"],
-              "query": [{ "key": "id", "value": "SELLING_ID" }]
+              "raw": "{{baseUrl}}/client-payment/one?id=CLIENT_PAYMENT_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client-payment",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "CLIENT_PAYMENT_UUID"
+                }
+              ]
             }
           }
         },
@@ -1060,13 +2832,25 @@
           "name": "Delete One",
           "request": {
             "method": "DELETE",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/selling/one?id=SELLING_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling", "one"],
+              "raw": "{{baseUrl}}/client-payment/one?id=CLIENT_PAYMENT_UUID&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client-payment",
+                "one"
+              ],
               "query": [
-                { "key": "id", "value": "SELLING_ID" },
-                { "key": "method", "value": "soft" }
+                {
+                  "key": "id",
+                  "value": "CLIENT_PAYMENT_UUID"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
               ]
             }
           }
@@ -1075,89 +2859,217 @@
           "name": "Excel Download Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/selling/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling", "excel-download", "many"],
+              "raw": "{{baseUrl}}/client-payment/excel-download/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "client-payment",
+                "excel-download",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
               ]
-            }
-          }
-        },
-        {
-          "name": "Excel Download One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/selling/excel-download/one?id=SELLING_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling", "excel-download", "one"],
-              "query": [{ "key": "id", "value": "SELLING_ID" }]
             }
           }
         }
       ]
     },
     {
-      "name": "Selling Product MV",
+      "name": "Supplier Payment",
       "item": [
         {
           "name": "Find Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/selling-product-mv/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling-product-mv", "many"],
+              "raw": "{{baseUrl}}/supplier-payment/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier-payment",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "sellingId", "value": "", "disabled": true },
-                { "key": "productId", "value": "", "disabled": true }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "supplierId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
+          }
+        },
+        {
+          "name": "Find Many New (optimized)",
+          "description": "Optimallashtirilgan versiya",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supplier-payment/many-new?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier-payment",
+                "many-new"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            },
+            "description": "Optimallashtirilgan versiya"
           }
         },
         {
           "name": "Find One",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/selling-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
+              "raw": "{{baseUrl}}/supplier-payment/one?id=SUPPLIER_PAYMENT_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier-payment",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "SUPPLIER_PAYMENT_UUID"
+                }
+              ]
             }
           }
         },
         {
           "name": "Create One",
+          "description": "Auth talab qilinadi",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"sellingId\": \"SELLING_UUID\",\n  \"productId\": \"PRODUCT_UUID\",\n  \"count\": 2,\n  \"price\": 25000,\n  \"currencyId\": \"CURRENCY_UUID\"\n}"
+              "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"description\": \"To'lov\",\n  \"paymentMethods\": [\n    {\n      \"type\": \"cash\",\n      \"currencyId\": \"{{currencyId}}\",\n      \"amount\": 500000\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{baseUrl}}/selling-product-mv/one", "host": ["{{baseUrl}}"], "path": ["selling-product-mv", "one"] }
+            "url": {
+              "raw": "{{baseUrl}}/supplier-payment/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier-payment",
+                "one"
+              ]
+            },
+            "description": "Auth talab qilinadi"
           }
         },
         {
           "name": "Update One",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"count\": 4,\n  \"price\": 27000,\n  \"currencyId\": \"CURRENCY_UUID\"\n}"
+              "raw": "{\n  \"description\": \"Yangilangan\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/selling-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
+              "raw": "{{baseUrl}}/supplier-payment/one?id=SUPPLIER_PAYMENT_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier-payment",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "SUPPLIER_PAYMENT_UUID"
+                }
+              ]
             }
           }
         },
@@ -1165,89 +3077,60 @@
           "name": "Delete One",
           "request": {
             "method": "DELETE",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/selling-product-mv/one?id=MV_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["selling-product-mv", "one"],
-              "query": [{ "key": "id", "value": "MV_ID" }]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Staff",
-      "item": [
-        {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/staff/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff", "many"],
+              "raw": "{{baseUrl}}/supplier-payment/one?id=SUPPLIER_PAYMENT_UUID&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier-payment",
+                "one"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "search", "value": "", "disabled": true },
-                { "key": "fullname", "value": "", "disabled": true },
-                { "key": "phone", "value": "", "disabled": true }
+                {
+                  "key": "id",
+                  "value": "SUPPLIER_PAYMENT_UUID"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
               ]
             }
           }
         },
         {
-          "name": "Find One",
+          "name": "Excel Download Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/staff/one?id=STAFF_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff", "one"],
-              "query": [{ "key": "id", "value": "STAFF_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Create One",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullname\": \"Bobur Karimov\",\n  \"phone\": \"+998911234567\",\n  \"password\": \"securePass123\",\n  \"actionsToConnect\": [],\n  \"pagesToConnect\": []\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/staff/one", "host": ["{{baseUrl}}"], "path": ["staff", "one"] }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullname\": \"Yangilangan Ism\",\n  \"phone\": \"+998919876543\",\n  \"currencyId\": \"CURRENCY_UUID\",\n  \"actionsToConnect\": [],\n  \"actionsToDisconnect\": [],\n  \"pagesToConnect\": [],\n  \"pagesToDisconnect\": []\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/staff/one?id=STAFF_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff", "one"],
-              "query": [{ "key": "id", "value": "STAFF_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/staff/one?id=STAFF_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff", "one"],
+              "raw": "{{baseUrl}}/supplier-payment/excel-download/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier-payment",
+                "excel-download",
+                "many"
+              ],
               "query": [
-                { "key": "id", "value": "STAFF_ID" },
-                { "key": "method", "value": "soft" }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
               ]
             }
           }
@@ -1261,17 +3144,52 @@
           "name": "Find Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/staff-payment/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff-payment", "many"],
+              "raw": "{{baseUrl}}/staff-payment/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff-payment",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "staffId", "value": "", "disabled": true },
-                { "key": "search", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "staffId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "employeeId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
           }
@@ -1280,40 +3198,92 @@
           "name": "Find One",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/staff-payment/one?id=PAYMENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff-payment", "one"],
-              "query": [{ "key": "id", "value": "PAYMENT_ID" }]
+              "raw": "{{baseUrl}}/staff-payment/one?id=STAFF_PAYMENT_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff-payment",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "STAFF_PAYMENT_UUID"
+                }
+              ]
             }
           }
         },
         {
           "name": "Create One",
+          "description": "Auth talab qilinadi. Body: `method` (bitta object), `employeeId`",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"staffId\": \"STAFF_UUID\",\n  \"description\": \"Oylik maosh\",\n  \"paymentMethods\": [\n    { \"type\": \"cash\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 3000000 }\n  ]\n}"
+              "raw": "{\n  \"employeeId\": \"{{staffId}}\",\n  \"description\": \"Oylik maosh\",\n  \"method\": {\n    \"currencyId\": \"{{currencyId}}\",\n    \"amount\": 3000000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
-            "url": { "raw": "{{baseUrl}}/staff-payment/one", "host": ["{{baseUrl}}"], "path": ["staff-payment", "one"] }
+            "url": {
+              "raw": "{{baseUrl}}/staff-payment/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff-payment",
+                "one"
+              ]
+            },
+            "description": "Auth talab qilinadi. Body: `method` (bitta object), `employeeId`"
           }
         },
         {
           "name": "Update One",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"description\": \"Yangilangan tavsif\",\n  \"paymentMethods\": [\n    { \"type\": \"transfer\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 3500000 }\n  ]\n}"
+              "raw": "{\n  \"description\": \"Yangilangan\",\n  \"method\": {\n    \"currencyId\": \"{{currencyId}}\",\n    \"amount\": 3500000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/staff-payment/one?id=PAYMENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff-payment", "one"],
-              "query": [{ "key": "id", "value": "PAYMENT_ID" }]
+              "raw": "{{baseUrl}}/staff-payment/one?id=STAFF_PAYMENT_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff-payment",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "STAFF_PAYMENT_UUID"
+                }
+              ]
             }
           }
         },
@@ -1321,13 +3291,25 @@
           "name": "Delete One",
           "request": {
             "method": "DELETE",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/staff-payment/one?id=PAYMENT_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff-payment", "one"],
+              "raw": "{{baseUrl}}/staff-payment/one?id=STAFF_PAYMENT_UUID&method=soft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff-payment",
+                "one"
+              ],
               "query": [
-                { "key": "id", "value": "PAYMENT_ID" },
-                { "key": "method", "value": "soft" }
+                {
+                  "key": "id",
+                  "value": "STAFF_PAYMENT_UUID"
+                },
+                {
+                  "key": "method",
+                  "value": "soft"
+                }
               ]
             }
           }
@@ -1336,13 +3318,539 @@
           "name": "Excel Download Many",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/staff-payment/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["staff-payment", "excel-download", "many"],
+              "raw": "{{baseUrl}}/staff-payment/excel-download/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "staff-payment",
+                "excel-download",
+                "many"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Selling Product MV",
+      "item": [
+        {
+          "name": "Find Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/selling-product-mv/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling-product-mv",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "sellingId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "productId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "staffId",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/selling-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sellingId\": \"{{sellingId}}\",\n  \"productId\": \"{{productId}}\",\n  \"count\": 2,\n  \"price\": 25000,\n  \"currencyId\": \"{{currencyId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/selling-product-mv/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling-product-mv",
+                "one"
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Update One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/selling-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/selling-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "selling-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Arrival Product MV",
+      "item": [
+        {
+          "name": "Find Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arrival-product-mv/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival-product-mv",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "arrivalId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "productId",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arrival-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"arrivalId\": \"ARRIVAL_UUID\",\n  \"productId\": \"{{productId}}\",\n  \"count\": 5,\n  \"cost\": 5000,\n  \"costCurrencyId\": \"{{currencyId}}\",\n  \"price\": 8000,\n  \"priceCurrencyId\": \"{{currencyId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/arrival-product-mv/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival-product-mv",
+                "one"
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Update One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/arrival-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/arrival-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "arrival-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Returning Product MV",
+      "item": [
+        {
+          "name": "Find Many",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/returning-product-mv/many?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning-product-mv",
+                "many"
+              ],
+              "query": [
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "returningId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "productId",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find One",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/returning-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"returningId\": \"RETURNING_UUID\",\n  \"productId\": \"{{productId}}\",\n  \"count\": 2,\n  \"price\": 8000,\n  \"currencyId\": \"{{currencyId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/returning-product-mv/one",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning-product-mv",
+                "one"
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Update One",
+          "description": "Auth talab qilinadi",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/returning-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
+              ]
+            },
+            "description": "Auth talab qilinadi"
+          }
+        },
+        {
+          "name": "Delete One",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/returning-product-mv/one?id=MV_UUID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "returning-product-mv",
+                "one"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "MV_UUID"
+                }
               ]
             }
           }
@@ -1355,295 +3863,365 @@
         {
           "name": "Selling Period Stats",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/statistics/selling/period?type=day&currencyId=CURRENCY_UUID",
-              "host": ["{{baseUrl}}"],
-              "path": ["statistics", "selling", "period"],
+              "raw": "{{baseUrl}}/statistics/selling/period?type=day",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "statistics",
+                "selling",
+                "period"
+              ],
               "query": [
-                { "key": "type", "value": "day", "description": "day | week | month | year" },
-                { "key": "currencyId", "value": "CURRENCY_UUID" },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
+                {
+                  "key": "type",
+                  "value": "day",
+                  "description": "day | week | month | year"
+                }
               ]
             }
           }
         },
         {
           "name": "Selling Total Stats",
+          "description": "Kun/hafta/oy/yil + client/supplier debt totals",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/statistics/selling/total?currencyId=CURRENCY_UUID",
-              "host": ["{{baseUrl}}"],
-              "path": ["statistics", "selling", "total"],
-              "query": [
-                { "key": "currencyId", "value": "CURRENCY_UUID" }
+              "raw": "{{baseUrl}}/statistics/selling/total",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "statistics",
+                "selling",
+                "total"
               ]
-            }
+            },
+            "description": "Kun/hafta/oy/yil + client/supplier debt totals"
           }
         },
         {
-          "name": "Product MV Stats",
+          "name": "Product MV (all types)",
           "request": {
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/statistics/product-mv?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["statistics", "product-mv"],
+              "raw": "{{baseUrl}}/statistics/product-mv?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "statistics",
+                "product-mv"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "productId", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "type",
+                  "value": "selling",
+                  "disabled": true,
+                  "description": "selling | arrival | returning"
+                },
+                {
+                  "key": "productId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
           }
         },
         {
           "name": "Many Product Stats",
+          "description": "Service ichida pagination: false — barcha mahsulotlar",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/statistics/many-product-stats?pagination=false",
-              "host": ["{{baseUrl}}"],
-              "path": ["statistics", "many-product-stats"],
+              "raw": "{{baseUrl}}/statistics/many-product-stats?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "statistics",
+                "many-product-stats"
+              ],
               "query": [
-                { "key": "pagination", "value": "false" },
-                { "key": "productId", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
+                {
+                  "key": "productId",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
               ]
-            }
+            },
+            "description": "Service ichida pagination: false — barcha mahsulotlar"
           }
         },
         {
           "name": "Client Report",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/statistics/client-report?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["statistics", "client-report"],
+              "raw": "{{baseUrl}}/statistics/client-report?pageNumber=1&pageSize=20&pagination=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "statistics",
+                "client-report"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "clientId", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
+                {
+                  "key": "pageNumber",
+                  "value": "1",
+                  "description": "Sahifa raqami (1-based)"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Sahifa hajmi"
+                },
+                {
+                  "key": "pagination",
+                  "value": "true",
+                  "description": "Pagination yoqish"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "disabled": true
+                }
               ]
             }
+          }
+        },
+        {
+          "name": "Dashboard Summary",
+          "description": "Umumiy dashboard: sotuv, qaytarish, to‘lovlar",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/statistics/dashboard-summary?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "statistics",
+                "dashboard-summary"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2025-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "endDate",
+                  "value": "2025-12-31",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Umumiy dashboard: sotuv, qaytarish, to‘lovlar"
           }
         }
       ]
     },
     {
-      "name": "Supplier",
+      "name": "Upload",
       "item": [
         {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/supplier/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "search", "value": "", "disabled": true }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Find One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/supplier/one?id=SUPPLIER_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier", "one"],
-              "query": [{ "key": "id", "value": "SUPPLIER_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Create One",
+          "name": "Upload Supplier Excel",
+          "description": "multipart/form-data — Excel fayl",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullname\": \"Hamkor Kompaniya\",\n  \"phone\": \"+998712345678\"\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/supplier/one", "host": ["{{baseUrl}}"], "path": ["supplier", "one"] }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"fullname\": \"Yangilangan Kompaniya\",\n  \"phone\": \"+998717654321\"\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
             },
             "url": {
-              "raw": "{{baseUrl}}/supplier/one?id=SUPPLIER_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier", "one"],
-              "query": [{ "key": "id", "value": "SUPPLIER_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/supplier/one?id=SUPPLIER_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier", "one"],
+              "raw": "{{baseUrl}}/upload/supplier?mode=append&type=jas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "upload",
+                "supplier"
+              ],
               "query": [
-                { "key": "id", "value": "SUPPLIER_ID" },
-                { "key": "method", "value": "soft" }
+                {
+                  "key": "mode",
+                  "value": "append",
+                  "description": "append | overwrite"
+                },
+                {
+                  "key": "type",
+                  "value": "jas",
+                  "description": "jas | kas"
+                }
               ]
-            }
+            },
+            "description": "multipart/form-data — Excel fayl"
           }
         },
         {
-          "name": "Excel Download Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/supplier/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier", "excel-download", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Excel Download One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/supplier/excel-download/one?id=SUPPLIER_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier", "excel-download", "one"],
-              "query": [{ "key": "id", "value": "SUPPLIER_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Excel With Product Download One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/supplier/excel-with-product-download/one?id=SUPPLIER_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier", "excel-with-product-download", "one"],
-              "query": [{ "key": "id", "value": "SUPPLIER_ID" }]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Supplier Payment",
-      "item": [
-        {
-          "name": "Find Many",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/supplier-payment/many?page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier-payment", "many"],
-              "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" },
-                { "key": "supplierId", "value": "", "disabled": true },
-                { "key": "staffId", "value": "", "disabled": true },
-                { "key": "search", "value": "", "disabled": true },
-                { "key": "startDate", "value": "", "disabled": true },
-                { "key": "endDate", "value": "", "disabled": true }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Find One",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/supplier-payment/one?id=PAYMENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier-payment", "one"],
-              "query": [{ "key": "id", "value": "PAYMENT_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Create One",
+          "name": "Upload Client Excel",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"supplierId\": \"SUPPLIER_UUID\",\n  \"description\": \"To'lov tavsifi\",\n  \"paymentMethods\": [\n    { \"type\": \"cash\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 500000 }\n  ]\n}"
-            },
-            "url": { "raw": "{{baseUrl}}/supplier-payment/one", "host": ["{{baseUrl}}"], "path": ["supplier-payment", "one"] }
-          }
-        },
-        {
-          "name": "Update One",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"description\": \"Yangilangan tavsif\",\n  \"paymentMethods\": [\n    { \"type\": \"card\", \"currencyId\": \"CURRENCY_UUID\", \"amount\": 400000 }\n  ]\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
             },
             "url": {
-              "raw": "{{baseUrl}}/supplier-payment/one?id=PAYMENT_ID",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier-payment", "one"],
-              "query": [{ "key": "id", "value": "PAYMENT_ID" }]
-            }
-          }
-        },
-        {
-          "name": "Delete One",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{baseUrl}}/supplier-payment/one?id=PAYMENT_ID&method=soft",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier-payment", "one"],
+              "raw": "{{baseUrl}}/upload/client?mode=append&type=jas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "upload",
+                "client"
+              ],
               "query": [
-                { "key": "id", "value": "PAYMENT_ID" },
-                { "key": "method", "value": "soft" }
+                {
+                  "key": "mode",
+                  "value": "append"
+                },
+                {
+                  "key": "type",
+                  "value": "jas"
+                }
               ]
             }
           }
         },
         {
-          "name": "Excel Download Many",
+          "name": "Upload Product Excel",
           "request": {
-            "method": "GET",
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
             "url": {
-              "raw": "{{baseUrl}}/supplier-payment/excel-download/many?page=1&pageSize=100",
-              "host": ["{{baseUrl}}"],
-              "path": ["supplier-payment", "excel-download", "many"],
+              "raw": "{{baseUrl}}/upload/product?mode=append&type=jas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "upload",
+                "product"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "100" }
+                {
+                  "key": "mode",
+                  "value": "append"
+                },
+                {
+                  "key": "type",
+                  "value": "jas"
+                }
               ]
             }
           }

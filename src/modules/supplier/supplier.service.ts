@@ -281,6 +281,131 @@ export class SupplierService {
 		})
 	}
 
+	/** Tez ro'yxat — tarix yuklanmaydi, qarz SQL aggregate orqali (`GET /supplier/many-fast`) */
+	async findManyFast(query: SupplierFindManyRequest) {
+		const hasDebtFilter = query.debtType !== undefined && query.debtValue !== undefined
+
+		let supplierIds: string[]
+		let suppliersLight: Awaited<ReturnType<SupplierRepository['findManyLightByIds']>>
+
+		if (hasDebtFilter) {
+			const allIds = await this.supplierRepository.findAllIdsForMany(query)
+			const debtRows = await this.supplierRepository.aggregateDebtBySupplierIds(allIds)
+			const filteredIds = await this.filterSupplierIdsByDebt(allIds, debtRows, query.debtType!, query.debtValue!)
+			const totalBeforePage = filteredIds.length
+
+			supplierIds = query.pagination ? filteredIds.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize) : filteredIds
+
+			suppliersLight = await this.supplierRepository.findManyLightByIds(supplierIds)
+
+			const resultData = await this.attachSupplierDebtAndDates(suppliersLight, supplierIds)
+
+			return createResponse({
+				data: {
+					totalCount: totalBeforePage,
+					pagesCount: query.pagination ? Math.ceil(totalBeforePage / query.pageSize) : 1,
+					pageSize: resultData.length,
+					data: resultData,
+				},
+				success: { messages: ['find many fast success'] },
+			})
+		}
+
+		suppliersLight = await this.supplierRepository.findManyFastLight(query)
+		supplierIds = suppliersLight.map((s) => s.id)
+		const resultData = await this.attachSupplierDebtAndDates(suppliersLight, supplierIds)
+
+		const totalCount = query.pagination ? await this.supplierRepository.countFindManyNew(query) : resultData.length
+
+		return createResponse({
+			data: {
+				totalCount,
+				pagesCount: query.pagination ? Math.ceil(totalCount / query.pageSize) : 1,
+				pageSize: resultData.length,
+				data: resultData,
+			},
+			success: { messages: ['find many fast success'] },
+		})
+	}
+
+	private async filterSupplierIdsByDebt(
+		supplierIds: string[],
+		debtRows: Awaited<ReturnType<SupplierRepository['aggregateDebtBySupplierIds']>>,
+		debtType: DebtTypeEnum,
+		debtValue: string | number,
+	): Promise<string[]> {
+		const rawBySupplier = this.groupSupplierDebtRows(debtRows)
+		const currencyIdSet = new Set<string>()
+		for (const rows of rawBySupplier.values()) {
+			for (const r of rows) currencyIdSet.add(r.currencyId)
+		}
+
+		const [{ rates, symbols }] = await Promise.all([this.currencyRepository.findExchangeRatesAndSymbolsByIds([...currencyIdSet])])
+
+		const threshold = new Decimal(debtValue)
+		const filtered: string[] = []
+
+		for (const id of supplierIds) {
+			const netted = netDebtCrossCurrencyRows(rawBySupplier.get(id) ?? [], rates, symbols)
+			const totalDebt = netted.reduce((acc, d) => acc.plus(d.amount), new Decimal(0))
+
+			const matches =
+				debtType === DebtTypeEnum.gt
+					? totalDebt.gt(threshold)
+					: debtType === DebtTypeEnum.lt
+						? totalDebt.lt(threshold)
+						: debtType === DebtTypeEnum.eq
+							? totalDebt.eq(threshold)
+							: true
+
+			if (matches) filtered.push(id)
+		}
+
+		return filtered
+	}
+
+	private groupSupplierDebtRows(debtRows: Awaited<ReturnType<SupplierRepository['aggregateDebtBySupplierIds']>>) {
+		const map = new Map<string, Array<{ currencyId: string; amount: Decimal }>>()
+		for (const row of debtRows) {
+			const arr = map.get(row.supplier_id) ?? []
+			arr.push({
+				currencyId: row.currency_id,
+				amount: new Decimal(typeof row.amount === 'bigint' ? row.amount.toString() : (row.amount as string | number)),
+			})
+			map.set(row.supplier_id, arr)
+		}
+		return map
+	}
+
+	private async attachSupplierDebtAndDates(suppliersLight: Awaited<ReturnType<SupplierRepository['findManyLightByIds']>>, supplierIds: string[]) {
+		const [debtRows, lastDates] = await Promise.all([this.supplierRepository.aggregateDebtBySupplierIds(supplierIds), this.supplierRepository.fetchLastArrivalDates(supplierIds)])
+
+		const rawBySupplier = this.groupSupplierDebtRows(debtRows)
+		const currencyIdSet = new Set<string>()
+		for (const rows of rawBySupplier.values()) {
+			for (const r of rows) currencyIdSet.add(r.currencyId)
+		}
+
+		const [{ rates, symbols }, currencyBriefs] = await Promise.all([
+			this.currencyRepository.findExchangeRatesAndSymbolsByIds([...currencyIdSet]),
+			this.currencyRepository.findBriefByIds([...currencyIdSet]),
+		])
+		const currencyMap = currencyBriefMapFromRows(currencyBriefs)
+
+		return suppliersLight.map((s) => {
+			const netted = netDebtCrossCurrencyRows(rawBySupplier.get(s.id) ?? [], rates, symbols)
+			return {
+				id: s.id,
+				fullname: s.fullname,
+				phone: s.phone,
+				description: s.description ?? null,
+				createdAt: s.createdAt,
+				lastArrivalDate: lastDates.get(s.id) ?? null,
+				debtByCurrency: withCurrencyBriefAmountMany(netted, currencyMap),
+			}
+		})
+	}
+
 	async findOne(query: SupplierFindOneRequest) {
 		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
 		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined

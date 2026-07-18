@@ -285,6 +285,135 @@ export class ProductService {
 		return createResponse({ data: result, success: { messages: ['find many new success'] } })
 	}
 
+	/** Tez ro'yxat — `sellingMVs` yuklanmaydi, oxirgi sotuv SQL batch (`GET /product/many-fast`) */
+	async findManyFast(query: ProductFindManyRequest) {
+		const sortByLastSelling = query.sortByLastSellingDate === true
+		const clientId = query.clientId?.trim() || undefined
+
+		const [totalsAgg, briefRows] = await Promise.all([this.productRepository.fetchFindManyAggregatesFast(query), this.currencyRepository.findActiveBriefOrdered()])
+
+		const activeCurrencyIds = briefRows.map((r) => r.id)
+		const briefMap = currencyBriefMapFromRows(briefRows.map(({ id, name, symbol }) => ({ id, name, symbol })))
+		const currencyById = new Map<string, CurrencyFindOneData>(briefRows.map((c) => [c.id, c]))
+
+		const totalMaps = this.emptyMoneyMaps()
+		this.applySqlPriceAggToMoneyMaps(totalMaps, totalsAgg.priceAgg)
+		const totalCount = Number(totalsAgg.totalInventoryUnits)
+		const productsCount = Number(totalsAgg.productsCount)
+
+		let productsLight: Awaited<ReturnType<ProductRepository['findManyLightByIds']>>
+		let lastSellingMap: Awaited<ReturnType<ProductRepository['fetchLastSellingForProducts']>>
+
+		if (sortByLastSelling) {
+			const allRows = await this.productRepository.findAllIdsForMany(query)
+			lastSellingMap = await this.productRepository.fetchLastSellingForProducts(
+				allRows.map((r) => r.id),
+				clientId,
+			)
+
+			const sortedIds = this.sortProductRowsByLastSelling(allRows, lastSellingMap)
+			const pageIds = query.pagination ? sortedIds.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize) : sortedIds
+
+			productsLight = await this.productRepository.findManyLightByIds(pageIds)
+		} else {
+			productsLight = await this.productRepository.findManyFastList(query)
+			const pageIds = productsLight.map((p) => p.id)
+			lastSellingMap = await this.productRepository.fetchLastSellingForProducts(pageIds, clientId)
+		}
+
+		const data = this.mapProductsFastList(productsLight, lastSellingMap, currencyById)
+
+		const pageMaps = this.emptyMoneyMaps()
+		let pageCount = 0
+		for (const p of data) {
+			pageCount += p.count
+			this.addMappedProductToMaps(pageMaps, p)
+		}
+
+		const calcTotal: ProductFindManyCalc = {
+			totalCount,
+			...this.buildCalcFromMaps(activeCurrencyIds, totalMaps, briefMap),
+		}
+		const calcPage: ProductFindManyCalc = {
+			totalCount: pageCount,
+			...this.buildCalcFromMaps(activeCurrencyIds, pageMaps, briefMap),
+		}
+
+		const calc = { calcPage, calcTotal }
+
+		const result = query.pagination
+			? {
+					totalCount: productsCount,
+					pagesCount: Math.ceil(productsCount / query.pageSize),
+					pageSize: data.length,
+					data,
+					calc,
+				}
+			: { data, calc }
+
+		return createResponse({ data: result, success: { messages: ['find many fast success'] } })
+	}
+
+	private sortProductRowsByLastSelling(rows: Array<{ id: string; name: string }>, lastSellingMap: Awaited<ReturnType<ProductRepository['fetchLastSellingForProducts']>>): string[] {
+		return [...rows]
+			.sort((a, b) => {
+				const ad = lastSellingMap.get(a.id)?.date ?? null
+				const bd = lastSellingMap.get(b.id)?.date ?? null
+				if (!ad && !bd) return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+				if (!ad) return 1
+				if (!bd) return -1
+				const t = new Date(bd).getTime() - new Date(ad).getTime()
+				return t !== 0 ? t : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+			})
+			.map((r) => r.id)
+	}
+
+	private mapProductsFastList(
+		products: Awaited<ReturnType<ProductRepository['findManyLightByIds']>>,
+		lastSellingMap: Awaited<ReturnType<ProductRepository['fetchLastSellingForProducts']>>,
+		currencyById: Map<string, CurrencyFindOneData>,
+	) {
+		const attachPriceCurrency = (row: { id: string; type: PriceTypeEnum; price: Decimal; totalPrice: Decimal; currencyId: string; exchangeRate: Decimal } | undefined) => {
+			if (!row) return undefined
+			const currency =
+				currencyById.get(row.currencyId) ??
+				({
+					id: row.currencyId,
+					name: '',
+					symbol: '',
+					isActive: false,
+					exchangeRate: row.exchangeRate,
+					createdAt: new Date(0),
+				} satisfies CurrencyFindOneData)
+			return { ...row, currency }
+		}
+
+		return products.map((product) => {
+			const lastSellingRow = lastSellingMap.get(product.id)
+			return {
+				id: product.id,
+				count: product.count,
+				createdAt: product.createdAt,
+				description: product.description,
+				name: product.name,
+				minAmount: product.minAmount,
+				image: product.image,
+				lastSelling: lastSellingRow
+					? {
+							date: lastSellingRow.date,
+							price: lastSellingRow.price,
+							count: lastSellingRow.count,
+						}
+					: null,
+				prices: {
+					cost: attachPriceCurrency(product.prices.find((pri) => pri.type === PriceTypeEnum.cost)),
+					selling: attachPriceCurrency(product.prices.find((pri) => pri.type === PriceTypeEnum.selling)),
+					wholesale: attachPriceCurrency(product.prices.find((pri) => pri.type === PriceTypeEnum.wholesale)),
+				},
+			}
+		})
+	}
+
 	async findOne(query: ProductFindOneRequest) {
 		const product = await this.productRepository.findOne(query)
 

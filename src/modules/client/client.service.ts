@@ -154,6 +154,32 @@ export class ClientService {
 		return out
 	}
 
+	/** SQL aggregate — `getDebtSnapshotsByClientIds` tez alternativi (selling/product ro‘yxatlari uchun) */
+	async getDebtSnapshotsByClientIdsFast(clientIds: string[]): Promise<Map<string, ClientDebtByCurrency[]>> {
+		const unique = [...new Set(clientIds.filter(Boolean))]
+		if (unique.length === 0) return new Map()
+
+		const debtRows = await this.clientRepository.aggregateDebtByClientIds(unique)
+		const rawByClient = this.groupClientDebtRows(debtRows)
+		const currencyIdSet = new Set<string>()
+		for (const rows of rawByClient.values()) {
+			for (const r of rows) currencyIdSet.add(r.currencyId)
+		}
+
+		const [{ rates, symbols }, currencyBriefs] = await Promise.all([
+			this.currencyRepository.findExchangeRatesAndSymbolsByIds([...currencyIdSet]),
+			this.currencyRepository.findBriefByIds([...currencyIdSet]),
+		])
+		const currencyMap = currencyBriefMapFromRows(currencyBriefs)
+
+		const out = new Map<string, ClientDebtByCurrency[]>()
+		for (const id of unique) {
+			const netted = netDebtCrossCurrencyRows(rawByClient.get(id) ?? [], rates, symbols)
+			out.set(id, withCurrencyBriefAmountMany(netted, currencyMap))
+		}
+		return out
+	}
+
 	private inReportPeriod(d: Date, start?: Date, end?: Date): boolean {
 		if (!start && !end) return true
 		const t = new Date(d).getTime()
@@ -504,6 +530,132 @@ export class ClientService {
 		})
 	}
 
+	/** Tez ro'yxat — tarix yuklanmaydi, qarz SQL aggregate orqali (`GET /client/many-fast`) */
+	async findManyFast(query: ClientFindManyRequest) {
+		const hasDebtFilter = query.debtType !== undefined && query.debtValue !== undefined
+
+		let clientIds: string[]
+		let clientsLight: Awaited<ReturnType<ClientRepository['findManyLightByIds']>>
+
+		if (hasDebtFilter) {
+			const allIds = await this.clientRepository.findAllIdsForMany(query)
+			const debtRows = await this.clientRepository.aggregateDebtByClientIds(allIds)
+			const filteredIds = await this.filterClientIdsByDebt(allIds, debtRows, query.debtType!, query.debtValue!)
+			const totalBeforePage = filteredIds.length
+
+			clientIds = query.pagination ? filteredIds.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize) : filteredIds
+
+			clientsLight = await this.clientRepository.findManyLightByIds(clientIds)
+
+			const resultData = await this.attachClientDebtAndDates(clientsLight, clientIds)
+
+			return createResponse({
+				data: {
+					totalCount: totalBeforePage,
+					pagesCount: query.pagination ? Math.ceil(totalBeforePage / query.pageSize) : 1,
+					pageSize: resultData.length,
+					data: resultData,
+				},
+				success: { messages: ['find many fast success'] },
+			})
+		}
+
+		clientsLight = await this.clientRepository.findManyFastLight(query)
+		clientIds = clientsLight.map((c) => c.id)
+		const resultData = await this.attachClientDebtAndDates(clientsLight, clientIds)
+
+		const totalCount = query.pagination ? await this.clientRepository.countFindManyNew(query) : resultData.length
+
+		return createResponse({
+			data: {
+				totalCount,
+				pagesCount: query.pagination ? Math.ceil(totalCount / query.pageSize) : 1,
+				pageSize: resultData.length,
+				data: resultData,
+			},
+			success: { messages: ['find many fast success'] },
+		})
+	}
+
+	private async filterClientIdsByDebt(
+		clientIds: string[],
+		debtRows: Awaited<ReturnType<ClientRepository['aggregateDebtByClientIds']>>,
+		debtType: DebtTypeEnum,
+		debtValue: string | number,
+	): Promise<string[]> {
+		const rawByClient = this.groupClientDebtRows(debtRows)
+		const currencyIdSet = new Set<string>()
+		for (const rows of rawByClient.values()) {
+			for (const r of rows) currencyIdSet.add(r.currencyId)
+		}
+
+		const [{ rates, symbols }] = await Promise.all([this.currencyRepository.findExchangeRatesAndSymbolsByIds([...currencyIdSet])])
+
+		const threshold = new Decimal(debtValue)
+		const filtered: string[] = []
+
+		for (const id of clientIds) {
+			const netted = netDebtCrossCurrencyRows(rawByClient.get(id) ?? [], rates, symbols)
+			const totalDebt = netted.reduce((acc, d) => acc.plus(d.amount), new Decimal(0))
+
+			const matches =
+				debtType === DebtTypeEnum.gt
+					? totalDebt.gt(threshold)
+					: debtType === DebtTypeEnum.lt
+						? totalDebt.lt(threshold)
+						: debtType === DebtTypeEnum.eq
+							? totalDebt.eq(threshold)
+							: true
+
+			if (matches) filtered.push(id)
+		}
+
+		return filtered
+	}
+
+	private groupClientDebtRows(debtRows: Awaited<ReturnType<ClientRepository['aggregateDebtByClientIds']>>) {
+		const map = new Map<string, Array<{ currencyId: string; amount: Decimal }>>()
+		for (const row of debtRows) {
+			const arr = map.get(row.client_id) ?? []
+			arr.push({
+				currencyId: row.currency_id,
+				amount: new Decimal(typeof row.amount === 'bigint' ? row.amount.toString() : (row.amount as string | number)),
+			})
+			map.set(row.client_id, arr)
+		}
+		return map
+	}
+
+	private async attachClientDebtAndDates(clientsLight: Awaited<ReturnType<ClientRepository['findManyLightByIds']>>, clientIds: string[]) {
+		const [debtRows, lastDates] = await Promise.all([this.clientRepository.aggregateDebtByClientIds(clientIds), this.clientRepository.fetchLastSellingDates(clientIds)])
+
+		const rawByClient = this.groupClientDebtRows(debtRows)
+		const currencyIdSet = new Set<string>()
+		for (const rows of rawByClient.values()) {
+			for (const r of rows) currencyIdSet.add(r.currencyId)
+		}
+
+		const [{ rates, symbols }, currencyBriefs] = await Promise.all([
+			this.currencyRepository.findExchangeRatesAndSymbolsByIds([...currencyIdSet]),
+			this.currencyRepository.findBriefByIds([...currencyIdSet]),
+		])
+		const currencyMap = currencyBriefMapFromRows(currencyBriefs)
+
+		return clientsLight.map((c) => {
+			const netted = netDebtCrossCurrencyRows(rawByClient.get(c.id) ?? [], rates, symbols)
+			return {
+				id: c.id,
+				fullname: c.fullname,
+				phone: c.phone,
+				description: c.description ?? null,
+				telegram: c.telegram,
+				createdAt: c.createdAt,
+				lastSellingDate: lastDates.get(c.id) ?? null,
+				debtByCurrency: withCurrencyBriefAmountMany(netted, currencyMap),
+			}
+		})
+	}
+
 	async findOne(query: ClientFindOneRequest) {
 		const deedStartDate = query.deedStartDate ? new Date(new Date(query.deedStartDate).setHours(0, 0, 0, 0)) : undefined
 		const deedEndDate = query.deedEndDate ? new Date(new Date(query.deedEndDate).setHours(23, 59, 59, 999)) : undefined
@@ -747,91 +899,101 @@ export class ClientService {
 		return createResponse({ data: null, success: { messages: ['delete one success'] } })
 	}
 
+	// eslint-disable-next-line @typescript-eslint/require-await
 	async findManyForReport(query: ClientFindManyRequest) {
-		const clients = await this.clientRepository.findMany({ ...query, pagination: false })
+		// const clients = await this.clientRepository.findMany({ ...query, pagination: false })
 
-		const periodStart = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
-		const periodEnd = query.endDate ? new Date(new Date(query.endDate).setHours(23, 59, 59, 999)) : undefined
+		// const periodStart = query.startDate ? new Date(new Date(query.startDate).setHours(0, 0, 0, 0)) : undefined
+		// const periodEnd = query.endDate ? new Date(new Date(query.endDate).setHours(23, 59, 59, 999)) : undefined
 
-		const allCurrencyIds = new Set<string>()
-		for (const c of clients) {
-			const debtMap = this.calcDebtByCurrency(c.sellings, c.payments, c.returnings)
-			for (const id of debtMap.keys()) allCurrencyIds.add(id)
-			this.collectReportCurrencyIds(c.sellings, c.returnings, c.payments, periodStart, periodEnd, allCurrencyIds)
-		}
+		// const allCurrencyIds = new Set<string>()
+		// for (const c of clients) {
+		// 	const debtMap = this.calcDebtByCurrency(c.sellings, c.payments, c.returnings)
+		// 	for (const id of debtMap.keys()) allCurrencyIds.add(id)
+		// 	this.collectReportCurrencyIds(c.sellings, c.returnings, c.payments, periodStart, periodEnd, allCurrencyIds)
+		// }
 
-		const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...allCurrencyIds]))
+		// const currencyMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...allCurrencyIds]))
 
-		const mappedClientsPre = clients.map((c) => {
-			const debtMap = this.calcDebtByCurrency(c.sellings, c.payments, c.returnings)
-			const debtByCurrency = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
-			const report = this.buildClientReportSummary(c.sellings, c.returnings, c.payments, periodStart, periodEnd, currencyMap)
+		// const mappedClientsPre = clients.map((c) => {
+		// 	const debtMap = this.calcDebtByCurrency(c.sellings, c.payments, c.returnings)
+		// 	const debtByCurrency = Array.from(debtMap.entries()).map(([currencyId, amount]) => ({ currencyId, amount }))
+		// 	const report = this.buildClientReportSummary(c.sellings, c.returnings, c.payments, periodStart, periodEnd, currencyMap)
 
-			return {
-				id: c.id,
-				fullname: c.fullname,
-				phone: c.phone,
-				description: c.description,
-				telegram: c.telegram,
-				createdAt: c.createdAt,
-				debtByCurrency,
-				lastSellingDate: c.sellings?.length ? c.sellings[0].date : null,
-				report,
-			}
-		})
+		// 	return {
+		// 		id: c.id,
+		// 		fullname: c.fullname,
+		// 		phone: c.phone,
+		// 		description: c.description,
+		// 		telegram: c.telegram,
+		// 		createdAt: c.createdAt,
+		// 		debtByCurrency,
+		// 		lastSellingDate: c.sellings?.length ? c.sellings[0].date : null,
+		// 		report,
+		// 	}
+		// })
 
-		const reportDebtIds = new Set<string>()
-		for (const m of mappedClientsPre) {
-			for (const d of m.debtByCurrency) reportDebtIds.add(d.currencyId)
-		}
-		const { rates: reportRates, symbols: reportSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...reportDebtIds])
+		// const reportDebtIds = new Set<string>()
+		// for (const m of mappedClientsPre) {
+		// 	for (const d of m.debtByCurrency) reportDebtIds.add(d.currencyId)
+		// }
+		// const { rates: reportRates, symbols: reportSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...reportDebtIds])
 
-		const mappedClients = mappedClientsPre.map((m) => {
-			const debtByCurrency = netDebtCrossCurrencyRows(m.debtByCurrency, reportRates, reportSymbols)
-			const totalDebt = debtByCurrency.reduce((a, b) => a.plus(b.amount), new Decimal(0))
-			return { ...m, debtByCurrency, _totalDebt: totalDebt }
-		})
+		// const mappedClients = mappedClientsPre.map((m) => {
+		// 	const debtByCurrency = netDebtCrossCurrencyRows(m.debtByCurrency, reportRates, reportSymbols)
+		// 	const totalDebt = debtByCurrency.reduce((a, b) => a.plus(b.amount), new Decimal(0))
+		// 	return { ...m, debtByCurrency, _totalDebt: totalDebt }
+		// })
 
-		const clientsWithDebtCurrency = mappedClients.map((row) => ({
-			...row,
-			debtByCurrency: withCurrencyBriefAmountMany(row.debtByCurrency, currencyMap),
-		}))
+		// const clientsWithDebtCurrency = mappedClients.map((row) => ({
+		// 	...row,
+		// 	debtByCurrency: withCurrencyBriefAmountMany(row.debtByCurrency, currencyMap),
+		// }))
 
-		const filteredClients = clientsWithDebtCurrency.filter((c) => {
-			if (query.debtType && query.debtValue !== undefined) {
-				const value = new Decimal(query.debtValue)
-				switch (query.debtType) {
-					case DebtTypeEnum.gt:
-						return c._totalDebt.gt(value)
-					case DebtTypeEnum.lt:
-						return c._totalDebt.lt(value)
-					case DebtTypeEnum.eq:
-						return c._totalDebt.eq(value)
-					default:
-						return true
-				}
-			}
-			return true
-		})
+		// const filteredClients = clientsWithDebtCurrency.filter((c) => {
+		// 	if (query.debtType && query.debtValue !== undefined) {
+		// 		const value = new Decimal(query.debtValue)
+		// 		switch (query.debtType) {
+		// 			case DebtTypeEnum.gt:
+		// 				return c._totalDebt.gt(value)
+		// 			case DebtTypeEnum.lt:
+		// 				return c._totalDebt.lt(value)
+		// 			case DebtTypeEnum.eq:
+		// 				return c._totalDebt.eq(value)
+		// 			default:
+		// 				return true
+		// 		}
+		// 	}
+		// 	return true
+		// })
 
-		const sortedClients = filteredClients.sort((a, b) => {
-			const da = a.lastSellingDate ? new Date(a.lastSellingDate).getTime() : 0
-			const db = b.lastSellingDate ? new Date(b.lastSellingDate).getTime() : 0
-			return db - da
-		})
+		// const sortedClients = filteredClients.sort((a, b) => {
+		// 	const da = a.lastSellingDate ? new Date(a.lastSellingDate).getTime() : 0
+		// 	const db = b.lastSellingDate ? new Date(b.lastSellingDate).getTime() : 0
+		// 	return db - da
+		// })
 
-		const paginatedClients = query.pagination
-			? sortedClients.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize).map(({ _totalDebt, ...rest }) => rest)
-			: sortedClients.map(({ _totalDebt, ...rest }) => rest)
+		// const paginatedClients = query.pagination
+		// 	? sortedClients.slice((query.pageNumber - 1) * query.pageSize, query.pageNumber * query.pageSize).map(({ _totalDebt, ...rest }) => rest)
+		// 	: sortedClients.map(({ _totalDebt, ...rest }) => rest)
+
+		// const result = query.pagination
+		// 	? {
+		// 			totalCount: sortedClients.length,
+		// 			pagesCount: Math.ceil(sortedClients.length / query.pageSize),
+		// 			pageSize: paginatedClients.length,
+		// 			data: paginatedClients,
+		// 		}
+		// 	: { data: paginatedClients }
 
 		const result = query.pagination
 			? {
-					totalCount: sortedClients.length,
-					pagesCount: Math.ceil(sortedClients.length / query.pageSize),
-					pageSize: paginatedClients.length,
-					data: paginatedClients,
+					totalCount: 0,
+					pagesCount: 0,
+					pageSize: 0,
+					data: [],
 				}
-			: { data: paginatedClients }
+			: { data: [] }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
 	}

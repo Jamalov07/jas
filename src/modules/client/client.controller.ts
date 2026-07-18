@@ -25,18 +25,25 @@ export class ClientController {
 		this.clientService = clientService
 	}
 
-	@Get('many-old')
+	@Get('many/first')
 	@ApiOkResponse({ type: ClientFindManyResponseDto })
 	@ApiOperation({ summary: 'get all clients' })
 	async findMany(@Query() query: ClientFindManyRequestDto): Promise<ClientFindManyResponseDto> {
 		return this.clientService.findMany(query)
 	}
 
-	@Get('many')
+	@Get('many/second')
 	@ApiOkResponse({ type: ClientFindManyResponseDto })
 	@ApiOperation({ summary: 'get all clients (optimized)' })
 	findManyNew(@Query() query: ClientFindManyRequestDto): Promise<ClientFindManyResponseDto> {
 		return this.clientService.findManyNew(query)
+	}
+
+	@Get('many')
+	@ApiOkResponse({ type: ClientFindManyResponseDto })
+	@ApiOperation({ summary: 'get all clients (fast — SQL debt aggregate, no history load)' })
+	findManyFast(@Query() query: ClientFindManyRequestDto): Promise<ClientFindManyResponseDto> {
+		return this.clientService.findManyFast(query)
 	}
 
 	@Get('many/report')

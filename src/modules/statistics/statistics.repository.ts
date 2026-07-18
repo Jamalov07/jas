@@ -11,7 +11,14 @@ import { ClientReportByCurrency, ClientReportCalc, ClientReportRow, StatisticsDa
 import { StatsTypeEnum } from '../selling/enums'
 
 import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
-import { convertUTCtoLocal, currencyBriefMapFromRows, extractDateParts, netDebtCrossCurrencyRows, withCurrencyBriefAmountMany } from '@common'
+import {
+	convertUTCtoLocal,
+	currencyBriefMapFromRows,
+	extractDateParts,
+	fetchSellingTotalsByCurrencyForPeriod,
+	netDebtCrossCurrencyRows,
+	withCurrencyBriefAmountMany,
+} from '@common'
 import { Decimal } from '@prisma/client/runtime/library'
 import { CurrencyRepository } from '../currency'
 
@@ -205,6 +212,54 @@ export class StatisticsRepository {
 		])
 
 		return { dailyByCurrency, weeklyByCurrency, monthlyByCurrency, yearlyByCurrency }
+	}
+
+	private mapSellingTotalSqlRows(rows: Awaited<ReturnType<typeof fetchSellingTotalsByCurrencyForPeriod>>) {
+		return rows.map((r) => ({
+			currencyId: r.currency_id,
+			total: this.sqlSumToDecimal(r.total),
+			currency: { id: r.currency_id, name: '', symbol: r.symbol },
+		}))
+	}
+
+	private sqlSumToDecimal(raw: unknown): Decimal {
+		if (raw == null) return new Decimal(0)
+		if (typeof raw === 'bigint') return new Decimal(raw.toString())
+		if (typeof raw === 'string' || typeof raw === 'number') return new Decimal(raw)
+		if (raw instanceof Decimal) return raw
+		if (typeof raw === 'object' && typeof (raw as { toString?: () => string }).toString === 'function') {
+			return new Decimal((raw as { toString(): string }).toString())
+		}
+		return new Decimal(0)
+	}
+
+	/** `GET /statistics/selling/total-fast` — faqat accepted sotuvlar, SQL SUM */
+	async getSellingTotalStatsFast() {
+		const now = convertUTCtoLocal(new Date())
+		const extracted = extractDateParts(now, 'day') as { year: number; month: number; day: number }
+
+		const dailyStart = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day, 0, 0, 0, 0))
+		const dailyEnd = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day, 23, 59, 59, 999))
+		const weeklyStart = convertUTCtoLocal(new Date(extracted.year, extracted.month, extracted.day - 6, 0, 0, 0, 0))
+		const weeklyEnd = dailyEnd
+		const monthlyStart = convertUTCtoLocal(new Date(extracted.year, extracted.month, 1, 0, 0, 0, 0))
+		const monthlyEnd = dailyEnd
+		const yearlyStart = convertUTCtoLocal(new Date(extracted.year, 0, 1, 0, 0, 0, 0))
+		const yearlyEnd = dailyEnd
+
+		const [dailyRows, weeklyRows, monthlyRows, yearlyRows] = await Promise.all([
+			fetchSellingTotalsByCurrencyForPeriod(this.prisma, dailyStart, dailyEnd),
+			fetchSellingTotalsByCurrencyForPeriod(this.prisma, weeklyStart, weeklyEnd),
+			fetchSellingTotalsByCurrencyForPeriod(this.prisma, monthlyStart, monthlyEnd),
+			fetchSellingTotalsByCurrencyForPeriod(this.prisma, yearlyStart, yearlyEnd),
+		])
+
+		return {
+			dailyByCurrency: this.mapSellingTotalSqlRows(dailyRows),
+			weeklyByCurrency: this.mapSellingTotalSqlRows(weeklyRows),
+			monthlyByCurrency: this.mapSellingTotalSqlRows(monthlyRows),
+			yearlyByCurrency: this.mapSellingTotalSqlRows(yearlyRows),
+		}
 	}
 
 	// ─── All Product MV (cross-module) ─────────────────────────────────────────

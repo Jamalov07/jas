@@ -28,12 +28,20 @@ export class StatisticsController {
 		return this.statisticsService.getSellingPeriodStats(query)
 	}
 
-	@Get('selling/total')
+	@Get('selling/total/first')
 	@ApiOkResponse({ type: StatisticsGetSellingTotalStatsResponseDto })
 	@ApiOperation({ summary: 'get selling total stats (daily + weekly + monthly + yearly)' })
 	@AuthOptions(false, false)
 	async getSellingTotalStats(@Query() query: StatisticsGetSellingTotalStatsRequestDto): Promise<StatisticsGetSellingTotalStatsResponseDto> {
 		return this.statisticsService.getSellingTotalStats(query)
+	}
+
+	@Get('selling/total')
+	@ApiOkResponse({ type: StatisticsGetSellingTotalStatsResponseDto })
+	@ApiOperation({ summary: 'get selling total stats (fast SQL + 5min cache, accepted only)' })
+	@AuthOptions(false, false)
+	async getSellingTotalStatsFast(@Query() query: StatisticsGetSellingTotalStatsRequestDto): Promise<StatisticsGetSellingTotalStatsResponseDto> {
+		return this.statisticsService.getSellingTotalStatsFast(query)
 	}
 
 	@Get('product-mv')

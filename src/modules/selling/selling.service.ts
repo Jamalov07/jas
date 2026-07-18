@@ -37,8 +37,11 @@ import { BotService } from '../bot'
 import { BotSellingProductTitleEnum, BotSellingTitleEnum } from './enums'
 import { computeClientDebtBeforeSellingFromClosingTotals } from './helpers/selling-channel-summary.helper'
 import { ClientService } from '../client'
+import type { ClientDebtByCurrency } from '../client/interfaces'
 import { CurrencyRepository } from '../currency'
 import { resolveBrandName } from '../shared/pdf/constants'
+
+type SellingListCurrency = { id: string; name: string; symbol: string; exchangeRate: Decimal }
 
 @Injectable()
 export class SellingService {
@@ -110,6 +113,138 @@ export class SellingService {
 		},
 	>(products: T[]) {
 		return products.map((p) => this.mapSellingLinePricesToObject(p))
+	}
+
+	private mapSellingProductsPricesWithCurrency<
+		T extends {
+			count: number
+			createdAt: Date
+			id: string
+			product: { id: string; name: string; createdAt: Date; image: string | null; description: string | null }
+			prices: Array<{
+				type: PriceTypeEnum
+				price: Decimal
+				discount?: Decimal | null
+				totalPrice: Decimal
+				currencyId: string
+				currency?: { id: string; name: string; symbol: string; exchangeRate: Decimal } | null
+			}>
+		},
+	>(products: T[], currencyMap: Map<string, SellingListCurrency>) {
+		return products.map((line) => {
+			const row = line.prices.find((p) => p.type === PriceTypeEnum.selling) ?? line.prices[0]
+			const currency = row
+				? row.currency
+					? {
+							id: row.currency.id,
+							name: row.currency.name,
+							symbol: row.currency.symbol,
+							exchangeRate: row.currency.exchangeRate,
+						}
+					: this.sellingListCurrencyOrFallback(row.currencyId, currencyMap)
+				: undefined
+
+			return {
+				id: line.id,
+				count: line.count,
+				createdAt: line.createdAt,
+				product: {
+					id: line.product.id,
+					name: line.product.name,
+					createdAt: line.product.createdAt,
+					image: line.product.image ?? '',
+					description: line.product.description ?? '',
+				},
+				prices: row
+					? {
+							selling: {
+								price: row.price,
+								discount: row.discount ?? new Decimal(0),
+								totalPrice: row.totalPrice,
+								currency,
+							},
+						}
+					: { selling: null },
+			}
+		})
+	}
+
+	private sellingListCurrencyOrFallback(currencyId: string, currencyMap: Map<string, SellingListCurrency>): SellingListCurrency {
+		return (
+			currencyMap.get(currencyId) ?? {
+				id: currencyId,
+				name: '',
+				symbol: '',
+				exchangeRate: new Decimal(0),
+			}
+		)
+	}
+
+	private collectSellingListCurrencyIds(sellings: Awaited<ReturnType<SellingRepository['findManyFastList']>>): string[] {
+		const ids = new Set<string>()
+		for (const selling of sellings) {
+			for (const product of selling.products) {
+				for (const price of product.prices) ids.add(price.currencyId)
+			}
+			for (const method of selling.payment?.paymentMethods ?? []) ids.add(method.currencyId)
+			for (const method of selling.payment?.changeMethods ?? []) ids.add(method.currencyId)
+		}
+		return [...ids]
+	}
+
+	private async buildSellingListCurrencyMap(currencyIds: string[]): Promise<Map<string, SellingListCurrency>> {
+		const unique = [...new Set(currencyIds.filter(Boolean))]
+		if (unique.length === 0) return new Map()
+
+		const [briefs, { rates }] = await Promise.all([this.currencyRepository.findBriefByIds(unique), this.currencyRepository.findExchangeRatesAndSymbolsByIds(unique)])
+
+		return new Map(
+			briefs.map((b) => [
+				b.id,
+				{
+					id: b.id,
+					name: b.name,
+					symbol: b.symbol,
+					exchangeRate: rates.get(b.id) ?? new Decimal(0),
+				},
+			]),
+		)
+	}
+
+	private buildPaymentDataWithCurrency(
+		csp:
+			| {
+					id: string
+					description?: string | null
+					createdAt: Date
+					paymentMethods: { type: string; currencyId: string; amount: Decimal }[]
+					changeMethods: { type: string; currencyId: string; amount: Decimal }[]
+			  }
+			| null
+			| undefined,
+		currencyMap: Map<string, SellingListCurrency>,
+	): SellingPaymentData | undefined {
+		if (!csp) return undefined
+		return {
+			id: csp.id,
+			description: csp.description,
+			createdAt: csp.createdAt,
+			paymentMethods: csp.paymentMethods.map((m) => ({
+				type: m.type as SellingPaymentData['paymentMethods'][number]['type'],
+				currencyId: m.currencyId,
+				amount: m.amount,
+				currency: {
+					id: m.currencyId,
+					name: currencyMap.get(m.currencyId)?.name ?? '',
+					symbol: currencyMap.get(m.currencyId)?.symbol ?? '',
+				},
+			})),
+			changeMethods: (csp.changeMethods ?? []).map((m) => ({
+				type: m.type as SellingPaymentData['changeMethods'][number]['type'],
+				currencyId: m.currencyId,
+				amount: m.amount,
+			})),
+		}
 	}
 
 	private calcDebtByCurrency(totalPrices: { currencyId: string; total: Decimal; currency?: { symbol: string } }[], payment: SellingPaymentData | undefined) {
@@ -298,6 +433,105 @@ export class SellingService {
 			: { data: sellingsWithDebtCurrency, calc, changeCalc, calcPage }
 
 		return createResponse({ data: result, success: { messages: ['find many success'] } })
+	}
+
+	/** Tez ro'yxat — yengil select, mijoz qarzi SQL aggregate (`GET /selling/many-fast`) */
+	async findManyFast(query: SellingFindManyRequest) {
+		const [sellings, sellingsCount, activeBriefRows] = await Promise.all([
+			this.sellingRepository.findManyFastList(query),
+			query.pagination ? this.sellingRepository.countFindMany(query) : Promise.resolve(0),
+			this.currencyRepository.findActiveBriefOrdered(),
+		])
+
+		const activeCurrencyIds = activeBriefRows.map((r) => r.id)
+		const activeBriefMap = currencyBriefMapFromRows(activeBriefRows.map(({ id, name, symbol }) => ({ id, name, symbol })))
+		const { rates: activeDebtRates, symbols: activeDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(activeCurrencyIds)
+		const calcPage = this.buildFindManyCalcPage(sellings, activeCurrencyIds, activeBriefMap, activeDebtRates, activeDebtSymbols)
+
+		const clientIds = [...new Set(sellings.map((s) => s.client.id))]
+		const clientDebtMap = clientIds.length ? await this.clientService.getDebtSnapshotsByClientIdsFast(clientIds) : new Map()
+		const clientsWithDebtObject: Record<string, ClientDebtByCurrency[]> = {}
+		for (const id of clientIds) {
+			clientsWithDebtObject[id] = clientDebtMap.get(id) ?? []
+		}
+
+		const listCurrencyMap = await this.buildSellingListCurrencyMap(this.collectSellingListCurrencyIds(sellings))
+
+		const sellingDebtCurrIds = new Set<string>()
+		for (const selling of sellings) {
+			const tp = this.calcTotalPricesFromProducts(selling.products)
+			const pay = this.buildPaymentData(selling.payment)
+			for (const d of this.calcDebtByCurrency(tp, pay)) sellingDebtCurrIds.add(d.currencyId)
+		}
+		const { rates: sellingDebtRates, symbols: sellingDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds([...sellingDebtCurrIds])
+
+		const calcMap = new Map<string, Decimal>()
+		const mappedSellings = sellings.map((selling) => {
+			for (const method of selling.payment?.paymentMethods ?? []) {
+				const key = `${method.type}_${method.currencyId}`
+				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(method.amount))
+			}
+			for (const ch of selling.payment?.changeMethods ?? []) {
+				const key = `change_${ch.type}_${ch.currencyId}`
+				calcMap.set(key, (calcMap.get(key) ?? new Decimal(0)).plus(ch.amount))
+			}
+
+			const totalPrices = this.calcTotalPricesFromProducts(selling.products)
+			const payment = this.buildPaymentDataWithCurrency(selling.payment, listCurrencyMap)
+			const debtByCurrency = netDebtCrossCurrencyRows(this.calcDebtByCurrency(totalPrices, payment), sellingDebtRates, sellingDebtSymbols)
+			const products = this.mapSellingProductsPricesWithCurrency(selling.products, listCurrencyMap)
+			const totalPayments = aggregateAmountsByCurrencyId(selling.payment?.paymentMethods)
+			const totalChanges = aggregateAmountsByCurrencyId(selling.payment?.changeMethods)
+
+			return {
+				...selling,
+				products,
+				payment,
+				totalPrices,
+				totalPayments,
+				totalChanges,
+				debtByCurrency,
+				client: { ...selling.client, debtByCurrency: clientsWithDebtObject[selling.client.id] || [] },
+			}
+		})
+
+		const calc: SellingCalcEntry[] = fillPaymentMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
+		const changeCalc: SellingChangeCalcEntry[] = fillChangeMethodCurrencyTotalsByActiveIds(activeCurrencyIds, calcMap)
+
+		const currencyIdsForBrief = new Set<string>()
+		for (const s of mappedSellings) {
+			for (const d of s.debtByCurrency) currencyIdsForBrief.add(d.currencyId)
+			for (const t of s.totalPayments) currencyIdsForBrief.add(t.currencyId)
+			for (const t of s.totalChanges) currencyIdsForBrief.add(t.currencyId)
+			for (const d of clientsWithDebtObject[s.client.id] ?? []) currencyIdsForBrief.add(d.currencyId)
+		}
+		const currencyBriefMap = currencyBriefMapFromRows(await this.currencyRepository.findBriefByIds([...currencyIdsForBrief]))
+		const sellingsWithDebtCurrency = mappedSellings.map((s) => ({
+			...s,
+			debtByCurrency: withCurrencyBriefAmountMany(s.debtByCurrency, currencyBriefMap),
+			totalPayments: withCurrencyBriefTotalMany(s.totalPayments, currencyBriefMap),
+			totalChanges: withCurrencyBriefTotalMany(s.totalChanges, currencyBriefMap),
+			client: {
+				...s.client,
+				debtByCurrency: withCurrencyBriefAmountMany(clientsWithDebtObject[s.client.id] ?? [], currencyBriefMap),
+			},
+		}))
+
+		const totalCount = query.pagination ? sellingsCount : sellingsWithDebtCurrency.length
+
+		const result = query.pagination
+			? {
+					totalCount,
+					pagesCount: Math.ceil(totalCount / query.pageSize),
+					pageSize: sellingsWithDebtCurrency.length,
+					data: sellingsWithDebtCurrency,
+					calc,
+					changeCalc,
+					calcPage,
+				}
+			: { data: sellingsWithDebtCurrency, calc, changeCalc, calcPage }
+
+		return createResponse({ data: result, success: { messages: ['find many fast success'] } })
 	}
 
 	async findOne(query: SellingFindOneRequest) {

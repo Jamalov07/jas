@@ -12,6 +12,27 @@ import {
 } from './interfaces'
 import { PriceTypeEnum, Prisma } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
+import { fetchProductLastSellingByIds } from '@common'
+
+const PRODUCT_LIST_LIGHT_SELECT = {
+	id: true,
+	count: true,
+	createdAt: true,
+	description: true,
+	name: true,
+	minAmount: true,
+	image: true,
+	prices: {
+		select: {
+			id: true,
+			type: true,
+			price: true,
+			totalPrice: true,
+			currencyId: true,
+			exchangeRate: true,
+		},
+	},
+} as const
 
 const PRICE_SELECT = {
 	id: true,
@@ -151,6 +172,43 @@ export class ProductRepository {
 			},
 			orderBy: [{ name: 'asc' }],
 		})
+	}
+
+	/** `GET /product/many-fast` — `sellingMVs` yuklanmaydi, lastSelling SQL batch orqali */
+	async findManyFastList(query: ProductFindManyRequest) {
+		let paginationOptions = {}
+		if (query.pagination) {
+			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
+		}
+
+		return this.prisma.productModel.findMany({
+			where: this.buildFindManyWhereInput(query),
+			select: PRODUCT_LIST_LIGHT_SELECT,
+			orderBy: [{ name: 'asc' }],
+			...paginationOptions,
+		})
+	}
+
+	async findAllIdsForMany(query: ProductFindManyRequest): Promise<Array<{ id: string; name: string }>> {
+		return this.prisma.productModel.findMany({
+			where: this.buildFindManyWhereInput(query),
+			select: { id: true, name: true },
+			orderBy: [{ name: 'asc' }],
+		})
+	}
+
+	async findManyLightByIds(ids: string[]) {
+		if (ids.length === 0) return []
+		const rows = await this.prisma.productModel.findMany({
+			where: { id: { in: ids } },
+			select: PRODUCT_LIST_LIGHT_SELECT,
+		})
+		const byId = new Map(rows.map((r) => [r.id, r]))
+		return ids.map((id) => byId.get(id)).filter(Boolean) as typeof rows
+	}
+
+	fetchLastSellingForProducts(productIds: string[], clientId?: string) {
+		return fetchProductLastSellingByIds(this.prisma, productIds, clientId)
 	}
 
 	/** `GET product/many-new` — valyuta JOIN siz narxlar, `clientId` bo‘lmasa `sellingMVs` yuklanmaydi. */

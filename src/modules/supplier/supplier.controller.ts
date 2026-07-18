@@ -25,18 +25,25 @@ export class SupplierController {
 		this.supplierService = supplierService
 	}
 
-	@Get('many-old')
+	@Get('many/first')
 	@ApiOkResponse({ type: SupplierFindManyResponseDto })
 	@ApiOperation({ summary: 'get all suppliers' })
 	async findMany(@Query() query: SupplierFindManyRequestDto): Promise<SupplierFindManyResponseDto> {
 		return this.supplierService.findMany({ ...query, isDeleted: false })
 	}
 
-	@Get('many')
+	@Get('many/second')
 	@ApiOkResponse({ type: SupplierFindManyResponseDto })
 	@ApiOperation({ summary: 'get all suppliers (optimized)' })
 	findManyNew(@Query() query: SupplierFindManyRequestDto): Promise<SupplierFindManyResponseDto> {
 		return this.supplierService.findManyNew({ ...query, isDeleted: false })
+	}
+
+	@Get('many')
+	@ApiOkResponse({ type: SupplierFindManyResponseDto })
+	@ApiOperation({ summary: 'get all suppliers (fast — SQL debt aggregate, no history load)' })
+	findManyFast(@Query() query: SupplierFindManyRequestDto): Promise<SupplierFindManyResponseDto> {
+		return this.supplierService.findManyFast({ ...query, isDeleted: false })
 	}
 
 	@Get('one')

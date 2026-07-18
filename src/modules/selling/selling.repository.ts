@@ -36,6 +36,47 @@ const SELLING_PAYMENT_SELECT = {
 	paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: SELLING_PAYMENT_LINE_SELECT },
 	changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: SELLING_PAYMENT_LINE_SELECT },
 }
+const SELLING_PAYMENT_LINE_LIGHT_SELECT = { type: true, currencyId: true, amount: true }
+const SELLING_PAYMENT_LIGHT_SELECT = {
+	id: true,
+	description: true,
+	createdAt: true,
+	paymentMethods: { orderBy: [{ createdAt: 'desc' as const }], select: SELLING_PAYMENT_LINE_LIGHT_SELECT },
+	changeMethods: { orderBy: [{ createdAt: 'desc' as const }], select: SELLING_PAYMENT_LINE_LIGHT_SELECT },
+}
+const SELLING_LIST_LIGHT_SELECT = {
+	id: true as const,
+	status: true as const,
+	publicId: true as const,
+	date: true as const,
+	description: true as const,
+	createdAt: true as const,
+	updatedAt: true as const,
+	deletedAt: true as const,
+	client: { select: { id: true, fullname: true, phone: true, description: true, createdAt: true } },
+	staff: { select: { id: true, fullname: true, phone: true, createdAt: true } },
+	payment: { select: SELLING_PAYMENT_LIGHT_SELECT },
+	products: {
+		orderBy: [{ createdAt: 'desc' as const }, { id: 'asc' as const }],
+		select: {
+			id: true,
+			count: true,
+			createdAt: true,
+			prices: {
+				orderBy: [{ createdAt: 'desc' as const }],
+				select: {
+					type: true,
+					price: true,
+					discount: true,
+					totalPrice: true,
+					currencyId: true,
+					currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } },
+				},
+			},
+			product: { select: { id: true, name: true, createdAt: true, image: true, description: true } },
+		},
+	},
+}
 const SELLING_SELECT = {
 	id: true as const,
 	status: true as const,
@@ -129,6 +170,21 @@ export class SellingRepository {
 		})
 
 		return sellings
+	}
+
+	/** `GET /selling/many-fast` — valyuta JOIN siz yengil select */
+	async findManyFastList(query: SellingFindManyRequest) {
+		let paginationOptions = {}
+		if (query.pagination) {
+			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
+		}
+
+		return this.prisma.sellingModel.findMany({
+			where: this.sellingFindManyWhere(query),
+			orderBy: [{ date: 'desc' }],
+			select: SELLING_LIST_LIGHT_SELECT,
+			...paginationOptions,
+		})
 	}
 
 	async findOne(query: SellingFindOneRequest) {

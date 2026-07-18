@@ -10,6 +10,16 @@ import {
 	SupplierUpdateOneRequest,
 } from './interfaces'
 import { PriceTypeEnum, Prisma } from '@prisma/client'
+import { aggregateSupplierDebtByIds, fetchSupplierLastArrivalDates } from '@common'
+
+/** Ro'yxat uchun yengil select — tarix yuklanmaydi */
+const SUPPLIER_LIST_LIGHT_SELECT = {
+	id: true,
+	fullname: true,
+	phone: true,
+	description: true,
+	createdAt: true,
+} as const
 
 /** `SupplierService.calcDebtByCurrency` uchun */
 const SUPPLIER_DEBT_SOURCE_SELECT = {
@@ -72,6 +82,13 @@ export class SupplierRepository {
 		return {
 			...idPart,
 			...this.buildSupplierSearchFilter(query.search),
+		}
+	}
+
+	private supplierFindManyNewWhere(query: SupplierFindManyRequest): Prisma.SupplierModelWhereInput {
+		return {
+			deletedAt: query.isDeleted === true ? { not: null } : null,
+			...this.supplierFindManyWhere(query),
 		}
 	}
 
@@ -167,6 +184,46 @@ export class SupplierRepository {
 		return count
 	}
 
+	/** `GET /supplier/many-fast` — faqat asosiy maydonlar, pagination DB da */
+	async findManyFastLight(query: SupplierFindManyRequest) {
+		let paginationOptions = {}
+		if (query.pagination) {
+			paginationOptions = { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize }
+		}
+
+		return this.prisma.supplierModel.findMany({
+			where: this.supplierFindManyNewWhere(query),
+			select: SUPPLIER_LIST_LIGHT_SELECT,
+			...paginationOptions,
+		})
+	}
+
+	async findAllIdsForMany(query: SupplierFindManyRequest): Promise<string[]> {
+		const rows = await this.prisma.supplierModel.findMany({
+			where: this.supplierFindManyNewWhere(query),
+			select: { id: true },
+		})
+		return rows.map((r) => r.id)
+	}
+
+	async findManyLightByIds(ids: string[]) {
+		if (ids.length === 0) return []
+		const rows = await this.prisma.supplierModel.findMany({
+			where: { id: { in: ids } },
+			select: SUPPLIER_LIST_LIGHT_SELECT,
+		})
+		const byId = new Map(rows.map((r) => [r.id, r]))
+		return ids.map((id) => byId.get(id)).filter(Boolean) as typeof rows
+	}
+
+	aggregateDebtBySupplierIds(supplierIds: string[]) {
+		return aggregateSupplierDebtByIds(this.prisma, supplierIds)
+	}
+
+	fetchLastArrivalDates(supplierIds: string[]) {
+		return fetchSupplierLastArrivalDates(this.prisma, supplierIds)
+	}
+
 	async getMany(query: SupplierGetManyRequest) {
 		let paginationOptions = {}
 		if (query.pagination) {
@@ -205,10 +262,7 @@ export class SupplierRepository {
 	}
 
 	async findManyNew(query: SupplierFindManyRequest & { fetchAll?: boolean }) {
-		const where: Prisma.SupplierModelWhereInput = {
-			deletedAt: query.isDeleted === true ? { not: null } : null,
-			...this.supplierFindManyWhere(query),
-		}
+		const where = this.supplierFindManyNewWhere(query)
 
 		const paginationOptions = query.pagination && !query.fetchAll ? { take: query.pageSize, skip: (query.pageNumber - 1) * query.pageSize } : {}
 
@@ -228,10 +282,7 @@ export class SupplierRepository {
 
 	async countFindManyNew(query: SupplierFindManyRequest): Promise<number> {
 		return this.prisma.supplierModel.count({
-			where: {
-				deletedAt: query.isDeleted === true ? { not: null } : null,
-				...this.supplierFindManyWhere(query),
-			},
+			where: this.supplierFindManyNewWhere(query),
 		})
 	}
 

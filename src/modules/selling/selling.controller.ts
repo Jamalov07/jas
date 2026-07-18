@@ -28,6 +28,13 @@ export class SellingController {
 		return this.sellingService.findMany({ ...query, isDeleted: false })
 	}
 
+	@Get('many-fast')
+	@ApiOkResponse({ type: SellingFindManyResponseDto })
+	@ApiOperation({ summary: 'get all sellings (fast — light select, SQL client debt)' })
+	async findManyFast(@Query() query: SellingFindManyRequestDto): Promise<SellingFindManyResponseDto> {
+		return this.sellingService.findManyFast({ ...query, isDeleted: false })
+	}
+
 	@Get('one')
 	@ApiOperation({ summary: 'find one selling' })
 	@ApiOkResponse({ type: SellingFindOneResponseDto })
