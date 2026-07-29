@@ -35,7 +35,7 @@ import { ExcelService } from '../shared'
 import { Response } from 'express'
 import { BotService } from '../bot'
 import { BotSellingProductTitleEnum, BotSellingTitleEnum } from './enums'
-import { computeClientDebtBeforeSellingFromClosingTotals } from './helpers/selling-channel-summary.helper'
+import { computeClientDebtBeforeSellingFromClosingTotals, netSellingDebtRowsForDisplay } from './helpers/selling-channel-summary.helper'
 import { ClientService } from '../client'
 import type { ClientDebtByCurrency } from '../client/interfaces'
 import { CurrencyRepository } from '../currency'
@@ -304,9 +304,9 @@ export class SellingService {
 		}))
 	}
 
-	/** Joriy `findMany` sahifasidagi barcha sellinglar bo‘yicha yig‘indilar */
+	/** Joriy `findMany` / `findManyFast` sahifasidagi barcha sellinglar bo‘yicha yig‘indilar */
 	private buildFindManyCalcPage(
-		sellings: Awaited<ReturnType<SellingRepository['findMany']>>,
+		sellings: Awaited<ReturnType<SellingRepository['findMany']>> | Awaited<ReturnType<SellingRepository['findManyFastList']>>,
 		activeCurrencyIds: string[],
 		briefMap: Map<string, CurrencyBrief>,
 		debtRates: Map<string, Decimal>,
@@ -632,11 +632,13 @@ export class SellingService {
 
 				const invoiceDebt = this.calcDebtByCurrency2(totalPrices, payment)
 
-				const clientDebtBeforeSellingResolved = computeClientDebtBeforeSellingFromClosingTotals(
+				const clientDebtBeforeSellingRaw = computeClientDebtBeforeSellingFromClosingTotals(
 					clientResult.data.debtByCurrency as SellingDebtByCurrencyRow[] | undefined,
 					totalPrices,
 					payment,
 				)
+				const { rates: oldDebtRates, symbols: oldDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(clientDebtBeforeSellingRaw.map((r) => r.currencyId))
+				const clientDebtBeforeSellingResolved = netSellingDebtRowsForDisplay(clientDebtBeforeSellingRaw, oldDebtRates, oldDebtSymbols)
 
 				const sellingInfo = {
 					...selling,
@@ -721,11 +723,13 @@ export class SellingService {
 
 				const invoiceDebt = this.calcDebtByCurrency2(totalPrices, payment)
 
-				const clientDebtBeforeSellingForBot = computeClientDebtBeforeSellingFromClosingTotals(
+				const clientDebtBeforeSellingRaw = computeClientDebtBeforeSellingFromClosingTotals(
 					clientResult.data.debtByCurrency as SellingDebtByCurrencyRow[] | undefined,
 					totalPrices,
 					payment,
 				)
+				const { rates: oldDebtRates, symbols: oldDebtSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(clientDebtBeforeSellingRaw.map((r) => r.currencyId))
+				const clientDebtBeforeSellingForBot = netSellingDebtRowsForDisplay(clientDebtBeforeSellingRaw, oldDebtRates, oldDebtSymbols)
 
 				const sellingInfo = {
 					...updatedSelling,

@@ -384,8 +384,9 @@ export class PdfService {
 
 	/** KAS PDF: valyuta bo‘yicha bir qator — o‘ngga tekislangan stack */
 	private kasMoneyRowsStackRight(rows: Array<{ amount: Decimal; currency?: { symbol: string } }> | undefined): Content[] {
-		if (!rows?.length) return []
-		return rows.map(
+		const nonzero = (rows ?? []).filter((r) => r.amount && !r.amount.isZero())
+		if (!nonzero.length) return []
+		return nonzero.map(
 			(r): Content => ({
 				text: `${r.amount.toNumber()} ${r.currency?.symbol ?? ''}`.trim(),
 				fontSize: 11,

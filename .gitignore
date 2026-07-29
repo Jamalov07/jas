@@ -15,6 +15,7 @@ lerna-debug.log*
 uploads/*
 !uploads/index.md
 ok.json
+/backups
 
 # OS
 .DS_Store

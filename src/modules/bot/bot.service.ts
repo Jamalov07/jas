@@ -255,8 +255,9 @@ export class BotService {
 	}
 
 	private formatDebt(debtByCurrency: DebtEntry[]): string {
-		if (!debtByCurrency.length) return '0'
-		return debtByCurrency.map((d) => `${d.amount.toNumber()} ${d.currency.symbol}`).join(' + ')
+		const nonzero = debtByCurrency.filter((d) => d.amount && !d.amount.isZero())
+		if (!nonzero.length) return '0'
+		return nonzero.map((d) => `${d.amount.toNumber()} ${d.currency.symbol}`).join(' + ')
 	}
 
 	private buildPaymentMessage(params: {

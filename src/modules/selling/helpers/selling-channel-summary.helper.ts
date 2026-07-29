@@ -1,4 +1,5 @@
 import { Decimal } from '@prisma/client/runtime/library'
+import { netDebtCrossCurrencyRows } from '@common'
 import type { SellingDebtByCurrencyRow, SellingFindOneData, SellingPaymentData } from '../interfaces'
 
 const emptyBrief = (currencyId: string): SellingDebtByCurrencyRow['currency'] => ({
@@ -45,10 +46,38 @@ export function computeClientDebtBeforeSellingFromClosingTotals(
 	return out.filter((r) => !r.amount.isZero())
 }
 
+/**
+ * +/− aralash valyutali qarzni `exchange_rate` bo‘yicha tekislaydi (API/clientdagi `netDebtCrossCurrencyRows` bilan bir xil).
+ * Nol qatorlar chiqarib tashlanadi — caption/PDF da «-22 USD + 266200 UZS» ko‘rinmasligi uchun.
+ */
+export function netSellingDebtRowsForDisplay(rows: SellingDebtByCurrencyRow[] | undefined, rates: Map<string, Decimal>, symbols: Map<string, string>): SellingDebtByCurrencyRow[] {
+	if (!rows?.length) return []
+	const currencyById = new Map(rows.map((r) => [r.currencyId, r.currency]))
+	const symbolMap = new Map(symbols)
+	for (const r of rows) {
+		if (!symbolMap.has(r.currencyId) && r.currency?.symbol) {
+			symbolMap.set(r.currencyId, r.currency.symbol)
+		}
+	}
+	const netted = netDebtCrossCurrencyRows(
+		rows.map((r) => ({ currencyId: r.currencyId, amount: r.amount })),
+		rates,
+		symbolMap,
+	)
+	return netted
+		.filter((r) => !r.amount.isZero())
+		.map((r) => ({
+			currencyId: r.currencyId,
+			amount: r.amount,
+			currency: currencyById.get(r.currencyId) ?? emptyBrief(r.currencyId),
+		}))
+}
+
 /** Ko‘p valyutali qarz / summa — Telegram caption va PDF ostki qismi uchun */
 export function formatSellingMoneyRows(rows: { amount: Decimal; currency: { symbol: string } }[] | undefined): string {
-	if (!rows?.length) return '0'
-	return rows.map((r) => `${r.amount.toNumber()} ${r.currency.symbol}`).join(' + ')
+	const nonzero = (rows ?? []).filter((r) => r.amount && !r.amount.isZero())
+	if (!nonzero.length) return '0'
+	return nonzero.map((r) => `${r.amount.toNumber()} ${r.currency.symbol}`).join(' + ')
 }
 
 export function formatSellingTotalPrices(totalPrices: SellingFindOneData['totalPrices']): string {
