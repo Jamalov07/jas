@@ -186,6 +186,9 @@ export class SellingService {
 			for (const product of selling.products) {
 				for (const price of product.prices) ids.add(price.currencyId)
 			}
+			for (const product of selling.deletedProducts ?? []) {
+				for (const price of product.prices) ids.add(price.currencyId)
+			}
 			for (const method of selling.payment?.paymentMethods ?? []) ids.add(method.currencyId)
 			for (const method of selling.payment?.changeMethods ?? []) ids.add(method.currencyId)
 		}
@@ -383,12 +386,14 @@ export class SellingService {
 			const payment = this.buildPaymentData(selling.payment)
 			const debtByCurrency = netDebtCrossCurrencyRows(this.calcDebtByCurrency(totalPrices, payment), sellingDebtRates, sellingDebtSymbols)
 			const products = this.mapSellingProductsPrices(selling.products)
+			const deletedProducts = this.mapSellingProductsPrices(selling.deletedProducts ?? [])
 			const totalPayments = aggregateAmountsByCurrencyId(selling.payment?.paymentMethods)
 			const totalChanges = aggregateAmountsByCurrencyId(selling.payment?.changeMethods)
 
 			return {
 				...selling,
 				products,
+				deletedProducts,
 				payment,
 				totalPrices,
 				totalPayments,
@@ -480,12 +485,14 @@ export class SellingService {
 			const payment = this.buildPaymentDataWithCurrency(selling.payment, listCurrencyMap)
 			const debtByCurrency = netDebtCrossCurrencyRows(this.calcDebtByCurrency(totalPrices, payment), sellingDebtRates, sellingDebtSymbols)
 			const products = this.mapSellingProductsPricesWithCurrency(selling.products, listCurrencyMap)
+			const deletedProducts = this.mapSellingProductsPricesWithCurrency(selling.deletedProducts ?? [], listCurrencyMap)
 			const totalPayments = aggregateAmountsByCurrencyId(selling.payment?.paymentMethods)
 			const totalChanges = aggregateAmountsByCurrencyId(selling.payment?.changeMethods)
 
 			return {
 				...selling,
 				products,
+				deletedProducts,
 				payment,
 				totalPrices,
 				totalPayments,
@@ -547,6 +554,7 @@ export class SellingService {
 		const { rates: oneSellingRates, symbols: oneSellingSymbols } = await this.currencyRepository.findExchangeRatesAndSymbolsByIds(debtRaw.map((d) => d.currencyId))
 		const debtByCurrencyNet = netDebtCrossCurrencyRows(debtRaw, oneSellingRates, oneSellingSymbols)
 		const products = this.mapSellingProductsPrices(selling.products)
+		const deletedProducts = this.mapSellingProductsPrices(selling.deletedProducts ?? [])
 		const totalPayments = aggregateAmountsByCurrencyId(selling.payment?.paymentMethods)
 		const totalChanges = aggregateAmountsByCurrencyId(selling.payment?.changeMethods)
 
@@ -565,6 +573,7 @@ export class SellingService {
 			data: {
 				...selling,
 				products,
+				deletedProducts,
 				payment,
 				totalPrices,
 				totalPayments: withCurrencyBriefTotalMany(totalPayments, currencyBriefMap),
@@ -670,6 +679,7 @@ export class SellingService {
 		const data = {
 			...selling,
 			products: this.mapSellingProductsPrices(selling.products),
+			deletedProducts: this.mapSellingProductsPrices(selling.deletedProducts ?? []),
 			totalPrices: this.calcTotalPricesFromProducts(selling.products),
 			payment: this.buildPaymentData(selling.payment),
 		}

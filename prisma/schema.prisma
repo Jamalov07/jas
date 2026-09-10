@@ -148,6 +148,7 @@ model CurrencyModel {
   productPrices     ProductPriceModel[]
 
   sellingMVPrices   SellingProductMVPriceModel[]
+  deletedSellingMVPrices DeletedSellingProductMVPriceModel[]
   arrivalMVPrices   ArrivalProductMVPriceModel[]
   returningMVPrices ReturningProductMVPriceModel[]
 
@@ -254,6 +255,7 @@ model StaffModel {
   returnings   ReturningModel[]
 
   sellingMVs   SellingProductMVModel[]
+  deletedSellingMVs DeletedSellingProductMVModel[]
   arrivalMVs   ArrivalProductMVModel[]
   returningMVs ReturningProductMVModel[]
 
@@ -293,6 +295,7 @@ model ProductModel {
 
   prices       ProductPriceModel[]
   sellingMVs   SellingProductMVModel[]
+  deletedSellingMVs DeletedSellingProductMVModel[]
   arrivalMVs   ArrivalProductMVModel[]
   returningMVs ReturningProductMVModel[]
 
@@ -348,6 +351,7 @@ model SellingModel {
   staff    StaffModel              @relation(fields: [staffId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
   
   products SellingProductMVModel[]
+  deletedProducts DeletedSellingProductMVModel[]
   payment ClientSellingPaymentModel?
 
   createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
@@ -410,6 +414,55 @@ model SellingProductMVPriceModel {
   @@index([currencyId])
   @@unique([type, productMVId])
   @@map("selling_product_mv_price")
+}
+
+model DeletedSellingProductMVModel {
+  id        String @map("id")         @db.Uuid    @default(dbgenerated("GEN_RANDOM_UUID()"))
+  count     Int    @map("count")      @db.Integer @default(1)
+  productId String @map("product_id") @db.Uuid
+  sellingId String @map("selling_id") @db.Uuid
+  staffId   String @map("staff_id")   @db.Uuid
+
+  product ProductModel @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  selling SellingModel @relation(fields: [sellingId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  staff   StaffModel   @relation(fields: [staffId],   references: [id], onDelete: Cascade, onUpdate: NoAction)
+  prices  DeletedSellingProductMVPriceModel[]
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@index([id])
+  @@index([sellingId])
+  @@index([productId])
+  @@index([createdAt])
+  @@map("deleted_selling_product_mv")
+}
+
+model DeletedSellingProductMVPriceModel {
+  id          String        @map("id")                    @db.Uuid           @default(dbgenerated("GEN_RANDOM_UUID()"))
+  type        PriceTypeEnum @map("type")
+  price       Decimal       @map("price")                 @db.Decimal(18, 3) @default(0)
+  /// Chegirma foizi (0–100), masalan 10 = 10%
+  discount    Decimal?      @map("discount")              @db.Decimal(6, 3)  @default(0)
+  totalPrice  Decimal       @map("total_price")           @db.Decimal(18, 3) @default(0)
+  currencyId  String        @map("currency_id")           @db.Uuid
+  productMVId String        @map("product_mv_id") @db.Uuid
+
+  currency  CurrencyModel                @relation(fields: [currencyId],  references: [id], onDelete: Cascade, onUpdate: NoAction)
+  productMV DeletedSellingProductMVModel @relation(fields: [productMVId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@index([id])
+  @@index([productMVId])
+  @@index([currencyId])
+  @@unique([type, productMVId])
+  @@map("deleted_selling_product_mv_price")
 }
 
 model ClientSellingPaymentModel {

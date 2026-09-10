@@ -5,7 +5,15 @@ import { ConfigService } from '@nestjs/config'
 import { ActionMethodEnum, PrismaClient } from '@prisma/client'
 import { actionDescriptionConverter } from '../../../common/helper'
 
-const MODELS_WITHOUT_CREATED_AT = ['ActionModel', 'BotUserModel', 'ProductPriceModel', 'SellingProductMVPriceModel', 'ArrivalProductMVPriceModel', 'ReturningProductMVPriceModel']
+const MODELS_WITHOUT_CREATED_AT = [
+	'ActionModel',
+	'BotUserModel',
+	'ProductPriceModel',
+	'SellingProductMVPriceModel',
+	'DeletedSellingProductMVPriceModel',
+	'ArrivalProductMVPriceModel',
+	'ReturningProductMVPriceModel',
+]
 
 /** Nest `RequestMethod` nomi (kichik) → Prisma `ActionMethodEnum` (faqat DBda borlar) */
 const NEST_VERB_TO_ACTION: Record<string, ActionMethodEnum> = {
@@ -21,6 +29,7 @@ const MODELS_WITHOUT_DELETED_AT = [
 	'BotUserModel',
 	'ProductPriceModel',
 	'SellingProductMVPriceModel',
+	'DeletedSellingProductMVPriceModel',
 	'ArrivalProductMVPriceModel',
 	'ReturningProductMVPriceModel',
 	'DayCloseLog',

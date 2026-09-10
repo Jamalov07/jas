@@ -96,6 +96,9 @@ export class SellingFindOneDataDto extends PickType(SellingRequiredDto, ['id', '
 
 	@ApiPropertyOptional()
 	products?: any[]
+
+	@ApiPropertyOptional()
+	deletedProducts?: any[]
 }
 
 export class SellingFindManyDataDto extends PaginationResponseDto implements SellingFindManyData {

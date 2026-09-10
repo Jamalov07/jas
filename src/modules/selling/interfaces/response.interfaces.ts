@@ -110,6 +110,7 @@ export declare interface SellingFindOneData extends Pick<SellingRequired, 'id' |
 	totalChanges?: Array<{ currencyId: string; total: Decimal; currency: { id: string; name: string; symbol: string } }>
 	payment?: SellingPaymentData
 	products?: SellingProductData[]
+	deletedProducts?: SellingProductData[]
 }
 
 export declare interface SellingFindManyResponse extends GlobalResponse {

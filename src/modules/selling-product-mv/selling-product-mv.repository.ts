@@ -11,7 +11,7 @@ import { PriceTypeEnum, SellingStatusEnum } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { calcSellingLineTotalPrice } from '@common'
 
-const PRICES_SELECT = { id: true, type: true, price: true, discount: true, totalPrice: true, currencyId: true, currency: { select: { symbol: true, id: true } } }
+const PRICES_SELECT = { id: true, type: true, price: true, discount: true, totalPrice: true, currencyId: true, createdAt: true, currency: { select: { symbol: true, id: true } } }
 
 const SELLING_MV_SELECT = {
 	id: true,
@@ -172,13 +172,41 @@ export class SellingProductMVRepository {
 
 	async deleteOne(query: SellingProductMVDeleteOneRequest) {
 		const existing = await this.findOne(query)
+		if (!existing) return
 
-		await this.prisma.sellingProductMVModel.delete({ where: { id: query.id } })
+		await this.prisma.$transaction(async (tx) => {
+			await tx.deletedSellingProductMVModel.create({
+				data: {
+					id: existing.id,
+					count: existing.count,
+					productId: existing.productId,
+					sellingId: existing.sellingId,
+					staffId: existing.staffId,
+					createdAt: existing.createdAt,
+					prices: {
+						create: (existing.prices ?? []).map((price) => ({
+							id: price.id,
+							type: price.type,
+							price: price.price,
+							discount: price.discount ?? new Decimal(0),
+							totalPrice: price.totalPrice,
+							currencyId: price.currencyId,
+							createdAt: price.createdAt,
+						})),
+					},
+				},
+			})
 
-		if (existing?.selling?.status === SellingStatusEnum.accepted) {
-			const newCount = (existing?.product?.count ?? 0) + (existing?.count ?? 0)
-			await this.prisma.productModel.update({ where: { id: existing?.product?.id }, data: { count: { increment: existing?.count } } })
-			await this.syncProductPrices(existing?.product?.id, newCount)
-		}
+			await tx.sellingProductMVModel.delete({ where: { id: query.id } })
+
+			if (existing.selling?.status === SellingStatusEnum.accepted) {
+				const newCount = (existing.product?.count ?? 0) + (existing.count ?? 0)
+				await tx.productModel.update({ where: { id: existing.product?.id }, data: { count: { increment: existing.count } } })
+				const prices = await tx.productPriceModel.findMany({ where: { productId: existing.productId }, select: { id: true, type: true, price: true } })
+				for (const p of prices) {
+					await tx.productPriceModel.update({ where: { id: p.id }, data: { totalPrice: new Decimal(newCount).mul(p.price) } })
+				}
+			}
+		})
 	}
 }

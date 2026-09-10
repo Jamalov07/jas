@@ -28,6 +28,7 @@ const PRODUCT_MV_SELECT = {
 	prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRODUCT_MV_PRICE_SELECT },
 	product: { select: { id: true, name: true, createdAt: true, image: true, description: true } },
 }
+const DELETED_PRODUCT_MV_SELECT = PRODUCT_MV_SELECT
 const SELLING_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { id: true, name: true, symbol: true } } }
 const SELLING_PAYMENT_SELECT = {
 	id: true,
@@ -76,6 +77,26 @@ const SELLING_LIST_LIGHT_SELECT = {
 			product: { select: { id: true, name: true, createdAt: true, image: true, description: true } },
 		},
 	},
+	deletedProducts: {
+		orderBy: [{ createdAt: 'desc' as const }, { id: 'asc' as const }],
+		select: {
+			id: true,
+			count: true,
+			createdAt: true,
+			prices: {
+				orderBy: [{ createdAt: 'desc' as const }],
+				select: {
+					type: true,
+					price: true,
+					discount: true,
+					totalPrice: true,
+					currencyId: true,
+					currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } },
+				},
+			},
+			product: { select: { id: true, name: true, createdAt: true, image: true, description: true } },
+		},
+	},
 }
 const SELLING_SELECT = {
 	id: true as const,
@@ -92,6 +113,10 @@ const SELLING_SELECT = {
 	products: {
 		orderBy: [{ createdAt: 'desc' as const }, { id: 'asc' as const }],
 		select: PRODUCT_MV_SELECT,
+	},
+	deletedProducts: {
+		orderBy: [{ createdAt: 'desc' as const }, { id: 'asc' as const }],
+		select: DELETED_PRODUCT_MV_SELECT,
 	},
 }
 
@@ -193,6 +218,38 @@ export class SellingRepository {
 			select: {
 				...SELLING_SELECT,
 				products: {
+					orderBy: [{ createdAt: 'desc' as const }],
+					select: {
+						id: true,
+						count: true,
+						createdAt: true,
+						prices: {
+							orderBy: [{ createdAt: 'desc' as const }],
+							select: {
+								type: true,
+								price: true,
+								discount: true,
+								totalPrice: true,
+								currencyId: true,
+								currency: { select: { symbol: true, id: true, name: true, exchangeRate: true } },
+							},
+						},
+						product: {
+							select: {
+								id: true,
+								name: true,
+								createdAt: true,
+								image: true,
+								description: true,
+								prices: {
+									orderBy: [{ createdAt: 'desc' as const }],
+									select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } },
+								},
+							},
+						},
+					},
+				},
+				deletedProducts: {
 					orderBy: [{ createdAt: 'desc' as const }],
 					select: {
 						id: true,
