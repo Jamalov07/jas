@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { ProductOptional, ProductRequired } from '../interfaces'
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator'
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator'
 import { Transform } from 'class-transformer'
 
 export class ProductRequiredDto extends DefaultRequiredFieldsDto implements ProductRequired {
@@ -61,4 +61,9 @@ export class ProductOptionalDto extends DefaultOptionalFieldsDto implements Prod
 	@ApiPropertyOptional({ type: 'string', format: 'binary', description: 'image file' })
 	@IsOptional()
 	image?: any
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	categoryId?: string
 }

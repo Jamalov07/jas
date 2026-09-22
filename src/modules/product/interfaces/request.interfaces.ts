@@ -36,11 +36,13 @@ export declare interface ProductGetManyRequest extends ProductOptional, Paginati
 
 export declare interface ProductGetOneRequest extends ProductOptional {}
 
-export declare interface ProductCreateOneRequest extends Pick<ProductRequired, 'name' | 'count' | 'minAmount' | 'image'>, Pick<ProductOptional, 'description'> {
+export declare interface ProductCreateOneRequest
+	extends Pick<ProductRequired, 'name' | 'count' | 'minAmount' | 'image'>,
+		Pick<ProductOptional, 'description' | 'categoryId'> {
 	prices: ProductPricesInput
 }
 
-export declare interface ProductUpdateOneRequest extends Pick<ProductOptional, 'name' | 'deletedAt' | 'count' | 'minAmount' | 'description' | 'image'> {
+export declare interface ProductUpdateOneRequest extends Pick<ProductOptional, 'name' | 'deletedAt' | 'count' | 'minAmount' | 'description' | 'image' | 'categoryId'> {
 	prices?: ProductPricesUpdateInput
 }
 

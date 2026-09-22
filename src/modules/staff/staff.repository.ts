@@ -41,6 +41,7 @@ export class StaffRepository {
 				fullname: true,
 				phone: true,
 				actions: true,
+				isActive: true,
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -60,6 +61,7 @@ export class StaffRepository {
 				pages: true,
 				phone: true,
 				actions: true,
+				isActive: true,
 				updatedAt: true,
 				createdAt: true,
 				deletedAt: true,
@@ -105,7 +107,7 @@ export class StaffRepository {
 
 		const staff = await this.prisma.staffModel.findFirst({
 			where: { id: query.id, fullname: query.fullname, phone: query.phone, ...whereOptionsPart },
-			select: { id: true, fullname: true, phone: true, currency: true, createdAt: true, deletedAt: true, password: true, token: true, pages: true },
+			select: { id: true, fullname: true, phone: true, currency: true, createdAt: true, deletedAt: true, password: true, token: true, pages: true, isActive: true },
 		})
 
 		return staff
@@ -128,6 +130,7 @@ export class StaffRepository {
 				fullname: body.fullname,
 				password: body.password,
 				phone: body.phone,
+				isActive: body.isActive,
 				actions: { connect: body.actionsToConnect.map((r) => ({ id: r })) },
 				pages: body.pagesToConnect,
 			},
@@ -136,6 +139,7 @@ export class StaffRepository {
 				createdAt: true,
 				fullname: true,
 				phone: true,
+				isActive: true,
 				actions: { select: { id: true, description: true, method: true, url: true, name: true, permission: true } },
 			},
 		})
@@ -167,9 +171,10 @@ export class StaffRepository {
 				fullname: body.fullname,
 				password: body.password,
 				phone: body.phone,
-				token: body.token,
+				token: body.isActive === false ? '' : body.token,
 				currencyId: body.currencyId,
 				deletedAt: body.deletedAt,
+				isActive: body.isActive,
 				actions: {
 					connect: (body.actionsToConnect ?? []).map((r) => ({ id: r })),
 					disconnect: (body.actionsToDisconnect ?? []).map((r) => ({ id: r })),

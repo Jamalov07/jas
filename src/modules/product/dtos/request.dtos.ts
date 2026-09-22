@@ -103,7 +103,7 @@ export class ProductFindManyRequestDto
 export class ProductFindOneRequestDto extends IntersectionType(PickType(ProductRequiredDto, ['id'])) implements ProductFindOneRequest {}
 
 export class ProductCreateOneRequestDto
-	extends IntersectionType(PickType(ProductRequiredDto, ['name', 'count', 'minAmount']), PickType(ProductOptionalDto, ['description', 'image']))
+	extends IntersectionType(PickType(ProductRequiredDto, ['name', 'count', 'minAmount']), PickType(ProductOptionalDto, ['description', 'image', 'categoryId']))
 	implements ProductCreateOneRequest
 {
 	@ApiProperty({ type: ProductPricesInputDto })
@@ -122,7 +122,7 @@ export class ProductCreateOneRequestDto
 }
 
 export class ProductUpdateOneRequestDto
-	extends IntersectionType(PickType(ProductOptionalDto, ['name', 'deletedAt', 'count', 'minAmount', 'description', 'image']))
+	extends IntersectionType(PickType(ProductOptionalDto, ['name', 'deletedAt', 'count', 'minAmount', 'description', 'image', 'categoryId']))
 	implements ProductUpdateOneRequest
 {
 	@ApiPropertyOptional({ type: ProductPricesUpdateInputDto })
@@ -210,6 +210,11 @@ export class ProductCreateOne2RequestDto {
 
 	@ApiPropertyOptional({ type: 'string', format: 'binary', description: 'image file' })
 	image?: any
+
+	@ApiPropertyOptional({ type: String })
+	@IsOptional()
+	@IsUUID('4')
+	categoryId?: string
 }
 
 export class ProductUpdateOne2RequestDto extends PartialType(ProductCreateOne2RequestDto) {}

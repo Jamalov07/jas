@@ -243,6 +243,8 @@ model StaffModel {
   password   String       @map("password")    @db.VarChar()
   token      String?      @map("token")       @db.VarChar()
   type       StaffTypeEnum                                        @default(staff)
+  /// Login ruxsati: false bo‘lsa kirish mumkin emas
+  isActive   Boolean      @map("is_active")                       @default(true)
   pages      PageEnum[]                                           @default([])
   currencyId String?      @map("currency_id") @db.Uuid
 
@@ -284,6 +286,22 @@ model StaffModel {
 // Product
 // ─────────────────────────────────────────────────────────────────────────────
 
+model ProductCategoryModel {
+  id   String @map("id")   @db.Uuid      @default(dbgenerated("GEN_RANDOM_UUID()"))
+  name String @map("name") @db.VarChar() @unique
+
+  products ProductModel[]
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz @default(dbgenerated("NOW()"))
+  updatedAt DateTime  @map("updated_at") @db.Timestamptz @updatedAt
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@id([id])
+  @@index([name])
+  @@index([createdAt])
+  @@map("product_category")
+}
+
 model ProductModel {
   id          String  @map("id")          @db.Uuid      @default(dbgenerated("GEN_RANDOM_UUID()"))
   name        String  @map("name")        @db.VarChar()
@@ -292,7 +310,9 @@ model ProductModel {
   minAmount   Int     @map("min_amount")  @db.Integer   @default(0)
 
   image       String? @map("image")       @db.VarChar() @default("")
+  categoryId  String? @map("category_id") @db.Uuid
 
+  category     ProductCategoryModel? @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   prices       ProductPriceModel[]
   sellingMVs   SellingProductMVModel[]
   deletedSellingMVs DeletedSellingProductMVModel[]
@@ -306,6 +326,7 @@ model ProductModel {
   @@id([id])
   @@index([id])
   @@index([name])
+  @@index([categoryId], map: "product_category_id_fk_idx")
   @@index([createdAt])
   @@map("product")
 }

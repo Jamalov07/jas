@@ -22,6 +22,8 @@ const PRODUCT_LIST_LIGHT_SELECT = {
 	name: true,
 	minAmount: true,
 	image: true,
+	categoryId: true,
+	category: { select: { id: true, name: true } },
 	prices: {
 		select: {
 			id: true,
@@ -106,6 +108,8 @@ export class ProductRepository {
 				name: true,
 				minAmount: true,
 				image: true,
+				categoryId: true,
+				category: { select: { id: true, name: true } },
 				prices: {
 					select: { id: true, type: true, price: true, totalPrice: true, currencyId: true, currency: true, exchangeRate: true },
 				},
@@ -138,6 +142,8 @@ export class ProductRepository {
 				name: true,
 				minAmount: true,
 				image: true,
+				categoryId: true,
+				category: { select: { id: true, name: true } },
 				prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRICE_SELECT },
 				sellingMVs: {
 					orderBy: { selling: { date: 'desc' } },
@@ -228,6 +234,8 @@ export class ProductRepository {
 			name: true,
 			minAmount: true,
 			image: true,
+			categoryId: true,
+			category: { select: { id: true, name: true } },
 			prices: {
 				select: {
 					id: true,
@@ -354,6 +362,7 @@ export class ProductRepository {
 				minAmount: body.minAmount,
 				description: body.description,
 				image: body.image,
+				categoryId: body.categoryId,
 				prices: {
 					create: [
 						{
@@ -394,6 +403,7 @@ export class ProductRepository {
 				minAmount: body.minAmount,
 				description: body.description,
 				image: body.image,
+				categoryId: body.categoryId,
 			},
 		})
 

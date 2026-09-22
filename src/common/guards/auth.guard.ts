@@ -96,6 +96,9 @@ export class AuthGuard implements CanActivate {
 				if (user.deletedAt) {
 					throw new UnauthorizedException(ERROR_MSG.AUTH.USER_WAS_DELETED.UZ)
 				}
+				if (user.isActive === false) {
+					throw new UnauthorizedException(ERROR_MSG.AUTH.INACTIVE.UZ)
+				}
 			}
 
 			return { id: user?.id }

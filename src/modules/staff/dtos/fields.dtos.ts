@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PickType } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { StaffOptional, StaffRequired } from '../interfaces'
-import { IsEnum, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID } from 'class-validator'
+import { IsBoolean, IsEnum, IsJWT, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, IsUUID } from 'class-validator'
 import { $Enums, PageEnum, StaffTypeEnum } from '@prisma/client'
 
 export class StaffRequiredDto extends DefaultRequiredFieldsDto implements StaffRequired {
@@ -37,6 +37,11 @@ export class StaffRequiredDto extends DefaultRequiredFieldsDto implements StaffR
 
 	@ApiProperty({ enum: PageEnum, isArray: true })
 	pages: $Enums.PageEnum[]
+
+	@ApiProperty({ type: Boolean })
+	@IsNotEmpty()
+	@IsBoolean()
+	isActive: boolean
 }
 
 export class StaffOptionalDto extends DefaultOptionalFieldsDto implements StaffOptional {
@@ -72,4 +77,9 @@ export class StaffOptionalDto extends DefaultOptionalFieldsDto implements StaffO
 
 	@ApiPropertyOptional({ enum: PageEnum, isArray: true })
 	pages?: $Enums.PageEnum[]
+
+	@ApiPropertyOptional({ type: Boolean })
+	@IsOptional()
+	@IsBoolean()
+	isActive?: boolean
 }

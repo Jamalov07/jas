@@ -12,6 +12,7 @@ import {
 	CurrencyModule,
 	PermissionModule,
 	ProductModule,
+	ProductCategoryModule,
 	PrismaModule,
 	ReturningModule,
 	ReturningProductMVModule,
@@ -34,6 +35,7 @@ import { ClientPaymentController } from './modules/client-payment/client-payment
 import { CurrencyController } from './modules/currency/currency.controller'
 import { PermissionController } from './modules/permission/permission.controller'
 import { ProductController } from './modules/product/product.controller'
+import { ProductCategoryController } from './modules/product-category/product-category.controller'
 import { ReturningController } from './modules/returning/returning.controller'
 import { SellingController } from './modules/selling/selling.controller'
 import { StaffController } from './modules/staff/staff.controller'
@@ -62,6 +64,7 @@ import { join } from 'path'
 		CurrencyModule,
 		PermissionModule,
 		ProductModule,
+		ProductCategoryModule,
 		ReturningModule,
 		ReturningProductMVModule,
 		SellingModule,
@@ -88,6 +91,7 @@ export class AppModule implements OnModuleInit {
 			this.prisma.createActionMethods(CurrencyController),
 			this.prisma.createActionMethods(PermissionController),
 			this.prisma.createActionMethods(ProductController),
+			this.prisma.createActionMethods(ProductCategoryController),
 			this.prisma.createActionMethods(ReturningController),
 			this.prisma.createActionMethods(SellingController),
 			this.prisma.createActionMethods(StaffController),

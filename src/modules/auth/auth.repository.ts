@@ -19,6 +19,7 @@ export class AuthRepository {
 				fullname: true,
 				password: true,
 				phone: true,
+				isActive: true,
 				createdAt: true,
 				deletedAt: true,
 				updatedAt: true,

@@ -49,6 +49,11 @@ export const ERROR_MSG = {
 			RU: 'staff was deleted',
 			UZ: "xodim o'chirilgan",
 		},
+		INACTIVE: {
+			EN: 'staff is inactive',
+			RU: 'staff is inactive',
+			UZ: "xodim faol emas, kirish mumkin emas",
+		},
 		WRONG_PASSWORD: {
 			EN: 'wrong password',
 			RU: 'wrong password',
@@ -172,6 +177,18 @@ export const ERROR_MSG = {
 			EN: 'name already exists',
 			RU: 'name already exists',
 			UZ: 'nom allaqachon mavjud',
+		},
+	},
+	PRODUCT_CATEGORY: {
+		NOT_FOUND: {
+			EN: 'product category not found',
+			RU: 'product category not found',
+			UZ: 'mahsulot kategoriyasi topilmadi',
+		},
+		NAME_EXISTS: {
+			EN: 'category name already exists',
+			RU: 'category name already exists',
+			UZ: 'kategoriya nomi allaqachon mavjud',
 		},
 	},
 	PRODUCT_MV: {

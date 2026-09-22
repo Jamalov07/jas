@@ -29,6 +29,10 @@ export class AuthService {
 			throw new BadRequestException(ERROR_MSG.AUTH.DELETED.UZ)
 		}
 
+		if (!staff.isActive) {
+			throw new BadRequestException(ERROR_MSG.AUTH.INACTIVE.UZ)
+		}
+
 		const isCorrect = await bcrypt.compare(body.password, staff.password)
 		if (!isCorrect) {
 			throw new UnauthorizedException(ERROR_MSG.AUTH.WRONG_PASSWORD.UZ)
@@ -57,6 +61,10 @@ export class AuthService {
 
 		if (!staff) {
 			throw new UnauthorizedException(ERROR_MSG.STAFF.NOT_FOUND.UZ)
+		}
+
+		if (!staff.isActive) {
+			throw new UnauthorizedException(ERROR_MSG.AUTH.INACTIVE.UZ)
 		}
 
 		const tokens = await this.jwtService.getTokens({ id: body.user.id })

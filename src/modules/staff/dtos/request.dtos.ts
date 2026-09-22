@@ -10,12 +10,16 @@ export class StaffFindManyRequestDto
 export class StaffFindOneRequestDto extends IntersectionType(PickType(StaffRequiredDto, ['id'])) implements StaffFindOneRequest {}
 
 export class StaffCreateOneRequestDto
-	extends IntersectionType(PickType(StaffRequiredDto, ['fullname', 'phone', 'password']), PickType(RequestOtherFieldsDto, ['actionsToConnect', 'pagesToConnect']))
+	extends IntersectionType(
+		PickType(StaffRequiredDto, ['fullname', 'phone', 'password']),
+		PickType(StaffOptionalDto, ['isActive']),
+		PickType(RequestOtherFieldsDto, ['actionsToConnect', 'pagesToConnect']),
+	)
 	implements StaffCreateOneRequest {}
 
 export class StaffUpdateOneRequestDto
 	extends IntersectionType(
-		PickType(StaffOptionalDto, ['deletedAt', 'fullname', 'password', 'phone', 'token', 'currencyId']),
+		PickType(StaffOptionalDto, ['deletedAt', 'fullname', 'password', 'phone', 'token', 'currencyId', 'isActive']),
 		PickType(RequestOtherFieldsDto, ['actionsToConnect', 'actionsToDisconnect', 'pagesToConnect', 'pagesToDisconnect']),
 	)
 	implements StaffUpdateOneRequest {}
