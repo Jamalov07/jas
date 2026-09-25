@@ -36,7 +36,7 @@ export declare interface SellingProductData {
 	id: string
 	count: number
 	createdAt: Date
-	product: { id: string; name: string; createdAt: Date }
+	product: { id: string; name: string; createdAt: Date; categoryId?: string | null; category?: { id: string; name: string } | null }
 	prices: { selling: SellingProductSellingPrice | null }
 }
 

@@ -120,7 +120,15 @@ export class SellingService {
 			count: number
 			createdAt: Date
 			id: string
-			product: { id: string; name: string; createdAt: Date; image: string | null; description: string | null }
+			product: {
+				id: string
+				name: string
+				createdAt: Date
+				image: string | null
+				description: string | null
+				categoryId?: string | null
+				category?: { id: string; name: string } | null
+			}
 			prices: Array<{
 				type: PriceTypeEnum
 				price: Decimal
@@ -154,6 +162,8 @@ export class SellingService {
 					createdAt: line.product.createdAt,
 					image: line.product.image ?? '',
 					description: line.product.description ?? '',
+					categoryId: line.product.categoryId ?? null,
+					category: line.product.category ?? null,
 				},
 				prices: row
 					? {

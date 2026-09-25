@@ -21,12 +21,21 @@ const PRODUCT_MV_PRICE_SELECT = {
 	currencyId: true,
 	currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } },
 }
+const PRODUCT_BRIEF_SELECT = {
+	id: true,
+	name: true,
+	createdAt: true,
+	image: true,
+	description: true,
+	categoryId: true,
+	category: { select: { id: true, name: true } },
+}
 const PRODUCT_MV_SELECT = {
 	id: true,
 	count: true,
 	createdAt: true,
 	prices: { orderBy: [{ createdAt: 'desc' as const }], select: PRODUCT_MV_PRICE_SELECT },
-	product: { select: { id: true, name: true, createdAt: true, image: true, description: true } },
+	product: { select: PRODUCT_BRIEF_SELECT },
 }
 const DELETED_PRODUCT_MV_SELECT = PRODUCT_MV_SELECT
 const SELLING_PAYMENT_LINE_SELECT = { type: true, currencyId: true, amount: true, currency: { select: { id: true, name: true, symbol: true } } }
@@ -74,7 +83,7 @@ const SELLING_LIST_LIGHT_SELECT = {
 					currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } },
 				},
 			},
-			product: { select: { id: true, name: true, createdAt: true, image: true, description: true } },
+			product: { select: PRODUCT_BRIEF_SELECT },
 		},
 	},
 	deletedProducts: {
@@ -94,7 +103,7 @@ const SELLING_LIST_LIGHT_SELECT = {
 					currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } },
 				},
 			},
-			product: { select: { id: true, name: true, createdAt: true, image: true, description: true } },
+			product: { select: PRODUCT_BRIEF_SELECT },
 		},
 	},
 }
@@ -236,11 +245,7 @@ export class SellingRepository {
 						},
 						product: {
 							select: {
-								id: true,
-								name: true,
-								createdAt: true,
-								image: true,
-								description: true,
+								...PRODUCT_BRIEF_SELECT,
 								prices: {
 									orderBy: [{ createdAt: 'desc' as const }],
 									select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } },
@@ -268,11 +273,7 @@ export class SellingRepository {
 						},
 						product: {
 							select: {
-								id: true,
-								name: true,
-								createdAt: true,
-								image: true,
-								description: true,
+								...PRODUCT_BRIEF_SELECT,
 								prices: {
 									orderBy: [{ createdAt: 'desc' as const }],
 									select: { type: true, price: true, totalPrice: true, currencyId: true, currency: { select: { id: true, name: true, exchangeRate: true, symbol: true } } },

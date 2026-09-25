@@ -35,6 +35,12 @@ export class ProductPriceDataDto implements ProductPriceData {
 }
 
 export class ProductFindOneDataDto extends PickType(ProductRequiredDto, ['id', 'name', 'createdAt', 'description', 'count', 'minAmount', 'image']) implements ProductFindOneData {
+	@ApiPropertyOptional({ type: String })
+	categoryId?: string | null
+
+	@ApiPropertyOptional()
+	category?: { id: string; name: string } | null
+
 	@ApiProperty({})
 	prices: Record<PriceTypeEnum, ProductPriceData>
 

@@ -32,7 +32,8 @@ export declare interface ProductFindManyData extends PaginationResponse<ProductF
 	calc: { calcPage: ProductFindManyCalc; calcTotal: ProductFindManyCalc }
 }
 
-export declare interface ProductFindOneData extends Pick<ProductRequired, 'id' | 'name' | 'createdAt'>, Pick<ProductOptional, 'count' | 'minAmount' | 'description' | 'image'> {
+export declare interface ProductFindOneData extends Pick<ProductRequired, 'id' | 'name' | 'createdAt'>, Pick<ProductOptional, 'count' | 'minAmount' | 'description' | 'image' | 'categoryId'> {
+	category?: { id: string; name: string } | null
 	prices?: Record<PriceTypeEnum, ProductPriceData>
 	lastSelling?: {
 		date: Date | null

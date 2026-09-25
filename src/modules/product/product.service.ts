@@ -226,6 +226,8 @@ export class ProductService {
 				name: product.name,
 				minAmount: product.minAmount,
 				image: product.image,
+				categoryId: product.categoryId,
+				category: product.category,
 				lastSelling: lastSellingMV
 					? {
 							date: lastSellingMV?.selling?.date ?? null,
@@ -398,6 +400,8 @@ export class ProductService {
 				name: product.name,
 				minAmount: product.minAmount,
 				image: product.image,
+				categoryId: product.categoryId,
+				category: product.category,
 				lastSelling: lastSellingRow
 					? {
 							date: lastSellingRow.date,
