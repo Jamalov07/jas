@@ -16,15 +16,17 @@ export class PdfService {
 	constructor(private readonly prisma: PrismaService) {}
 
 	private getInvoiceCategoryName(item: { product?: { category?: { name?: string } | null } }): string {
-		return item.product?.category?.name?.trim() ?? ''
+		return item.product?.category?.name?.trim() || '-'
 	}
 
 	private sortInvoiceProductsByCategory<T extends { product?: { name?: string; category?: { name?: string } | null } }>(products: T[]): T[] {
 		return [...products].sort((a, b) => {
 			const ca = this.getInvoiceCategoryName(a)
 			const cb = this.getInvoiceCategoryName(b)
-			if (!ca && cb) return 1
-			if (ca && !cb) return -1
+			const aEmpty = ca === '-'
+			const bEmpty = cb === '-'
+			if (aEmpty && !bEmpty) return 1
+			if (!aEmpty && bEmpty) return -1
 			const byCategory = ca.localeCompare(cb, 'uz', { sensitivity: 'base' })
 			if (byCategory !== 0) return byCategory
 			return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'uz', { sensitivity: 'base' })
@@ -33,7 +35,7 @@ export class PdfService {
 
 	private invoiceCategoryCell(item: { product?: { category?: { name?: string } | null } }, prevCategory: { name: string }): string {
 		const name = this.getInvoiceCategoryName(item)
-		if (!name || name === prevCategory.name) return ''
+		if (name === prevCategory.name) return ''
 		prevCategory.name = name
 		return name
 	}
