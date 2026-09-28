@@ -15,6 +15,29 @@ import { Decimal } from '@prisma/client/runtime/library'
 export class PdfService {
 	constructor(private readonly prisma: PrismaService) {}
 
+	private getInvoiceCategoryName(item: { product?: { category?: { name?: string } | null } }): string {
+		return item.product?.category?.name?.trim() ?? ''
+	}
+
+	private sortInvoiceProductsByCategory<T extends { product?: { name?: string; category?: { name?: string } | null } }>(products: T[]): T[] {
+		return [...products].sort((a, b) => {
+			const ca = this.getInvoiceCategoryName(a)
+			const cb = this.getInvoiceCategoryName(b)
+			if (!ca && cb) return 1
+			if (ca && !cb) return -1
+			const byCategory = ca.localeCompare(cb, 'uz', { sensitivity: 'base' })
+			if (byCategory !== 0) return byCategory
+			return (a.product?.name ?? '').localeCompare(b.product?.name ?? '', 'uz', { sensitivity: 'base' })
+		})
+	}
+
+	private invoiceCategoryCell(item: { product?: { category?: { name?: string } | null } }, prevCategory: { name: string }): string {
+		const name = this.getInvoiceCategoryName(item)
+		if (!name || name === prevCategory.name) return ''
+		prevCategory.name = name
+		return name
+	}
+
 	/** API javobi `{ selling: { price, totalPrice } }` yoki bot/DB dan massiv */
 	private lineSellingPriceParts(item: { prices: unknown }) {
 		const p = item.prices as any
@@ -57,23 +80,27 @@ export class PdfService {
 				},
 				{
 					table: {
-						widths: ['auto', '*', 'auto', 'auto', 'auto'],
+						widths: ['auto', 'auto', '*', 'auto', 'auto', 'auto'],
 						body: [
 							[
 								{ text: '№', bold: true },
+								{ text: 'Категория', bold: true },
 								{ text: 'Товар или услуга', bold: true },
 								{ text: 'Кол-во', bold: true },
 								{ text: 'Цена', bold: true },
 								{ text: 'Сумма', bold: true },
 							],
-							...(selling.products ?? [])
-								.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
-								.map((item, index) => {
-									const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
-									const price = pr?.toNumber?.() ?? 0
-									const totalPrice = tpr?.toNumber?.() ?? price * item.count
-									return [index + 1, item.product.name, item.count, `${price} ${sym}`, `${totalPrice} ${sym}`]
-								}),
+							...(() => {
+								const prev = { name: '' }
+								return this.sortInvoiceProductsByCategory((selling.products ?? []).filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)).map(
+									(item, index) => {
+										const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
+										const price = pr?.toNumber?.() ?? 0
+										const totalPrice = tpr?.toNumber?.() ?? price * item.count
+										return [index + 1, this.invoiceCategoryCell(item, prev), item.product.name, item.count, `${price} ${sym}`, `${totalPrice} ${sym}`]
+									},
+								)
+							})(),
 						],
 					},
 					layout: {
@@ -164,29 +191,34 @@ export class PdfService {
 				{
 					table: {
 						headerRows: 1,
-						widths: ['auto', '*', 50, 70, 80],
+						widths: ['auto', 'auto', '*', 50, 70, 80],
 						body: [
 							[
 								{ text: '№', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
+								{ text: 'Turi', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 								{ text: 'Mahsulot nomi', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 								{ text: 'Soni', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 								{ text: 'Narxi', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 								{ text: 'Jami', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 							],
-							...(selling.products ?? [])
-								.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
-								.map((item, index) => {
-									const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
-									const price = pr?.toNumber?.() ?? 0
-									const totalPrice = tpr?.toNumber?.() ?? price * item.count
-									return [
-										{ text: index + 1, fontSize: 12, alignment: 'center' },
-										{ text: item.product.name, fontSize: 12, alignment: 'left' },
-										{ text: item.count.toString(), fontSize: 12, alignment: 'center' },
-										{ text: `${price} ${sym}`, fontSize: 12, alignment: 'right' },
-										{ text: `${totalPrice} ${sym}`, fontSize: 12, alignment: 'right' },
-									]
-								}),
+							...(() => {
+								const prev = { name: '' }
+								return this.sortInvoiceProductsByCategory((selling.products ?? []).filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)).map(
+									(item, index) => {
+										const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
+										const price = pr?.toNumber?.() ?? 0
+										const totalPrice = tpr?.toNumber?.() ?? price * item.count
+										return [
+											{ text: index + 1, fontSize: 12, alignment: 'center' },
+											{ text: this.invoiceCategoryCell(item, prev), fontSize: 12, alignment: 'left' },
+											{ text: item.product.name, fontSize: 12, alignment: 'left' },
+											{ text: item.count.toString(), fontSize: 12, alignment: 'center' },
+											{ text: `${price} ${sym}`, fontSize: 12, alignment: 'right' },
+											{ text: `${totalPrice} ${sym}`, fontSize: 12, alignment: 'right' },
+										]
+									},
+								)
+							})(),
 						],
 					},
 					layout: {
@@ -242,34 +274,35 @@ export class PdfService {
 		const paidBlock = this.kasPaymentMethodsStackRight(selling.payment)
 
 		const headerGray = '#e8e8e8'
+		const prevCategory = { name: '' }
 		const tableBody = [
 			[
 				{ text: '№', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
+				{ text: 'Turi', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
 				{ text: 'Mahsulot nomi', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
 				{ text: '✓', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
 				{ text: 'Soni', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
 				{ text: 'Narxi', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
 				{ text: 'Summasi', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
 			],
-			...(selling.products ?? [])
-				.filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)
-				.map((item, index) => {
-					const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
-					const price = pr?.toNumber?.() ?? 0
-					const totalPrice = tpr?.toNumber?.() ?? price * item.count
-					const p = item.prices as { selling?: { currency?: { symbol: string } } } | undefined
-					const symTrim = `${sym || p?.selling?.currency?.symbol || ''}`.trim()
-					const priceStr = symTrim ? `${price}${symTrim}` : `${price}`
-					const sumStr = symTrim ? `${totalPrice} ${symTrim}` : `${totalPrice}`
-					return [
-						{ text: String(index + 1), fontSize: 11, alignment: 'center' },
-						{ text: item.product.name, fontSize: 11, alignment: 'left' },
-						{ text: '', fontSize: 11, alignment: 'center' },
-						{ text: String(item.count), fontSize: 11, alignment: 'center' },
-						{ text: priceStr, fontSize: 11, alignment: 'center' },
-						{ text: sumStr, fontSize: 11, alignment: 'center' },
-					]
-				}),
+			...this.sortInvoiceProductsByCategory((selling.products ?? []).filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)).map((item, index) => {
+				const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
+				const price = pr?.toNumber?.() ?? 0
+				const totalPrice = tpr?.toNumber?.() ?? price * item.count
+				const p = item.prices as { selling?: { currency?: { symbol: string } } } | undefined
+				const symTrim = `${sym || p?.selling?.currency?.symbol || ''}`.trim()
+				const priceStr = symTrim ? `${price}${symTrim}` : `${price}`
+				const sumStr = symTrim ? `${totalPrice} ${symTrim}` : `${totalPrice}`
+				return [
+					{ text: String(index + 1), fontSize: 11, alignment: 'center' },
+					{ text: this.invoiceCategoryCell(item, prevCategory), fontSize: 11, alignment: 'left' },
+					{ text: item.product.name, fontSize: 11, alignment: 'left' },
+					{ text: '', fontSize: 11, alignment: 'center' },
+					{ text: String(item.count), fontSize: 11, alignment: 'center' },
+					{ text: priceStr, fontSize: 11, alignment: 'center' },
+					{ text: sumStr, fontSize: 11, alignment: 'center' },
+				]
+			}),
 		] as Content[][]
 
 		const jamiLines: Content[] = (selling.totalPrices ?? []).map(
@@ -318,7 +351,7 @@ export class PdfService {
 				{
 					table: {
 						headerRows: 1,
-						widths: [26, '*', 22, 40, 72, 78],
+						widths: [26, 68, '*', 22, 40, 68, 72],
 						body: tableBody,
 					},
 					layout: {
