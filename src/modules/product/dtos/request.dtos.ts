@@ -12,7 +12,7 @@ import {
 } from '../interfaces'
 import { PaginationRequestDto, RequestOtherFieldsDto, IsDecimalIntOrBigInt } from '@common'
 import { ProductOptionalDto, ProductRequiredDto } from './fields.dtos'
-import { IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested, IsBoolean } from 'class-validator'
+import { IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateIf, ValidateNested, IsBoolean } from 'class-validator'
 import { Transform, Type } from 'class-transformer'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -211,10 +211,16 @@ export class ProductCreateOne2RequestDto {
 	@ApiPropertyOptional({ type: 'string', format: 'binary', description: 'image file' })
 	image?: any
 
-	@ApiPropertyOptional({ type: String })
+	@ApiPropertyOptional({ type: String, nullable: true, description: 'UUID yoki null (category o‘chirish)' })
 	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined) return undefined
+		if (value === null || value === '' || value === 'null') return null
+		return value
+	})
+	@ValidateIf((_, value) => value !== null && value !== undefined)
 	@IsUUID('4')
-	categoryId?: string
+	categoryId?: string | null
 }
 
 export class ProductUpdateOne2RequestDto extends PartialType(ProductCreateOne2RequestDto) {}

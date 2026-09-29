@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { DefaultOptionalFieldsDto, DefaultRequiredFieldsDto } from '../../../common'
 import { ProductOptional, ProductRequired } from '../interfaces'
-import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator'
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator'
 import { Transform } from 'class-transformer'
 
 export class ProductRequiredDto extends DefaultRequiredFieldsDto implements ProductRequired {
@@ -62,8 +62,14 @@ export class ProductOptionalDto extends DefaultOptionalFieldsDto implements Prod
 	@IsOptional()
 	image?: any
 
-	@ApiPropertyOptional({ type: String })
+	@ApiPropertyOptional({ type: String, nullable: true, description: 'UUID yoki null (category o‘chirish)' })
 	@IsOptional()
+	@Transform(({ value }) => {
+		if (value === undefined) return undefined
+		if (value === null || value === '' || value === 'null') return null
+		return value
+	})
+	@ValidateIf((_, value) => value !== null && value !== undefined)
 	@IsUUID('4')
-	categoryId?: string
+	categoryId?: string | null
 }

@@ -403,7 +403,8 @@ export class ProductRepository {
 				minAmount: body.minAmount,
 				description: body.description,
 				image: body.image,
-				categoryId: body.categoryId,
+				// undefined → tegilmaydi; null → o‘chiriladi; UUID → o‘rnatiladi
+				...(body.categoryId !== undefined ? { categoryId: body.categoryId } : {}),
 			},
 		})
 
