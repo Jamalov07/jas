@@ -33,11 +33,8 @@ export class PdfService {
 		})
 	}
 
-	private invoiceCategoryCell(item: { product?: { category?: { name?: string } | null } }, prevCategory: { name: string }): string {
-		const name = this.getInvoiceCategoryName(item)
-		if (name === prevCategory.name) return ''
-		prevCategory.name = name
-		return name
+	private invoiceCategoryCell(item: { product?: { category?: { name?: string } | null } }): string {
+		return this.getInvoiceCategoryName(item)
 	}
 
 	/** API javobi `{ selling: { price, totalPrice } }` yoki bot/DB dan massiv */
@@ -93,13 +90,12 @@ export class PdfService {
 								{ text: 'Сумма', bold: true },
 							],
 							...(() => {
-								const prev = { name: '' }
 								return this.sortInvoiceProductsByCategory((selling.products ?? []).filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)).map(
 									(item, index) => {
 										const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
 										const price = pr?.toNumber?.() ?? 0
 										const totalPrice = tpr?.toNumber?.() ?? price * item.count
-										return [index + 1, this.invoiceCategoryCell(item, prev), item.product.name, item.count, `${price} ${sym}`, `${totalPrice} ${sym}`]
+										return [index + 1, this.invoiceCategoryCell(item), item.product.name, item.count, `${price} ${sym}`, `${totalPrice} ${sym}`]
 									},
 								)
 							})(),
@@ -204,7 +200,6 @@ export class PdfService {
 								{ text: 'Jami', bold: true, alignment: 'center', fillColor: '#f2f2f2', fontSize: 13 },
 							],
 							...(() => {
-								const prev = { name: '' }
 								return this.sortInvoiceProductsByCategory((selling.products ?? []).filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)).map(
 									(item, index) => {
 										const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
@@ -212,7 +207,7 @@ export class PdfService {
 										const totalPrice = tpr?.toNumber?.() ?? price * item.count
 										return [
 											{ text: index + 1, fontSize: 12, alignment: 'center' },
-											{ text: this.invoiceCategoryCell(item, prev), fontSize: 12, alignment: 'left' },
+											{ text: this.invoiceCategoryCell(item), fontSize: 12, alignment: 'left' },
 											{ text: item.product.name, fontSize: 12, alignment: 'left' },
 											{ text: item.count.toString(), fontSize: 12, alignment: 'center' },
 											{ text: `${price} ${sym}`, fontSize: 12, alignment: 'right' },
@@ -276,7 +271,6 @@ export class PdfService {
 		const paidBlock = this.kasPaymentMethodsStackRight(selling.payment)
 
 		const headerGray = '#e8e8e8'
-		const prevCategory = { name: '' }
 		const tableBody = [
 			[
 				{ text: '№', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
@@ -297,7 +291,7 @@ export class PdfService {
 				const sumStr = symTrim ? `${totalPrice} ${symTrim}` : `${totalPrice}`
 				return [
 					{ text: String(index + 1), fontSize: 11, alignment: 'center' },
-					{ text: this.invoiceCategoryCell(item, prevCategory), fontSize: 11, alignment: 'left' },
+					{ text: this.invoiceCategoryCell(item), fontSize: 11, alignment: 'left' },
 					{ text: item.product.name, fontSize: 11, alignment: 'left' },
 					{ text: '', fontSize: 11, alignment: 'center' },
 					{ text: String(item.count), fontSize: 11, alignment: 'center' },
