@@ -16,6 +16,7 @@ export declare interface BotConfigOptions {
 	token?: string
 	sellingChannelId?: string
 	paymentChannelId?: string
+	reminderChannelId?: string
 }
 
 export declare interface OldServiceConfigOptions {

@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma'
-import { SellingFindOneData, SellingDebtByCurrencyRow } from '../../selling'
+import { SellingFindOneData } from '../../selling'
 import { BotSellingProductTitleEnum } from '../../selling/enums'
 import { buildSellingPdfFooterSummaryBlock } from '../../selling/helpers/selling-channel-summary.helper'
 import * as pdfMake from 'pdfmake/build/pdfmake'
 import vfsFonts from 'pdfmake/build/vfs_fonts'
-import { TDocumentDefinitions, Content } from 'pdfmake/interfaces'
+import { TDocumentDefinitions } from 'pdfmake/interfaces'
 import { formatDdMmYyyyHhMmForUzDisplay } from '../../../common'
-import { jasInstagramQrCodeBase64, jasTelegramQrCodeBase64, resolveBrandName, resolvePdfLogoBase64 } from './constants'
+import { jasInstagramQrCodeBase64, jasTelegramQrCodeBase64, resolvePdfLogoBase64 } from './constants'
 import { Decimal } from '@prisma/client/runtime/library'
 ;(pdfMake as any).vfs = vfsFonts
 
@@ -139,11 +139,7 @@ export class PdfService {
 	}
 
 	async generateInvoicePdfBuffer2(selling: SellingFindOneData): Promise<Buffer> {
-		if (resolveBrandName() === 'JAS') {
-			return this.generateJasInvoicePdfBuffer(selling)
-		} else {
-			return this.generateKasInvoicePdfBuffer(selling)
-		}
+		return this.generateJasInvoicePdfBuffer(selling)
 	}
 
 	async generateJasInvoicePdfBuffer(selling: SellingFindOneData): Promise<Buffer> {
@@ -262,187 +258,6 @@ export class PdfService {
 				resolve(Buffer.from(buffer))
 			})
 		})
-	}
-
-	async generateKasInvoicePdfBuffer(selling: SellingFindOneData): Promise<Buffer> {
-		const buyerLine = [selling.publicId, selling.client?.fullname, selling.client?.phone].filter(Boolean).join(' ')
-		const oldDebtLines = this.kasMoneyRowsStackRight(selling.clientDebtBeforeSelling as SellingDebtByCurrencyRow[] | undefined)
-		const newDebtBlock = this.kasMoneyRowsStackRight(selling.client?.debtByCurrency as SellingDebtByCurrencyRow[] | undefined)
-		const paidBlock = this.kasPaymentMethodsStackRight(selling.payment)
-
-		const headerGray = '#e8e8e8'
-		const tableBody = [
-			[
-				{ text: '№', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
-				{ text: 'Turi', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
-				{ text: 'Mahsulot nomi', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
-				{ text: '✓', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
-				{ text: 'Soni', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
-				{ text: 'Narxi', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
-				{ text: 'Summasi', bold: true, alignment: 'center', fillColor: headerGray, fontSize: 11 },
-			],
-			...this.sortInvoiceProductsByCategory((selling.products ?? []).filter((item) => (item as any).status !== BotSellingProductTitleEnum.deleted)).map((item, index) => {
-				const { price: pr, totalPrice: tpr, symbol: sym } = this.lineSellingPriceParts(item)
-				const price = pr?.toNumber?.() ?? 0
-				const totalPrice = tpr?.toNumber?.() ?? price * item.count
-				const p = item.prices as { selling?: { currency?: { symbol: string } } } | undefined
-				const symTrim = `${sym || p?.selling?.currency?.symbol || ''}`.trim()
-				const priceStr = symTrim ? `${price}${symTrim}` : `${price}`
-				const sumStr = symTrim ? `${totalPrice} ${symTrim}` : `${totalPrice}`
-				return [
-					{ text: String(index + 1), fontSize: 11, alignment: 'center' },
-					{ text: this.invoiceCategoryCell(item), fontSize: 11, alignment: 'left' },
-					{ text: item.product.name, fontSize: 11, alignment: 'left' },
-					{ text: '', fontSize: 11, alignment: 'center' },
-					{ text: String(item.count), fontSize: 11, alignment: 'center' },
-					{ text: priceStr, fontSize: 11, alignment: 'center' },
-					{ text: sumStr, fontSize: 11, alignment: 'center' },
-				]
-			}),
-		] as Content[][]
-
-		const jamiLines: Content[] = (selling.totalPrices ?? []).map(
-			(t): Content => ({
-				text: `${t.total.toNumber()} ${(t as { currency?: { symbol?: string } }).currency?.symbol ?? ''}`.trim(),
-				fontSize: 11,
-				alignment: 'right',
-				bold: true,
-			}),
-		)
-		if (!jamiLines.length) {
-			jamiLines.push({ text: '0', fontSize: 11, alignment: 'right', bold: true })
-		}
-
-		const docDefinition: TDocumentDefinitions = {
-			content: [
-				{
-					columns: [
-						{
-							width: '32%',
-							stack: [
-								{ text: 'Mansur +998 99 044 00 24', fontSize: 11, margin: [0, 0, 0, 6] },
-								{ text: 'Mamur +998 90 863 69 91', fontSize: 11 },
-							],
-							alignment: 'left',
-						},
-						{
-							width: '36%',
-							stack: [{ image: 'logo', width: 110, alignment: 'center', margin: [0, 0, 0, 0] }],
-							alignment: 'center',
-						},
-						{
-							width: '32%',
-							stack: [
-								{ text: `Xaridor: ${buyerLine}`, fontSize: 11, alignment: 'right', margin: [0, 0, 0, 6] },
-								{ text: `Sotuv sanasi: ${this.formatDate(selling.date)}`, fontSize: 11, alignment: 'right', margin: [0, 0, 0, 6] },
-								{ text: 'Eski qarz', fontSize: 11, alignment: 'right', bold: true, margin: [0, 0, 0, 2] },
-								...(oldDebtLines.length ? oldDebtLines : ([{ text: '0', fontSize: 11, alignment: 'right' }] as Content[])),
-							],
-							alignment: 'right',
-						},
-					],
-					columnGap: 8,
-					margin: [0, 16, 0, 14],
-				} as Content,
-				{
-					table: {
-						headerRows: 1,
-						widths: [26, 68, '*', 22, 40, 68, 72],
-						body: tableBody,
-					},
-					layout: {
-						hLineWidth: (i, node) => (i === 0 || i === 1 || i === node.table.body.length ? 0.6 : 0.4),
-						vLineWidth: (i, node) => (i === 0 || i === node.table.widths.length ? 0.6 : 0.4),
-						hLineColor: () => '#000000',
-						vLineColor: () => '#000000',
-						paddingLeft: () => 5,
-						paddingRight: () => 5,
-						paddingTop: () => 4,
-						paddingBottom: () => 4,
-					},
-					margin: [0, 0, 0, 12],
-				},
-				{
-					columns: [
-						{ width: '*', text: '' },
-						{
-							width: 260,
-							stack: [
-								{
-									columns: [
-										{ width: '*', text: 'Jami summa:', fontSize: 11, alignment: 'right', margin: [0, 0, 10, 0] },
-										{ width: 'auto', stack: jamiLines },
-									],
-									margin: [0, 0, 0, 8],
-								},
-								{
-									columns: [
-										{ width: '*', text: "To'lov qilindi:", fontSize: 11, alignment: 'right', margin: [0, 0, 10, 0] },
-										{ width: 'auto', stack: paidBlock.length ? paidBlock : [{ text: '0', fontSize: 11, alignment: 'right' }] },
-									],
-									margin: [0, 0, 0, 8],
-								},
-								{
-									columns: [
-										{ width: '*', text: 'Mijoz qarzi:', fontSize: 11, alignment: 'right', margin: [0, 0, 10, 0], bold: true },
-										{ width: 'auto', stack: newDebtBlock.length ? newDebtBlock : [{ text: '0', fontSize: 11, alignment: 'right' }] },
-									],
-								},
-							],
-							alignment: 'right',
-						},
-					],
-					margin: [0, 4, 0, 0],
-				},
-			],
-			images: {
-				logo: resolvePdfLogoBase64(),
-			},
-			defaultStyle: {
-				font: 'Roboto',
-			},
-		}
-
-		return new Promise((resolve) => {
-			const pdfDocGenerator = pdfMake.createPdf(docDefinition)
-			pdfDocGenerator.getBuffer((buffer) => {
-				resolve(Buffer.from(buffer))
-			})
-		})
-	}
-
-	/** KAS PDF: valyuta bo‘yicha bir qator — o‘ngga tekislangan stack */
-	private kasMoneyRowsStackRight(rows: Array<{ amount: Decimal; currency?: { symbol: string } }> | undefined): Content[] {
-		const nonzero = (rows ?? []).filter((r) => r.amount && !r.amount.isZero())
-		if (!nonzero.length) return []
-		return nonzero.map(
-			(r): Content => ({
-				text: `${r.amount.toNumber()} ${r.currency?.symbol ?? ''}`.trim(),
-				fontSize: 11,
-				alignment: 'right',
-			}),
-		)
-	}
-
-	/** KAS PDF: shu hujjat `paymentMethods` bo‘yicha (valyuta bo‘yicha qatorlar) */
-	private kasPaymentMethodsStackRight(payment: SellingFindOneData['payment']): Content[] {
-		if (!payment?.paymentMethods?.length) return []
-		const map = new Map<string, { total: Decimal; symbol: string }>()
-		for (const m of payment.paymentMethods) {
-			const sym = m.currency?.symbol ?? ''
-			const cur = map.get(m.currencyId)
-			map.set(m.currencyId, {
-				total: (cur?.total ?? new Decimal(0)).plus(m.amount),
-				symbol: sym || cur?.symbol || '',
-			})
-		}
-		return [...map.values()].map(
-			(v): Content => ({
-				text: `${v.total.toNumber()} ${v.symbol}`.trim(),
-				fontSize: 11,
-				alignment: 'right',
-			}),
-		)
 	}
 
 	private formatDate(date: Date): string {

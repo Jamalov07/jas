@@ -1,17 +1,18 @@
-import { DynamicModule, Module } from '@nestjs/common'
+import { DynamicModule, forwardRef, Module } from '@nestjs/common'
 import { MyBotName } from './constants'
 import { TelegrafModule } from 'nestjs-telegraf'
 import { ConfigService } from '@nestjs/config'
 import { BotService } from './bot.service'
 import { BotUpdate } from './bot.update'
 import { PdfModule, PrismaModule } from '../shared'
+import { ChatModule } from '../chat/chat.module'
 
 const isBotConfigured = (): boolean => !!process.env.BOT_TOKEN?.trim()
 
 @Module({})
 export class BotModule {
 	static forRoot(): DynamicModule {
-		const imports: DynamicModule['imports'] = [PrismaModule, PdfModule]
+		const imports: DynamicModule['imports'] = [PrismaModule, PdfModule, forwardRef(() => ChatModule)]
 		const providers: DynamicModule['providers'] = [BotService]
 
 		if (isBotConfigured()) {

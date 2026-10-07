@@ -24,6 +24,9 @@ import {
 	SupplierModule,
 	SupplierPaymentModule,
 	UploadModule,
+	ChatModule,
+	ReminderModule,
+	CronModule,
 } from '@module'
 import { appConfig, botConfig, databaseConfig, jwtConfig, oldServiceConfig } from '@config'
 import { AuthGuard, CheckPermissionGuard } from '@common'
@@ -42,6 +45,8 @@ import { StaffController } from './modules/staff/staff.controller'
 import { StaffPaymentController } from './modules/staff-payment/staff-payment.controller'
 import { SupplierController } from './modules/supplier/supplier.controller'
 import { SupplierPaymentController } from './modules/supplier-payment/supplier-payment.controller'
+import { ChatController } from './modules/chat/chat.controller'
+import { ReminderController } from './modules/reminder/reminder.controller'
 import { ServeStaticModule } from '@nestjs/serve-static'
 import { join } from 'path'
 
@@ -75,6 +80,9 @@ import { join } from 'path'
 		SupplierModule,
 		SupplierPaymentModule,
 		UploadModule,
+		ChatModule,
+		ReminderModule,
+		CronModule,
 	],
 	controllers: [],
 	providers: [AuthGuard, CheckPermissionGuard],
@@ -98,6 +106,8 @@ export class AppModule implements OnModuleInit {
 			this.prisma.createActionMethods(StaffPaymentController),
 			this.prisma.createActionMethods(SupplierController),
 			this.prisma.createActionMethods(SupplierPaymentController),
+			this.prisma.createActionMethods(ChatController),
+			this.prisma.createActionMethods(ReminderController),
 		])
 	}
 }

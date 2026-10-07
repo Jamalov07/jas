@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common'
-import { CronService } from './cron.service'
 import { ScheduleModule } from '@nestjs/schedule'
+import { ReminderModule } from '../../reminder/reminder.module'
+import { CronService } from './cron.service'
 
 @Module({
-	imports: [ScheduleModule.forRoot()],
+	imports: [ScheduleModule.forRoot(), ReminderModule],
 	providers: [CronService],
 	exports: [CronService],
 })

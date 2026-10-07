@@ -1,5 +1,6 @@
-import { Injectable, Optional } from '@nestjs/common'
-import { PdfService, PrismaService } from '../shared'
+import { forwardRef, Inject, Injectable, Optional } from '@nestjs/common'
+import { PdfService } from '../shared/pdf'
+import { PrismaService } from '../shared/prisma'
 import { Context, Markup, Telegraf } from 'telegraf'
 import { BotLanguageEnum } from '@prisma/client'
 import { InjectBot } from 'nestjs-telegraf'
@@ -11,6 +12,8 @@ import { ClientFindOneData } from '../client'
 import { BotSellingProductTitleEnum, BotSellingTitleEnum } from '../selling/enums'
 import { Decimal } from '@prisma/client/runtime/library'
 import { CurrencyBrief, formatDdMmYyyyHhMmForUzDisplay } from '../../common'
+import axios from 'axios'
+import { ChatRecorder } from '../chat/chat.recorder'
 
 type BotSellingData = Omit<SellingFindOneData, 'products'> & {
 	title?: BotSellingTitleEnum
@@ -35,6 +38,7 @@ export class BotService {
 		prisma: PrismaService,
 		pdfService: PdfService,
 		configService: ConfigService,
+		@Inject(forwardRef(() => ChatRecorder)) private readonly chatRecorder: ChatRecorder,
 		@Optional() @InjectBot(MyBotName) private readonly bot?: Telegraf<Context>,
 	) {
 		this.prisma = prisma
@@ -52,6 +56,10 @@ export class BotService {
 
 	private getPaymentChannelId(): string | undefined {
 		return this.configService.get<string>('bot.paymentChannelId')
+	}
+
+	private getReminderChannelId(): string | undefined {
+		return this.configService.get<string>('bot.reminderChannelId')
 	}
 
 	async onStart(context: Context) {
@@ -142,6 +150,103 @@ export class BotService {
 		}
 	}
 
+	async onIncomingText(context: Context) {
+		const message = context.message
+		if (!message || !('text' in message) || !context.from) return
+		await this.chatRecorder.ingestTelegram({
+			telegramUserId: String(context.from.id),
+			telegramMessageId: message.message_id,
+			text: message.text,
+		})
+	}
+
+	async onIncomingPhoto(context: Context) {
+		const message = context.message
+		if (!message || !('photo' in message) || !context.from || !message.photo?.length) return
+		const photo = message.photo[message.photo.length - 1]
+		const buffer = await this.downloadTelegramFile(photo.file_id)
+		await this.chatRecorder.ingestTelegram({
+			telegramUserId: String(context.from.id),
+			telegramMessageId: message.message_id,
+			text: 'caption' in message ? (message.caption ?? null) : null,
+			file: { buffer, fileName: 'photo.jpg', mimeType: 'image/jpeg', kind: 'photo' },
+		})
+	}
+
+	async onIncomingDocument(context: Context) {
+		const message = context.message
+		if (!message || !('document' in message) || !context.from) return
+		const document = message.document
+		const buffer = await this.downloadTelegramFile(document.file_id)
+		await this.chatRecorder.ingestTelegram({
+			telegramUserId: String(context.from.id),
+			telegramMessageId: message.message_id,
+			text: 'caption' in message ? (message.caption ?? null) : null,
+			file: {
+				buffer,
+				fileName: document.file_name || 'document',
+				mimeType: document.mime_type || 'application/octet-stream',
+				kind: 'document',
+			},
+		})
+	}
+
+	async sendTextToClient(telegramId: string, text: string): Promise<number | null> {
+		if (!this.isBotEnabled()) return null
+		try {
+			const sent = await this.bot!.telegram.sendMessage(telegramId, text)
+			return sent.message_id
+		} catch (error) {
+			console.log('bot send text error:', error)
+			return null
+		}
+	}
+
+	async sendFileToClient(telegramId: string, buffer: Buffer, fileName: string, mimeType: string, caption?: string): Promise<number | null> {
+		if (!this.isBotEnabled()) return null
+		try {
+			const source = { source: buffer, filename: fileName }
+			const extra = caption ? { caption } : {}
+			const sent = mimeType.startsWith('image/') ? await this.bot!.telegram.sendPhoto(telegramId, source, extra) : await this.bot!.telegram.sendDocument(telegramId, source, extra)
+			return sent.message_id
+		} catch (error) {
+			console.log('bot send file error:', error)
+			return null
+		}
+	}
+
+	async deleteTelegramMessage(telegramId: string, messageId: number): Promise<boolean> {
+		if (!this.isBotEnabled()) return false
+		try {
+			await this.bot!.telegram.deleteMessage(telegramId, messageId)
+			return true
+		} catch (error) {
+			console.log('bot delete message error:', error)
+			return false
+		}
+	}
+
+	async sendReminderChannelMessage(text: string): Promise<boolean> {
+		if (!this.isBotEnabled()) return false
+		const channelId = this.getReminderChannelId()
+		if (!channelId) return false
+		const chatInfo = await this.bot!.telegram.getChat(channelId).catch(() => undefined)
+		if (!chatInfo) return false
+		try {
+			await this.bot!.telegram.sendMessage(channelId, text)
+			return true
+		} catch (error) {
+			console.log('bot reminder channel error:', error)
+			return false
+		}
+	}
+
+	private async downloadTelegramFile(fileId: string): Promise<Buffer> {
+		const link = await this.bot!.telegram.getFileLink(fileId)
+		const response = await axios.get<ArrayBuffer>(link.href, { responseType: 'arraybuffer' })
+		return Buffer.from(response.data)
+	}
+
 	// ─── Selling notifications ────────────────────────────────────────────────
 
 	private formatTotalPrices(selling: BotSellingData): string {
@@ -199,7 +304,21 @@ export class BotService {
 		const telegramId = selling.client?.telegram?.id
 		if (!telegramId) return
 		const bufferPdf = await this.pdfService.generateInvoicePdfBuffer2(selling as any)
-		await this.bot!.telegram.sendDocument(telegramId, { source: bufferPdf, filename: `xarid.pdf` }, { caption: this.buildSellingCaption(selling) })
+		const sent = await this.bot!.telegram.sendDocument(telegramId, { source: bufferPdf, filename: `xarid.pdf` }, { caption: this.buildSellingCaption(selling) })
+		const clientId = selling.client?.id as string | undefined
+		if (clientId) {
+			await this.chatRecorder
+				.save({
+					clientId,
+					direction: 'system',
+					kind: 'document',
+					text: this.buildSellingCaption(selling),
+					telegramMessageId: sent.message_id,
+					sellingId: selling.id,
+					file: { buffer: bufferPdf, fileName: 'xarid.pdf', mimeType: 'application/pdf' },
+				})
+				.catch((error) => console.log('chat pdf error:', error))
+		}
 	}
 
 	async sendSellingToChannel(selling: BotSellingData) {

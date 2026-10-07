@@ -108,6 +108,8 @@ async function main() {
 						PageEnum.supplierpayment,
 						PageEnum.stuff,
 						PageEnum.stuffpayment,
+						PageEnum.chat,
+						PageEnum.reminder,
 					],
 					actions: { connect: actionIds },
 				},

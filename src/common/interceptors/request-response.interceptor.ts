@@ -8,6 +8,10 @@ export class RequestResponseInterceptor implements NestInterceptor {
 	private readonly logger = new Logger(RequestResponseInterceptor.name)
 
 	intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+		if (context.getType() !== 'http') {
+			return next.handle()
+		}
+
 		const request = context.switchToHttp().getRequest()
 
 		const requestInfo: any = { ip: request.ip, url: request.url, method: request.method, startDate: new Date().toISOString() }

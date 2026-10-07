@@ -1,12 +1,14 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import type { Request, Response } from 'express'
+import { IoAdapter } from '@nestjs/platform-socket.io'
 import { AppModule } from '../src/app.module'
 import { AllExceptionFilter, AuthGuard, DecimalToNumberInterceptor, RequestQueryTimezoneInterceptor, RequestResponseInterceptor, TimezoneInterceptor } from '../src/common'
 
 export async function createE2eApp(): Promise<INestApplication> {
 	const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
 	const app = moduleRef.createNestApplication()
+	app.useWebSocketAdapter(new IoAdapter(app))
 
 	const http = app.getHttpAdapter().getInstance()
 	http.get('/health', (_req: Request, res: Response) => res.status(200).send('alive'))

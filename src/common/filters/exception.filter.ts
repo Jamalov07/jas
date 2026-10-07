@@ -6,6 +6,10 @@ import { ERROR_MSG } from '../constants'
 @Catch()
 export class AllExceptionFilter implements ExceptionFilter {
 	catch(exception: any, host: ArgumentsHost) {
+		if (host.getType() !== 'http') {
+			return
+		}
+
 		const response = host.switchToHttp().getResponse<Response>()
 
 		console.log(exception)

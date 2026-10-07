@@ -20,7 +20,7 @@ export class AuthGuard implements CanActivate {
 	) {}
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
-		if (context['contextType'] === 'telegraf') {
+		if (context.getType() !== 'http' || context['contextType'] === 'telegraf') {
 			return true
 		}
 

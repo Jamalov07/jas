@@ -5,7 +5,7 @@ import { ProductController } from './product.controller'
 import { ProductService } from './product.service'
 import { ProductRepository } from './product.repository'
 import { MulterModule } from '@nestjs/platform-express'
-import multer from 'multer'
+import * as multer from 'multer'
 import { extname } from 'path'
 
 @Module({

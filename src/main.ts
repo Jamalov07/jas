@@ -2,6 +2,7 @@ import { NestFactory, repl } from '@nestjs/core'
 import { json, Request, Response } from 'express'
 import { INestApplication, ValidationPipe } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { IoAdapter } from '@nestjs/platform-socket.io'
 import { appConfig } from '@config'
 import { AppModule } from './app.module'
 import { RequestResponseInterceptor, AuthGuard, AllExceptionFilter, DecimalToNumberInterceptor, TimezoneInterceptor, RequestQueryTimezoneInterceptor } from '@common'
@@ -9,6 +10,7 @@ import compression from 'compression'
 
 async function bootstrap() {
 	const app = await NestFactory.create<INestApplication>(AppModule, { forceCloseConnections: true })
+	app.useWebSocketAdapter(new IoAdapter(app))
 
 	// await repl(AppModule)
 
