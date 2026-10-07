@@ -1187,10 +1187,18 @@ export class ExcelService {
 	// ─── Product Download ──────────────────────────────────────────────────────
 
 	async productDownloadMany(res: Response, query: ProductFindManyRequest) {
-		const nameFilter = query.search ? { OR: [{ name: { contains: query.search, mode: 'insensitive' as const } }] } : {}
+		const searchWords = query.search?.split(/\s+/).filter(Boolean) ?? []
+		const nameFilter =
+			searchWords.length === 0
+				? {}
+				: {
+						[searchWords.length > 1 ? 'AND' : 'OR']: searchWords.map((word) => ({
+							name: { contains: word, mode: 'insensitive' as const },
+						})),
+					}
 
 		const products = await this.prisma.productModel.findMany({
-			where: { ...nameFilter },
+			where: { ...nameFilter, deletedAt: null },
 			select: {
 				id: true,
 				name: true,

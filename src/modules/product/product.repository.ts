@@ -99,7 +99,7 @@ export class ProductRepository {
 		}
 
 		const products = await this.prisma.productModel.findMany({
-			where: { ...this.buildSearchFilter(query.search) },
+			where: this.buildFindManyWhereInput(query),
 			select: {
 				id: true,
 				count: true,
@@ -133,7 +133,7 @@ export class ProductRepository {
 
 	async findOne(query: ProductFindOneRequest) {
 		const product = await this.prisma.productModel.findFirst({
-			where: { id: query.id },
+			where: { id: query.id, deletedAt: null },
 			select: {
 				id: true,
 				count: true,
@@ -162,7 +162,7 @@ export class ProductRepository {
 
 	async countFindMany(query: ProductFindManyRequest) {
 		const count = await this.prisma.productModel.count({
-			where: { ...this.buildSearchFilter(query.search) },
+			where: this.buildFindManyWhereInput(query),
 		})
 
 		return count
@@ -171,7 +171,7 @@ export class ProductRepository {
 	/** `findMany` filteri bilan mos keladigan barcha mahsulotlar uchun calcTotal (yengil select) */
 	async findManyForInventoryCalc(query: ProductFindManyRequest) {
 		return this.prisma.productModel.findMany({
-			where: { ...this.buildSearchFilter(query.search) },
+			where: this.buildFindManyWhereInput(query),
 			select: {
 				count: true,
 				prices: { orderBy: [{ createdAt: 'desc' as const }], select: { type: true, totalPrice: true, currencyId: true } },
@@ -311,7 +311,7 @@ export class ProductRepository {
 		}
 
 		const products = await this.prisma.productModel.findMany({
-			where: { id: { in: query.ids }, name: query.name },
+			where: { id: { in: query.ids }, name: query.name, deletedAt: null },
 			include: { prices: { select: PRICE_SELECT } },
 			orderBy: [{ name: 'asc' }],
 			...paginationOptions,
@@ -322,7 +322,7 @@ export class ProductRepository {
 
 	async getOne(query: ProductGetOneRequest) {
 		const product = await this.prisma.productModel.findFirst({
-			where: { id: query.id, name: query.name },
+			where: { id: query.id, name: query.name, deletedAt: null },
 		})
 
 		return product
@@ -330,7 +330,7 @@ export class ProductRepository {
 
 	async getOneWithPrices(query: ProductGetOneRequest) {
 		const product = await this.prisma.productModel.findFirst({
-			where: { id: query.id, name: query.name },
+			where: { id: query.id, name: query.name, deletedAt: null },
 			include: { prices: true },
 		})
 
@@ -339,7 +339,7 @@ export class ProductRepository {
 
 	async countGetMany(query: ProductGetManyRequest) {
 		const count = await this.prisma.productModel.count({
-			where: { id: { in: query.ids }, name: query.name },
+			where: { id: { in: query.ids }, name: query.name, deletedAt: null },
 		})
 
 		return count
@@ -446,8 +446,9 @@ export class ProductRepository {
 	}
 
 	async deleteOne(query: ProductDeleteOneRequest) {
-		const product = await this.prisma.productModel.delete({
+		const product = await this.prisma.productModel.update({
 			where: { id: query.id },
+			data: { deletedAt: new Date() },
 		})
 
 		return product
