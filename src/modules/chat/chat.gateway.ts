@@ -41,7 +41,9 @@ export class ChatGateway implements OnGatewayInit {
 	}
 
 	emitMessage(clientId: string, message: ChatMessageView) {
-		this.server?.to(this.room(clientId)).emit('message', message)
+		if (!this.server) return
+		this.server.to(this.room(clientId)).emit('message', message)
+		this.server.emit('inbox', message)
 	}
 
 	emitDeleted(clientId: string, id: string) {

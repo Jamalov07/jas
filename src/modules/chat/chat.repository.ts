@@ -37,7 +37,7 @@ export class ChatRepository {
 		return this.prisma.chatMessageModel.update({ where: { id }, data: { deletedAt: new Date() } })
 	}
 
-	async inbox(limit = 40) {
+	async inbox() {
 		const rows = await this.prisma.chatMessageModel.findMany({
 			where: { deletedAt: null, client: { deletedAt: null } },
 			distinct: ['clientId'],
@@ -58,7 +58,7 @@ export class ChatRepository {
 				},
 			},
 		})
-		const sorted = [...rows].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime()).slice(0, limit)
+		const sorted = [...rows].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
 		const ids = sorted.map((row) => row.client.id)
 		const counts = ids.length
 			? await this.prisma.chatMessageModel.groupBy({
