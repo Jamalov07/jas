@@ -19,6 +19,13 @@ import {
 export class ChatController {
 	constructor(private readonly chatService: ChatService) {}
 
+	@Get('inbox')
+	@AuthOptions(true, true)
+	@ApiOperation({ summary: 'latest client conversations' })
+	inbox() {
+		return this.chatService.inbox()
+	}
+
 	@Get('many')
 	@AuthOptions(true, true)
 	@ApiOkResponse({ type: ChatFindManyResponseDto })
