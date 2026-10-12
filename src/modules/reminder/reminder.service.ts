@@ -46,6 +46,7 @@ export class ReminderService {
 		const reminder = await this.repository.create({
 			clientId: body.clientId,
 			startDate: toUtcDateOnly(body.startDate),
+			sendHour: body.sendHour ?? 8,
 			description: body.description.trim(),
 		})
 		return createResponse({ data: reminder, success: { messages: ['create one success'] } })
@@ -56,6 +57,7 @@ export class ReminderService {
 		const reminder = await this.repository.update(id, {
 			...(body.description !== undefined ? { description: body.description.trim() } : {}),
 			...(body.startDate !== undefined ? { startDate: toUtcDateOnly(body.startDate) } : {}),
+			...(body.sendHour !== undefined ? { sendHour: body.sendHour } : {}),
 		})
 		return createResponse({ data: reminder, success: { messages: ['update one success'] } })
 	}
@@ -68,7 +70,8 @@ export class ReminderService {
 
 	async dispatchDue(now = new Date()): Promise<ReminderDispatchResult> {
 		const today = tashkentToday(now)
-		const due = await this.repository.findDue(today)
+		const hour = tashkentHour(now)
+		const due = await this.repository.findDue(today, hour)
 		const lines: string[] = []
 		let sentToClients = 0
 		let skippedNoTelegram = 0
@@ -105,6 +108,36 @@ export class ReminderService {
 		}
 
 		const digest = lines.length ? `Eslatmalar (${moment.tz(now, TZ).format('DD.MM.YYYY')})\n\n${lines.join('\n')}` : ''
+
+		return {
+			processed: sentToClients + skippedNoTelegram,
+			sentToClients,
+			skippedNoTelegram,
+			waitingForBot,
+			channelDelivered: false,
+			digest,
+		}
+	}
+
+	async dispatchChannel(now = new Date()): Promise<ReminderDispatchResult> {
+		const today = tashkentToday(now)
+		const due = await this.repository.findDueForChannel(today)
+		const lines: string[] = []
+		let skippedNoTelegram = 0
+		let lineNo = 0
+
+		for (const reminder of due) {
+			const telegram = reminder.client.telegram
+			const canSend = !!telegram?.id && telegram.isActive !== false
+			if (!canSend) {
+				skippedNoTelegram += 1
+				lines.push(`${++lineNo}. ${this.personLine(reminder.client)}: ${reminder.description} — telegram yo'q`)
+				continue
+			}
+			lines.push(`${++lineNo}. ${this.personLine(reminder.client)}: ${reminder.description}`)
+		}
+
+		const digest = lines.length ? `Eslatmalar (${moment.tz(now, TZ).format('DD.MM.YYYY')})\n\n${lines.join('\n')}` : ''
 		let channelDelivered = false
 		if (digest) {
 			const parts = splitTelegramText(digest, TELEGRAM_LIMIT)
@@ -113,10 +146,10 @@ export class ReminderService {
 		}
 
 		return {
-			processed: sentToClients + skippedNoTelegram,
-			sentToClients,
+			processed: due.length,
+			sentToClients: 0,
 			skippedNoTelegram,
-			waitingForBot,
+			waitingForBot: 0,
 			channelDelivered,
 			digest,
 		}
@@ -135,6 +168,10 @@ export class ReminderService {
 
 export function tashkentToday(now = new Date()): Date {
 	return new Date(`${moment.tz(now, TZ).format('YYYY-MM-DD')}T00:00:00.000Z`)
+}
+
+export function tashkentHour(now = new Date()): number {
+	return moment.tz(now, TZ).hour()
 }
 
 export function toUtcDateOnly(value: string | Date): Date {

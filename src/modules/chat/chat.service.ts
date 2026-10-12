@@ -30,6 +30,12 @@ export class ChatService {
 		return createResponse({ data, success: { messages: ['get many success'] } })
 	}
 
+	async markRead(clientId: string) {
+		await this.requireClient(clientId)
+		await this.repository.markRead(clientId, new Date())
+		return createResponse({ data: { clientId }, success: { messages: ['update one success'] } })
+	}
+
 	async createText(staffId: string, body: ChatCreateTextRequestDto) {
 		const client = await this.requireClient(body.clientId)
 		const telegramMessageId = await this.deliverText(client.telegram, body.text)

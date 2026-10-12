@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, IntersectionType } from '@nestjs/swagger'
-import { IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator'
+import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator'
 import { GlobalModifyResponseDto, GlobalResponseDto, PaginationRequestDto, PaginationResponseDto } from '@common'
 
 export class ReminderClientDto {
@@ -25,6 +25,9 @@ export class ReminderDataDto {
 
 	@ApiProperty()
 	startDate: Date
+
+	@ApiProperty({ example: 8, minimum: 0, maximum: 23 })
+	sendHour: number
 
 	@ApiProperty()
 	description: string
@@ -64,6 +67,13 @@ export class ReminderCreateOneRequestDto {
 	@IsNotEmpty()
 	startDate: string
 
+	@ApiPropertyOptional({ example: 8, minimum: 0, maximum: 23, default: 8 })
+	@IsOptional()
+	@IsInt()
+	@Min(0)
+	@Max(23)
+	sendHour?: number
+
 	@ApiProperty()
 	@IsString()
 	@IsNotEmpty()
@@ -76,6 +86,13 @@ export class ReminderUpdateOneRequestDto {
 	@IsOptional()
 	@IsDateString()
 	startDate?: string
+
+	@ApiPropertyOptional({ example: 8, minimum: 0, maximum: 23 })
+	@IsOptional()
+	@IsInt()
+	@Min(0)
+	@Max(23)
+	sendHour?: number
 
 	@ApiPropertyOptional()
 	@IsOptional()

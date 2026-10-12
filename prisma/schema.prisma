@@ -205,6 +205,7 @@ model ClientModel {
   fullname    String  @map("fullname")    @db.VarChar()
   phone       String? @map("phone")       @db.VarChar()      @unique
   description String? @map("description") @db.VarChar()      @default("")
+  chatReadAt  DateTime? @map("chat_read_at") @db.Timestamptz
 
   telegram  BotUserModel?
 
@@ -1098,6 +1099,7 @@ model ReminderModel {
   id          String    @map("id")           @db.Uuid      @default(dbgenerated("GEN_RANDOM_UUID()"))
   clientId    String    @map("client_id")    @db.Uuid
   startDate   DateTime  @map("start_date")   @db.Date
+  sendHour    Int       @map("send_hour")    @default(8)
   description String    @map("description")  @db.VarChar()
   lastSentOn  DateTime? @map("last_sent_on") @db.Date
 

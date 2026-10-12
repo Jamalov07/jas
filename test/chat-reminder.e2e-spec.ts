@@ -188,6 +188,7 @@ describe('Chat and reminders', () => {
 
 	it('sends due reminders once, skips clients without telegram, and stops after delete', async () => {
 		const reminders = app.get(ReminderService)
+		const atEight = new Date('2026-06-01T03:00:00.000Z')
 		const created = await request(server).post('/reminder/one').set(auth(token)).send({
 			clientId,
 			startDate: '2020-01-01',
@@ -196,7 +197,7 @@ describe('Chat and reminders', () => {
 		expectGlobalSuccessJsonCreated(created)
 		const reminderId = created.body.data.id as string
 
-		const first = await reminders.dispatchDue()
+		const first = await reminders.dispatchDue(atEight)
 		expect(first.waitingForBot).toBeGreaterThanOrEqual(1)
 		expect(first.digest).not.toContain('qarz eslatmasi')
 		const still = await request(server).get('/reminder/one').query({ id: reminderId }).set(auth(token))
@@ -210,7 +211,7 @@ describe('Chat and reminders', () => {
 		expectGlobalSuccessJsonCreated(plain)
 		const plainId = plain.body.data.id as string
 
-		const second = await reminders.dispatchDue()
+		const second = await reminders.dispatchDue(atEight)
 		expect(second.skippedNoTelegram).toBeGreaterThanOrEqual(1)
 		expect(second.digest).toContain("telegram yo'q")
 		expect(second.digest).toContain('telegram yoq eslatma')
@@ -219,7 +220,7 @@ describe('Chat and reminders', () => {
 		const sent = await request(server).get('/reminder/one').query({ id: plainId }).set(auth(token))
 		expect(sent.body.data.lastSentOn).toBeTruthy()
 
-		const third = await reminders.dispatchDue()
+		const third = await reminders.dispatchDue(atEight)
 		expect(third.digest.includes('telegram yoq eslatma')).toBe(false)
 
 		const future = await request(server).post('/reminder/one').set(auth(token)).send({
@@ -233,7 +234,19 @@ describe('Chat and reminders', () => {
 		expectGlobalSuccessJsonCreated(patched)
 		expect(patched.body.data.description).toBe('kechiktirilgan eslatma')
 
-		const beforeStop = await reminders.dispatchDue()
+		const beforeStop = await reminders.dispatchDue(atEight)
+		const evening = await request(server).post('/reminder/one').set(auth(token)).send({
+			clientId: plainClientId,
+			startDate: '2020-01-01',
+			description: 'kechki eslatma',
+			sendHour: 15,
+		})
+		expectGlobalSuccessJsonCreated(evening)
+		expect(evening.body.data.sendHour).toBe(15)
+		const skippedAtEight = await reminders.dispatchDue(atEight)
+		expect(skippedAtEight.digest.includes('kechki eslatma')).toBe(false)
+		const atFifteen = await reminders.dispatchDue(new Date('2026-06-01T10:00:00.000Z'))
+		expect(atFifteen.digest).toContain('kechki eslatma')
 		expect(beforeStop.digest.includes('kechiktirilgan eslatma')).toBe(false)
 
 		const removed = await request(server).delete('/reminder/one').query({ id: plainId }).set(auth(token))

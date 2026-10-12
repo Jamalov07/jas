@@ -6,6 +6,7 @@ const reminderSelect = {
 	id: true,
 	clientId: true,
 	startDate: true,
+	sendHour: true,
 	description: true,
 	lastSentOn: true,
 	createdAt: true,
@@ -35,11 +36,11 @@ export class ReminderRepository {
 		return this.prisma.reminderModel.findFirst({ where: { id, deletedAt: null }, select: reminderSelect })
 	}
 
-	async create(data: { clientId: string; startDate: Date; description: string }) {
+	async create(data: { clientId: string; startDate: Date; sendHour: number; description: string }) {
 		return this.prisma.reminderModel.create({ data, select: reminderSelect })
 	}
 
-	async update(id: string, data: { startDate?: Date; description?: string }) {
+	async update(id: string, data: { startDate?: Date; sendHour?: number; description?: string }) {
 		return this.prisma.reminderModel.update({ where: { id }, data, select: reminderSelect })
 	}
 
@@ -47,12 +48,27 @@ export class ReminderRepository {
 		return this.prisma.reminderModel.update({ where: { id }, data: { deletedAt: new Date() } })
 	}
 
-	findDue(today: Date) {
+	findDue(today: Date, hour: number) {
 		return this.prisma.reminderModel.findMany({
 			where: {
 				deletedAt: null,
 				startDate: { lte: today },
+				sendHour: hour,
 				OR: [{ lastSentOn: null }, { lastSentOn: { lt: today } }],
+			},
+			select: {
+				id: true,
+				description: true,
+				client: { select: { id: true, fullname: true, phone: true, telegram: { select: { id: true, isActive: true } } } },
+			},
+		})
+	}
+
+	findDueForChannel(today: Date) {
+		return this.prisma.reminderModel.findMany({
+			where: {
+				deletedAt: null,
+				startDate: { lte: today },
 			},
 			select: {
 				id: true,

@@ -26,6 +26,13 @@ export class ChatController {
 		return this.chatService.inbox()
 	}
 
+	@Post('read')
+	@AuthOptions(true, true)
+	@ApiOperation({ summary: 'mark a client conversation as read' })
+	markRead(@Body() body: ChatFindManyRequestDto) {
+		return this.chatService.markRead(body.clientId)
+	}
+
 	@Get('many')
 	@AuthOptions(true, true)
 	@ApiOkResponse({ type: ChatFindManyResponseDto })
